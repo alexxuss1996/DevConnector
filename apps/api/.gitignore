@@ -64,4 +64,4 @@ test/types/index.js
 # compiled app
 dist
 
-!src/routes/*
+!src/modules/routes/profile/**/*.ts

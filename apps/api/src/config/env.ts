@@ -1,4 +1,4 @@
-import Type from "@sinclair/typebox";
+import Type from "typebox";
 
 export const EnvSchema = Type.Object({
   JWT_SECRET: Type.String(),

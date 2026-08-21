@@ -1,9 +1,8 @@
 import mongoose, { Schema } from "mongoose";
 
 export interface IUser {
-  username?: string;
+  name?: string;
   email: string;
-  isOnboarded: boolean;
   passwordHash?: string;
   googleId?: string;
   avatar?: string;
@@ -11,7 +10,7 @@ export interface IUser {
 
 const userSchema = new Schema<IUser>(
   {
-    username: { type: String, sparse: true, unique: true, trim: true },
+    name: { type: String, sparse: true, unique: true, trim: true },
     email: {
       type: String,
       required: true,
@@ -19,7 +18,6 @@ const userSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
-    isOnboarded: { type: Boolean, default: false },
     passwordHash: { type: String, select: false },
     googleId: { type: String, sparse: true, unique: true, select: false },
     avatar: { type: String },

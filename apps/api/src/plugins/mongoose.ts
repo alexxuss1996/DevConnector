@@ -13,18 +13,17 @@ export default fp(async (fastify) => {
   if (!uri) {
     throw new Error("MONGODB_URI is not set");
   }
-  try {
-    await mongoose.connect(uri);
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
+  fastify.log.info("Connecting to MongoDB...");
+
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 5000,
+  });
 
   fastify.log.info("Connected to MongoDB Atlas");
 
-  fastify.addHook("onClose", async (fastify) => {
+  fastify.decorate("db", mongoose.connection);
+
+  fastify.addHook("onClose", async () => {
     await mongoose.disconnect();
   });
-
-  fastify.decorate("db", mongoose.connection);
 });

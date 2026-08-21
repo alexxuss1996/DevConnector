@@ -1,6 +1,11 @@
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
 import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
+import { errorHandler } from "#helpers/error-handler";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface AppOptions
   extends FastifyServerOptions, Partial<AutoloadPluginOptions> {}
@@ -33,6 +38,8 @@ const app: FastifyPluginAsync<AppOptions> = async (
     dir: join(__dirname, "routes"),
     options: opts,
   });
+  // Custom error handler
+  void fastify.setErrorHandler(errorHandler);
 };
 
 export default app;

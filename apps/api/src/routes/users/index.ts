@@ -1,7 +1,10 @@
-import { type FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
-const users: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-  fastify.get("/", async function (request, reply) {
+const users: FastifyPluginAsyncTypebox = async (
+  fastify,
+  opts,
+): Promise<void> => {
+  fastify.get("/users", async function (request, reply) {
     return "Users";
   });
 };
