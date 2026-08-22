@@ -1,5 +1,6 @@
 import User from "#modules/users/user.model";
 import Session from "#modules/auth/session.model";
+import AppError from "#helpers/app-error";
 import argon2 from "argon2";
 import gravatarUrl from "gravatar-url";
 import { FastifyInstance } from "fastify";
@@ -35,13 +36,21 @@ class AuthService {
     });
 
     if (!response.ok) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(
+        401,
+        "GOOGLE_AUTH_FAILED",
+        "Invalid Google access token",
+      );
     }
 
     const user = (await response.json()) as GoogleUser;
 
     if (!user.email_verified) {
-      throw new Error("Google Email is not verified");
+      throw new AppError(
+        401,
+        "GOOGLE_AUTH_FAILED",
+        "Google Email is not verified",
+      );
     }
 
     if (!user.sub || !user.email) {
@@ -101,7 +110,7 @@ class AuthService {
     );
 
     if (!session) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
   }
 
@@ -115,13 +124,13 @@ class AuthService {
     );
 
     if (!user) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     const isPasswordCorrect = await argon2.verify(user.passwordHash!, password);
 
     if (!isPasswordCorrect) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     const { accessToken, refreshToken } = await this.createSession(
@@ -148,7 +157,7 @@ class AuthService {
     let existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(400, "REGISTRATION_FAILED", "Registration failed");
     }
 
     const passwordHash = await argon2.hash(password);
@@ -199,7 +208,11 @@ class AuthService {
 
       if (user) {
         if (user.googleId && user.googleId !== googleUser.sub) {
-          throw new Error("Google account is already linked");
+          throw new AppError(
+            409,
+            "GOOGLE_ACCOUNT_CONFLICT",
+            "Google account is already linked",
+          );
         }
         user.googleId = googleUser.sub;
         user.name ??= googleUser.name;
@@ -247,11 +260,11 @@ class AuthService {
         sessionId: string;
       }>(token);
     } catch {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     if (payload.type !== "refresh") {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     const session = await Session.findById(payload.sessionId).select(
@@ -259,30 +272,30 @@ class AuthService {
     );
 
     if (!session) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
     if (payload.sub !== session.userId.toString()) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     if (session.revokedAt) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     if (session.expiresAt <= new Date()) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     const isValid = await argon2.verify(session.refreshTokenHash!, token);
 
     if (!isValid) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     const user = await User.findById(session.userId);
 
     if (!user) {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     const refreshToken = fastify.jwt.sign(
@@ -335,11 +348,11 @@ class AuthService {
         sessionId: string;
       }>(refreshToken);
     } catch {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     if (payload.type !== "refresh") {
-      throw new Error("Invalid Credentials");
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
     await this.revokeSession(payload.sessionId);
