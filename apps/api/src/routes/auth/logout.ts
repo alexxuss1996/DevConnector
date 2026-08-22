@@ -9,9 +9,7 @@ const logout: FastifyPluginAsyncTypebox = async (
   fastify.post("/logout", async function (request, reply) {
     const token = request.cookies.refresh_token;
     if (token) {
-      try {
-        await authService.logout(fastify, token);
-      } catch {}
+      await authService.logout(fastify, token);
     }
 
     return clearAuthCookies(reply).status(204).send();

@@ -201,31 +201,32 @@ class AuthService {
 
     const email = googleUser.email.toLowerCase().trim();
 
-    let user = await User.findOne({ googleId: googleUser.sub });
+    let user = await User.findOne({
+      $or: [{ googleId: googleUser.sub }, { email }],
+    });
 
     if (!user) {
-      user = await User.findOne({ email });
+      user = await User.create({
+        email,
+        googleId: googleUser.sub,
+        name: googleUser.name,
+        avatar: googleUser.picture,
+      });
+    } else {
+      if (user.googleId && user.googleId !== googleUser.sub) {
+        throw new AppError(
+          409,
+          "GOOGLE_ACCOUNT_CONFLICT",
+          "Google account is already linked",
+        );
+      }
 
-      if (user) {
-        if (user.googleId && user.googleId !== googleUser.sub) {
-          throw new AppError(
-            409,
-            "GOOGLE_ACCOUNT_CONFLICT",
-            "Google account is already linked",
-          );
-        }
+      if (!user.googleId) {
         user.googleId = googleUser.sub;
         user.name ??= googleUser.name;
         user.avatar ??= googleUser.picture;
 
         await user.save();
-      } else {
-        user = await User.create({
-          email,
-          googleId: googleUser.sub,
-          name: googleUser.name,
-          avatar: googleUser.picture,
-        });
       }
     }
 

@@ -2,6 +2,7 @@ import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { RegisterUserSchema } from "#modules/auth/auth.schemas";
 import { authService } from "#modules/auth/auth.service";
 import { setAuthCookies } from "#helpers/auth.cookies";
+import { trimEmail } from "#helpers/auth";
 
 const register: FastifyPluginAsyncTypebox = async (
   fastify,
@@ -10,7 +11,7 @@ const register: FastifyPluginAsyncTypebox = async (
   fastify.post(
     "/register",
 
-    { schema: { body: RegisterUserSchema } },
+    { preValidation: [trimEmail], schema: { body: RegisterUserSchema } },
     async function (request, reply) {
       const result = await authService.register(fastify, request.body);
       return setAuthCookies(reply, result.accessToken, result.refreshToken)

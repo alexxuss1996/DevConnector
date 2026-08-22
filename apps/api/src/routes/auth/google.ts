@@ -1,5 +1,7 @@
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { authService } from "#modules/auth/auth.service";
+import AppError from "#helpers/app-error";
+import { setAuthCookies } from "#helpers/auth.cookies";
 
 const googleCallback: FastifyPluginAsyncTypebox = async (fastify) => {
   fastify.get("/google/callback", async (request, reply) => {
@@ -14,27 +16,21 @@ const googleCallback: FastifyPluginAsyncTypebox = async (fastify) => {
         token.access_token,
       );
 
-      reply
-        .setCookie("access_token", result.accessToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          path: "/",
-        })
-        .setCookie("refresh_token", result.refreshToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          path: "/auth",
-        });
-
-      return reply.redirect("http://localhost:3000");
+      return setAuthCookies(
+        reply,
+        result.accessToken,
+        result.refreshToken,
+      ).redirect("http://localhost:3000");
     } catch (err) {
       fastify.log.error(err);
 
-      return reply.status(401).send({
-        message: "Google authentication failed",
-      });
+      if (err instanceof AppError && err.statusCode === 401) {
+        return reply.status(401).send({
+          message: "Google authentication failed",
+        });
+      }
+
+      throw err;
     }
   });
 };

@@ -43,9 +43,13 @@ describe("AuthService.register", () => {
       }),
     );
     // session document constructed via the service should save without DB
-    const sessionSave = stubMethod(Session.prototype, "save", async function (this: any) {
-      return this;
-    });
+    const sessionSave = stubMethod(
+      Session.prototype,
+      "save",
+      async function (this: any) {
+        return this;
+      },
+    );
 
     const result = await authService.register(app, {
       name: "Jane Doe",
@@ -57,10 +61,20 @@ describe("AuthService.register", () => {
     assert.equal(sessionSave.mock.callCount(), 1);
     assert.equal(result.user.email, "jane.doe@example.com");
     assert.equal(result.user.name, "Jane Doe");
-    assert.equal(result.user.avatar, gravatarUrl("jane.doe@example.com", { size: 200, rating: "pg", default: "retro" }));
+    assert.equal(
+      result.user.avatar,
+      gravatarUrl("jane.doe@example.com", {
+        size: 200,
+        rating: "pg",
+        default: "retro",
+      }),
+    );
     assert.equal(typeof result.accessToken, "string");
     assert.equal(typeof result.refreshToken, "string");
-    const access = app.jwt.verify(result.accessToken) as { sub: string; type: string };
+    const access = app.jwt.verify(result.accessToken) as {
+      sub: string;
+      type: string;
+    };
     assert.equal(access.type, "access");
     const refresh = app.jwt.verify(result.refreshToken) as { type: string };
     assert.equal(refresh.type, "refresh");
@@ -113,7 +127,11 @@ describe("AuthService.login", () => {
   test("throws when user is not found", async () => {
     stubMethod(User, "findOne", () => mkQuery(null));
     await assert.rejects(
-      () => authService.login(app, { email: "nope@example.com", password: "password123" }),
+      () =>
+        authService.login(app, {
+          email: "nope@example.com",
+          password: "password123",
+        }),
       /Invalid Credentials/,
     );
   });
@@ -125,7 +143,11 @@ describe("AuthService.login", () => {
     );
 
     await assert.rejects(
-      () => authService.login(app, { email: "jane@example.com", password: "wrong-password" }),
+      () =>
+        authService.login(app, {
+          email: "jane@example.com",
+          password: "wrong-password",
+        }),
       /Invalid Credentials/,
     );
   });
@@ -138,7 +160,10 @@ describe("AuthService.login", () => {
       return this;
     });
 
-    await authService.login(app, { email: "  JANE@Example.COM  ", password: "password123" });
+    await authService.login(app, {
+      email: "  JANE@Example.COM  ",
+      password: "password123",
+    });
 
     const query = findOne.mock.calls[0]?.arguments[0];
     assert.deepEqual(query, { email: "jane@example.com" });
@@ -146,11 +171,17 @@ describe("AuthService.login", () => {
 });
 
 describe("AuthService.refresh", () => {
-  async function buildSessionAndToken(sessionOverrides: Record<string, unknown> = {}) {
+  async function buildSessionAndToken(
+    sessionOverrides: Record<string, unknown> = {},
+  ) {
     const userId = newId();
     const sessionId = newId();
     const refreshToken = app.jwt.sign(
-      { sub: userId.toString(), type: "refresh", sessionId: sessionId.toString() },
+      {
+        sub: userId.toString(),
+        type: "refresh",
+        sessionId: sessionId.toString(),
+      },
       { expiresIn: "30d" },
     );
     const refreshTokenHash = await argon2.hash(refreshToken);
@@ -166,7 +197,9 @@ describe("AuthService.refresh", () => {
   test("rotates tokens on a valid refresh", async () => {
     const { refreshToken, session, userId } = await buildSessionAndToken();
     const findById = stubMethod(Session, "findById", () => mkQuery(session));
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, email: "jane@example.com", name: "Jane" })));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, email: "jane@example.com", name: "Jane" })),
+    );
 
     const result = await authService.refresh(app, refreshToken);
 
@@ -176,13 +209,55 @@ describe("AuthService.refresh", () => {
     assert.equal(typeof result.refreshToken, "string");
     const access = app.jwt.verify(result.accessToken) as { type: string };
     assert.equal(access.type, "access");
-    const rotated = app.jwt.verify(result.refreshToken) as { type: string; sessionId: string };
+    const rotated = app.jwt.verify(result.refreshToken) as {
+      type: string;
+      sessionId: string;
+    };
     assert.equal(rotated.type, "refresh");
     assert.equal(rotated.sessionId, session._id.toString());
   });
 
+  test("replaces the stored refresh token hash during rotation", async () => {
+    const { refreshToken, session, userId } = await buildSessionAndToken();
+
+    const oldHash = session.refreshTokenHash;
+
+    stubMethod(Session, "findById", () => mkQuery(session));
+
+    stubMethod(User, "findById", () =>
+      mkQuery(
+        mkUser({
+          _id: userId,
+          email: "jane@example.com",
+          name: "Jane",
+        }),
+      ),
+    );
+
+    stubMethod(Session.prototype, "save", async function (this: any) {
+      return this;
+    });
+
+    const result = await authService.refresh(app, refreshToken);
+
+    assert.notEqual(session.refreshTokenHash, oldHash);
+
+    assert.equal(
+      await argon2.verify(session.refreshTokenHash, result.refreshToken),
+      true,
+    );
+
+    assert.equal(
+      await argon2.verify(session.refreshTokenHash, refreshToken),
+      false,
+    );
+  });
+
   test("throws for an invalid (garbage) token", async () => {
-    await assert.rejects(() => authService.refresh(app, "garbage-token"), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, "garbage-token"),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the token is an access token instead of a refresh token", async () => {
@@ -190,14 +265,20 @@ describe("AuthService.refresh", () => {
       { sub: newId().toString(), type: "access" },
       { expiresIn: "15m" },
     );
-    await assert.rejects(() => authService.refresh(app, accessToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, accessToken),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the session no longer exists", async () => {
     const { refreshToken } = await buildSessionAndToken();
     stubMethod(Session, "findById", () => mkQuery(null));
 
-    await assert.rejects(() => authService.refresh(app, refreshToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, refreshToken),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the session userId does not match the token", async () => {
@@ -205,7 +286,10 @@ describe("AuthService.refresh", () => {
     session.userId = newId(); // different user
     stubMethod(Session, "findById", () => mkQuery(session));
 
-    await assert.rejects(() => authService.refresh(app, refreshToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, refreshToken),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the session has been revoked", async () => {
@@ -214,7 +298,10 @@ describe("AuthService.refresh", () => {
     });
     stubMethod(Session, "findById", () => mkQuery(session));
 
-    await assert.rejects(() => authService.refresh(app, refreshToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, refreshToken),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the session has expired", async () => {
@@ -223,15 +310,23 @@ describe("AuthService.refresh", () => {
     });
     stubMethod(Session, "findById", () => mkQuery(session));
 
-    await assert.rejects(() => authService.refresh(app, refreshToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, refreshToken),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the refresh token hash does not match", async () => {
     const { refreshToken, session } = await buildSessionAndToken();
-    session.refreshTokenHash = await argon2.hash("a-completely-different-token");
+    session.refreshTokenHash = await argon2.hash(
+      "a-completely-different-token",
+    );
     stubMethod(Session, "findById", () => mkQuery(session));
 
-    await assert.rejects(() => authService.refresh(app, refreshToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, refreshToken),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the user is gone", async () => {
@@ -239,7 +334,10 @@ describe("AuthService.refresh", () => {
     stubMethod(Session, "findById", () => mkQuery(session));
     stubMethod(User, "findById", () => mkQuery(null));
 
-    await assert.rejects(() => authService.refresh(app, refreshToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.refresh(app, refreshToken),
+      /Invalid Credentials/,
+    );
   });
 });
 
@@ -252,7 +350,9 @@ describe("AuthService.logout", () => {
       sessionId: sessionId.toString(),
     });
     const session = mkSessionDoc({ _id: sessionId, userId });
-    const revoke = stubMethod(Session, "findOneAndUpdate", () => mkQuery(session));
+    const revoke = stubMethod(Session, "findOneAndUpdate", () =>
+      mkQuery(session),
+    );
 
     await authService.logout(app, refreshToken);
 
@@ -263,7 +363,10 @@ describe("AuthService.logout", () => {
   });
 
   test("throws for an invalid (garbage) token", async () => {
-    await assert.rejects(() => authService.logout(app, "garbage-token"), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.logout(app, "garbage-token"),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the session cannot be found", async () => {
@@ -275,7 +378,10 @@ describe("AuthService.logout", () => {
     });
     stubMethod(Session, "findOneAndUpdate", () => mkQuery(null));
 
-    await assert.rejects(() => authService.logout(app, refreshToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.logout(app, refreshToken),
+      /Invalid Credentials/,
+    );
   });
 
   test("throws when the token is an access token", async () => {
@@ -283,7 +389,10 @@ describe("AuthService.logout", () => {
       { sub: newId().toString(), type: "access" },
       { expiresIn: "15m" },
     );
-    await assert.rejects(() => authService.logout(app, accessToken), /Invalid Credentials/);
+    await assert.rejects(
+      () => authService.logout(app, accessToken),
+      /Invalid Credentials/,
+    );
   });
 });
 
@@ -307,19 +416,30 @@ describe("AuthService.authenticateGoogle", () => {
     }));
     stubMethod(User, "findOne", () => mkQuery(null));
     const create = stubMethod(User, "create", (data: any) =>
-      mkUser({ name: data.name, email: data.email, googleId: data.googleId, avatar: data.avatar }),
+      mkUser({
+        name: data.name,
+        email: data.email,
+        googleId: data.googleId,
+        avatar: data.avatar,
+      }),
     );
     stubMethod(Session.prototype, "save", async function (this: any) {
       return this;
     });
 
-    const result = await authService.authenticateGoogle(app, "google-access-token");
+    const result = await authService.authenticateGoogle(
+      app,
+      "google-access-token",
+    );
 
     assert.equal(create.mock.callCount(), 1);
     assert.equal(result.user.email, "newuser@example.com");
     assert.equal(result.user.name, "New User");
     assert.equal(result.user.avatar, "https://example.com/pic.png");
-    const refresh = app.jwt.verify(result.refreshToken) as { sub: string; type: string };
+    const refresh = app.jwt.verify(result.refreshToken) as {
+      sub: string;
+      type: string;
+    };
     assert.equal(refresh.type, "refresh");
   });
 
@@ -349,7 +469,10 @@ describe("AuthService.authenticateGoogle", () => {
       return this;
     });
 
-    const result = await authService.authenticateGoogle(app, "google-access-token");
+    const result = await authService.authenticateGoogle(
+      app,
+      "google-access-token",
+    );
 
     assert.equal(existingUser.save.mock.callCount(), 1);
     assert.equal(existingUser.googleId, "google-sub-456");
@@ -361,7 +484,11 @@ describe("AuthService.authenticateGoogle", () => {
   test("throws when the Google email is not verified", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: true,
-      json: async () => ({ sub: "s", email: "u@example.com", email_verified: false }),
+      json: async () => ({
+        sub: "s",
+        email: "u@example.com",
+        email_verified: false,
+      }),
     }));
     await assert.rejects(
       () => authService.authenticateGoogle(app, "token"),
@@ -381,7 +508,10 @@ describe("AuthService.authenticateGoogle", () => {
   });
 
   test("throws when the Google access token is rejected", async () => {
-    stubMethod(globalThis, "fetch", async () => ({ ok: false, json: async () => ({}) }));
+    stubMethod(globalThis, "fetch", async () => ({
+      ok: false,
+      json: async () => ({}),
+    }));
     await assert.rejects(
       () => authService.authenticateGoogle(app, "bad-token"),
       (err: any) =>
