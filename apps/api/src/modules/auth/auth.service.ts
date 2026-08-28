@@ -269,7 +269,7 @@ class AuthService {
     }
 
     const session = await Session.findById(payload.sessionId).select(
-      "+refreshTokenHash",
+      "+userId +refreshTokenHash",
     );
 
     if (!session) {
