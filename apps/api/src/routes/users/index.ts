@@ -4,7 +4,7 @@ const users: FastifyPluginAsyncTypebox = async (
   fastify,
   opts,
 ): Promise<void> => {
-  fastify.get("/users", async function (request, reply) {
+  fastify.get("/", async function (request, reply) {
     return "Users";
   });
 };

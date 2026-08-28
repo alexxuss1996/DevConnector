@@ -37,6 +37,7 @@ const app: FastifyPluginAsync<AppOptions> = async (
   void fastify.register(AutoLoad, {
     dir: join(__dirname, "routes"),
     options: opts,
+    dirNameRoutePrefix: true,
   });
   // Custom error handler
   void fastify.setErrorHandler(errorHandler);

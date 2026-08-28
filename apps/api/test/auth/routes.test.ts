@@ -372,7 +372,7 @@ describe("GET /auth/google/callback", () => {
     });
 
     assert.equal(reply.statusCode, 302);
-    assert.equal(reply.headers.location, "http://localhost:3000");
+    assert.equal(reply.headers.location, process.env.FRONTEND_URL!);
     assert.deepEqual(setCookieNames(reply).sort(), [
       "access_token",
       "refresh_token",
@@ -644,11 +644,13 @@ describe("POST /auth/refresh — additional cases", () => {
     const validToken = signRefreshToken(app, {
       sub: userId.toString(),
       sessionId: sessionId.toString(),
+      jti: "token-1",
     });
 
     const otherToken = signRefreshToken(app, {
       sub: userId.toString(),
       sessionId: sessionId.toString(),
+      jti: "token-2",
     });
 
     const session = mkSessionDoc({

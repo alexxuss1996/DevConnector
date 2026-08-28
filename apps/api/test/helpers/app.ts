@@ -4,7 +4,6 @@ import cookie from "@fastify/cookie";
 import sensible from "@fastify/sensible";
 import type { OAuth2Namespace } from "@fastify/oauth2";
 import authPlugin from "#plugins/auth";
-import authIndex from "#routes/auth/index";
 import registerRoute from "#routes/auth/register";
 import loginRoute from "#routes/auth/login";
 import refreshRoute from "#routes/auth/refresh";
@@ -37,7 +36,6 @@ export async function buildApp({
       }),
     } as unknown as OAuth2Namespace);
 
-    app.register(authIndex, { prefix: AUTH_PREFIX });
     app.register(registerRoute, { prefix: AUTH_PREFIX });
     app.register(loginRoute, { prefix: AUTH_PREFIX });
     app.register(refreshRoute, { prefix: AUTH_PREFIX });
@@ -67,18 +65,16 @@ export function signAccessToken(
   app: FastifyInstance,
   payload: Partial<AuthPayload> & Record<string, unknown> = {},
 ): string {
-  return app.jwt.sign(
-    { type: "access", ...payload } as AuthPayload,
-    { expiresIn: "15m" },
-  );
+  return app.jwt.sign({ type: "access", ...payload } as AuthPayload, {
+    expiresIn: "15m",
+  });
 }
 
 export function signRefreshToken(
   app: FastifyInstance,
   payload: Partial<AuthPayload> & Record<string, unknown>,
 ): string {
-  return app.jwt.sign(
-    { type: "refresh", ...payload } as AuthPayload,
-    { expiresIn: "30d" },
-  );
+  return app.jwt.sign({ type: "refresh", ...payload } as AuthPayload, {
+    expiresIn: "30d",
+  });
 }

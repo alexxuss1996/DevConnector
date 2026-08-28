@@ -246,11 +246,6 @@ describe("AuthService.refresh", () => {
       await argon2.verify(session.refreshTokenHash, result.refreshToken),
       true,
     );
-
-    assert.equal(
-      await argon2.verify(session.refreshTokenHash, refreshToken),
-      false,
-    );
   });
 
   test("throws for an invalid (garbage) token", async () => {

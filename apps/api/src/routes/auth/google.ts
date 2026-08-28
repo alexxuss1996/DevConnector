@@ -20,7 +20,7 @@ const googleCallback: FastifyPluginAsyncTypebox = async (fastify) => {
         reply,
         result.accessToken,
         result.refreshToken,
-      ).redirect("http://localhost:3000");
+      ).redirect(process.env.FRONTEND_URL!);
     } catch (err) {
       fastify.log.error(err);
 
