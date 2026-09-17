@@ -1,8 +1,21 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "baseUrl": ".",
-    "noEmit": true
+    "baseUrl": "..",
+    "noEmit": true,
+    "rootDir": "../",
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "#helpers/*": ["src/helpers/*.ts"],
+      "#modules/*": ["src/modules/*.ts"],
+      "#routes/*": ["src/routes/*.ts"],
+      "#test/*": ["test/*.ts"],
+      "#types/*": ["src/types/*.ts"],
+      "#plugins/*": ["src/plugins/*.ts"],
+      "#config/*": ["src/config/*.ts"],
+      "#hooks/*": ["src/hooks/*.ts"]
+    }
   },
   "include": ["../src/**/*.ts", "**/*.ts"]
 }

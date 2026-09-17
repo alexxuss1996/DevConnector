@@ -53,7 +53,7 @@ profile-*
 *code-workspace
 
 # clinic
-profile*
+
 *clinic*
 *flamegraph*
 
@@ -63,3 +63,5 @@ test/types/index.js
 
 # compiled app
 dist
+
+!src/**/**/profile/**/*.ts

@@ -1,17 +1,33 @@
-import { join } from 'node:path'
-import AutoLoad, { AutoloadPluginOptions } from '@fastify/autoload'
-import { FastifyPluginAsync, FastifyServerOptions } from 'fastify'
+import "#config/env";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
+import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
+import { errorHandler } from "#helpers/error-handler";
+import AjvErrors from "ajv-errors";
+import addFormats from "ajv-formats";
 
-export interface AppOptions extends FastifyServerOptions, Partial<AutoloadPluginOptions> {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-}
+export interface AppOptions
+  extends FastifyServerOptions, Partial<AutoloadPluginOptions> {}
 // Pass --options via CLI arguments in command to enable these options.
 const options: AppOptions = {
-}
+  logger: true,
+  ajv: {
+    customOptions: {
+      coerceTypes: false,
+      allErrors: true,
+      strict: false,
+    },
+    plugins: [AjvErrors as any, addFormats as any],
+  },
+};
 
 const app: FastifyPluginAsync<AppOptions> = async (
   fastify,
-  opts
+  opts,
 ): Promise<void> => {
   // Place here your custom code!
 
@@ -22,18 +38,24 @@ const app: FastifyPluginAsync<AppOptions> = async (
   // through your application
   // eslint-disable-next-line no-void
   void fastify.register(AutoLoad, {
-    dir: join(__dirname, 'plugins'),
-    options: opts
-  })
+    dir: join(__dirname, "plugins"),
+    options: opts,
+  });
 
   // This loads all plugins defined in routes
   // define your routes in one of these
   // eslint-disable-next-line no-void
   void fastify.register(AutoLoad, {
-    dir: join(__dirname, 'routes'),
-    options: opts
-  })
-}
+    dir: join(__dirname, "routes"),
+    options: opts,
+    dirNameRoutePrefix: true,
+  });
+  // Custom error handler
+  void fastify.setErrorHandler(errorHandler);
+  fastify.ready(async () => {
+    console.log(fastify.printRoutes());
+  });
+};
 
-export default app
-export { app, options }
+export default app;
+export { app, options };
