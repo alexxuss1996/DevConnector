@@ -201,16 +201,13 @@ describe("GET /posts/:id — not found", () => {
   });
 
   test("returns 404 for non-ObjectId string (invalid id format)", async () => {
-    // service will query with string; stub simulates not found for invalid format
-    stubMethod(Post, "findById", () => mkQuery(null));
-
     const reply = await app.inject({
       method: "GET",
       url: `/posts/not-a-valid-objectid`,
     });
 
-    assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.equal(reply.statusCode, 400);
+    assert.equal(reply.json().code, "VALIDATION_ERROR");
   });
 });
 

@@ -530,7 +530,7 @@ describe("GET /posts/ — logic", () => {
 // ============================================================
 describe("DELETE /posts/ — authentication", () => {
   test("returns 401 without a token", async () => {
-    const reply = await app.inject({ method: "DELETE", url: "/posts/" });
+    const reply = await app.inject({ method: "DELETE", url: `/posts/${newId()}` });
     assert.equal(reply.statusCode, 401);
     assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
   });
@@ -538,7 +538,7 @@ describe("DELETE /posts/ — authentication", () => {
   test("returns 401 for an empty Bearer token", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${newId()}`,
       headers: { authorization: "Bearer " },
     });
     assert.equal(reply.statusCode, 401);
@@ -551,7 +551,7 @@ describe("DELETE /posts/ — authentication", () => {
     });
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${newId()}`,
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
@@ -561,7 +561,7 @@ describe("DELETE /posts/ — authentication", () => {
     const token = signAccessToken(app, { sub: newId().toString() });
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${newId()}`,
       headers: { authorization: `Bearer ${token}x` },
     });
     assert.equal(reply.statusCode, 401);
@@ -574,7 +574,7 @@ describe("DELETE /posts/ — authentication", () => {
     stubMethod(Post, "findOneAndDelete", () => Promise.resolve(post as any));
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${post._id}`,
       cookies: { access_token: accessToken },
     });
     assert.equal(reply.statusCode, 204);
@@ -592,14 +592,14 @@ describe("DELETE /posts/ — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${post._id}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
 
     assert.equal(reply.statusCode, 204);
     assert.equal(findOneAndDelete.mock.callCount(), 1);
     const [filter] = findOneAndDelete.mock.calls[0].arguments as any[];
-    assert.deepEqual(filter, { userId: userId.toString() });
+    assert.deepEqual(filter, { _id: post._id.toString(), userId: userId.toString() });
     // 204 strips body — ensure no json body or empty
     assert.equal(reply.body, "");
   });
@@ -612,7 +612,7 @@ describe("DELETE /posts/ — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${post._id}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { userId: attackerId } as any,
     });
@@ -627,7 +627,7 @@ describe("DELETE /posts/ — logic", () => {
     stubMethod(Post, "findOneAndDelete", () => Promise.resolve(null));
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${newId()}`,
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
@@ -640,7 +640,7 @@ describe("DELETE /posts/ — logic", () => {
     });
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${newId()}`,
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 500);
@@ -651,7 +651,7 @@ describe("DELETE /posts/ — logic", () => {
     stubMethod(Post, "findOneAndDelete", () => Promise.reject(new Error("rejected")));
     const reply = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${newId()}`,
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 500);
@@ -670,7 +670,7 @@ describe("DELETE /posts/ — logic", () => {
 
     const replyA = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${postA._id}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userIdA.toString() })}` },
     });
     assert.equal(replyA.statusCode, 204);
@@ -681,13 +681,14 @@ describe("DELETE /posts/ — logic", () => {
     const findB = stubMethod(Post, "findOneAndDelete", () => Promise.resolve(null));
     const replyB = await app.inject({
       method: "DELETE",
-      url: "/posts/",
+      url: `/posts/${newId()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userIdB.toString() })}` },
     });
     assert.equal(replyB.statusCode, 404);
     assert.deepEqual(replyB.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
     assert.equal(findB.mock.callCount(), 1);
-    assert.deepEqual(findB.mock.calls[0].arguments[0], { userId: userIdB.toString() });
+    assert.equal(findB.mock.calls[0].arguments[0].userId, userIdB.toString());
+    assert.ok(findB.mock.calls[0].arguments[0]._id);
   });
 });
 
@@ -726,7 +727,7 @@ describe("postService — unit", () => {
     const { postService } = await import("#modules/posts/posts.service");
     stubMethod(Post, "findOneAndDelete", () => Promise.resolve(null));
     await assert.rejects(
-      () => postService.deletePost(newId().toString()),
+      () => postService.deletePost(newId().toString(), newId().toString()),
       (err: any) => {
         assert.equal(err.message, "Post not found");
         assert.equal(err.statusCode, 404);

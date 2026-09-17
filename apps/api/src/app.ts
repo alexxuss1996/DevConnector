@@ -5,6 +5,7 @@ import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
 import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
 import { errorHandler } from "#helpers/error-handler";
 import AjvErrors from "ajv-errors";
+import addFormats from "ajv-formats";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,7 +21,7 @@ const options: AppOptions = {
       allErrors: true,
       strict: false,
     },
-    plugins: [AjvErrors as any],
+    plugins: [AjvErrors as any, addFormats as any],
   },
 };
 

@@ -20,20 +20,6 @@ const addExperience: FastifyPluginAsyncTypebox = async (
       return reply.status(200).send(result);
     },
   );
-  fastify.put(
-    "/experience",
-    {
-      onRequest: [fastify.authenticate],
-      schema: { body: AddExperienceSchema },
-    },
-    async function (request, reply) {
-      const result = await profileService.addExperience(
-        request.user.sub,
-        request.body,
-      );
-      return reply.status(200).send(result);
-    },
-  );
 };
 
 export default addExperience;

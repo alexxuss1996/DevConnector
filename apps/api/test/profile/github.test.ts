@@ -157,7 +157,7 @@ describe("GET /profile/github/:username — logic", () => {
     const [url] = fetchMock.mock.calls[0].arguments as any[];
     assert.ok(url.includes("https://api.github.com/users/testuser123/repos"));
     assert.ok(url.includes("per_page=5"));
-    assert.ok(url.includes("sort=created:asc"));
+    assert.ok(url.includes("sort=created") && url.includes("direction=asc"));
   });
 
   test("sends correct headers (User-Agent, Accept, Authorization with token)", async () => {
@@ -254,7 +254,7 @@ describe("profileService.getGithubReposForProfile — unit", () => {
 
     const expected = [{ id: 42, name: "my-repo" }];
     const fetchMock = mock.method(global, "fetch", async (url: string, opts: any) => {
-      assert.equal(url, "https://api.github.com/users/octocat/repos?per_page=5&sort=created:asc");
+      assert.equal(url, "https://api.github.com/users/octocat/repos?per_page=5&sort=created&direction=asc");
       assert.equal(opts.headers["User-Agent"], "node.js");
       assert.equal(opts.headers.Accept, "application/vnd.github.v3+json");
       assert.equal(opts.headers.Authorization, "token unit-test-token");

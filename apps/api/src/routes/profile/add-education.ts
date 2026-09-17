@@ -20,20 +20,6 @@ const addEducation: FastifyPluginAsyncTypebox = async (
       return reply.status(200).send(result);
     },
   );
-  fastify.put(
-    "/education",
-    {
-      onRequest: [fastify.authenticate],
-      schema: { body: AddEducationSchema },
-    },
-    async function (request, reply) {
-      const result = await profileService.addEducation(
-        request.user.sub,
-        request.body,
-      );
-      return reply.status(200).send(result);
-    },
-  );
 };
 
 export default addEducation;

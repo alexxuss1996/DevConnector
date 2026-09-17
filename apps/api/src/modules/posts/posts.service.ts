@@ -13,6 +13,9 @@ class PostService {
     return posts;
   }
   async getPost(id: string) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
@@ -41,14 +44,20 @@ class PostService {
     return newPost.toJSON();
   }
 
-  async deletePost(userId: string) {
-    const post = await Post.findOneAndDelete({ userId });
+  async deletePost(userId: string, id: string) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
+    const post = await Post.findOneAndDelete({ _id: id, userId });
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
     }
   }
 
   async likePost(userId: string, id: string) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
@@ -69,6 +78,9 @@ class PostService {
   }
 
   async unlikePost(userId: string, id: string) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
@@ -85,6 +97,9 @@ class PostService {
   }
 
   async getPostComments(id: string) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
@@ -93,6 +108,9 @@ class PostService {
   }
 
   async createPostComment(userId: string, id: string, text: string) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
@@ -123,6 +141,12 @@ class PostService {
     commentId: string,
     text?: string,
   ) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
+    if (!isValidObjectId(commentId)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
@@ -151,6 +175,12 @@ class PostService {
   }
 
   async deletePostComment(userId: string, id: string, commentId: string) {
+    if (!isValidObjectId(id)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
+    if (!isValidObjectId(commentId)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");

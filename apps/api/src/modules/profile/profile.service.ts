@@ -6,7 +6,7 @@ import {
   AddExperienceInput,
   CreateProfileInput,
 } from "#modules/profile/profile.schemas";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import env from "#config/env";
 
 class ProfileService {
@@ -94,15 +94,30 @@ class ProfileService {
     return profile.toJSON();
   }
   async deleteProfileAndUser(userId: string) {
-    const profile = await Profile.findOneAndDelete({ userId });
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const profile = await Profile.findOneAndDelete({ userId }, { session });
 
-    if (!profile) {
-      throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
-    }
+      if (!profile) {
+        await session.abortTransaction();
+        throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
+      }
 
-    const user = await User.findOneAndDelete({ _id: userId });
-    if (!user) {
-      throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
+      const user = await User.findOneAndDelete({ _id: userId }, { session });
+      if (!user) {
+        await session.abortTransaction();
+        throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
+      }
+
+      await session.commitTransaction();
+    } catch (err) {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+      throw err;
+    } finally {
+      await session.endSession();
     }
   }
   async addExperience(userId: string, data: AddExperienceInput) {
@@ -117,7 +132,7 @@ class ProfileService {
       throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
     }
 
-    const experience = profile.experience ?? [];
+    const experience = (profile.experience ??= []);
 
     experience.push({
       title,
@@ -148,7 +163,7 @@ class ProfileService {
       throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
     }
 
-    const education = profile.education ?? [];
+    const education = (profile.education ??= []);
 
     education.push({
       school,
@@ -219,7 +234,7 @@ class ProfileService {
 
   async getGithubReposForProfile(username: string) {
     const response = await fetch(
-      `https://api.github.com/users/${username}/repos?per_page=5&sort=created:asc`,
+      `https://api.github.com/users/${username}/repos?per_page=5&sort=created&direction=asc`,
       {
         headers: {
           "User-Agent": "node.js",
@@ -230,7 +245,19 @@ class ProfileService {
     );
 
     if (!response.ok) {
-      throw new AppError(404, "GITHUB_REPOS_NOT_FOUND", "No repos found");
+      if (response.status === 404) {
+        throw new AppError(404, "GITHUB_REPOS_NOT_FOUND", "No repos found");
+      }
+      if (response.status === 401) {
+        throw new AppError(401, "GITHUB_AUTH_FAILED", "GitHub authentication failed");
+      }
+      if (response.status === 403 || response.status === 429) {
+        throw new AppError(response.status, "GITHUB_RATE_LIMITED", "GitHub rate limit exceeded");
+      }
+      if (response.status >= 500) {
+        throw new AppError(502, "GITHUB_UPSTREAM_ERROR", "GitHub server error");
+      }
+      throw new AppError(502, "GITHUB_UPSTREAM_ERROR", "GitHub upstream error");
     }
     const repos = await response.json();
     return repos;

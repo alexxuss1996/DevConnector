@@ -44,6 +44,9 @@ importers:
       ajv-errors:
         specifier: ^3.0.0
         version: 3.0.0(ajv@8.20.0)
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
       argon2:
         specifier: ^0.45.1
         version: 0.45.1

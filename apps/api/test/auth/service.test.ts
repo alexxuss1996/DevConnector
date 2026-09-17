@@ -152,6 +152,24 @@ describe("AuthService.login", () => {
     );
   });
 
+  test("throws 401 when user has no passwordHash (google-only account)", async () => {
+    stubMethod(User, "findOne", () =>
+      mkQuery(mkUser({ email: "google@example.com" })),
+    );
+
+    await assert.rejects(
+      () =>
+        authService.login(app, {
+          email: "google@example.com",
+          password: "password123",
+        }),
+      (err: any) =>
+        err.statusCode === 401 &&
+        err.code === "INVALID_CREDENTIALS" &&
+        /Invalid Credentials/.test(err.message),
+    );
+  });
+
   test("normalizes (lowercases + trims) the email before lookup", async () => {
     const passwordHash = await argon2.hash("password123");
     const existingUser = mkUser({ email: "jane@example.com", passwordHash });

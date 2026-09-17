@@ -30,6 +30,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const AjvErrors = require("ajv-errors");
+const addFormats = require("ajv-formats");
 
 const AUTH_PREFIX = "/auth";
 const PROFILE_PREFIX = "/profile";
@@ -40,7 +41,7 @@ export async function buildApp({
 }: { withRoutes?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false,
-    ajv: { customOptions: { coerceTypes: false, allErrors: true, strict: false }, plugins: [AjvErrors] },
+    ajv: { customOptions: { coerceTypes: false, allErrors: true, strict: false }, plugins: [AjvErrors, addFormats] },
   });
 
   await app.register(cookie);

@@ -20,17 +20,10 @@ const getProfileById: FastifyPluginAsyncTypebox = async (
     },
     async function (request, reply) {
       const { id } = request.params;
-      try {
-        const profile = await profileService.getProfile(id);
-        return {
-          profile,
-        };
-      } catch (error) {
-        return reply.status(404).send({
-          code: "PROFILE_NOT_FOUND",
-          message: "Profile not found",
-        });
-      }
+      const profile = await profileService.getProfile(id);
+      return {
+        profile,
+      };
     },
   );
 };

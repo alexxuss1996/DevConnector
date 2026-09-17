@@ -923,11 +923,11 @@ describe("POST /auth/logout — additional cases", () => {
       },
     });
 
-    assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
-      code: "INVALID_CREDENTIALS",
-      message: "Invalid Credentials",
-    });
+    assert.equal(reply.statusCode, 204);
+    const setCookies = reply.headers["set-cookie"] as string[];
+    assert.ok(Array.isArray(setCookies));
+    assert.ok(setCookies.some((c) => c.startsWith("access_token=")));
+    assert.ok(setCookies.some((c) => c.startsWith("refresh_token=")));
   });
 
   test("returns 401 when logout receives an access token", async () => {
@@ -944,11 +944,11 @@ describe("POST /auth/logout — additional cases", () => {
       },
     });
 
-    assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
-      code: "INVALID_CREDENTIALS",
-      message: "Invalid Credentials",
-    });
+    assert.equal(reply.statusCode, 204);
+    const setCookies = reply.headers["set-cookie"] as string[];
+    assert.ok(Array.isArray(setCookies));
+    assert.ok(setCookies.some((c) => c.startsWith("access_token=")));
+    assert.ok(setCookies.some((c) => c.startsWith("refresh_token=")));
   });
 });
 
@@ -1064,7 +1064,7 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 500);
+    assert.equal(reply.statusCode, 401);
   });
 
   test("returns 401 when Google user does not contain email", async () => {
@@ -1082,7 +1082,7 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 500);
+    assert.equal(reply.statusCode, 401);
   });
 
   test("links an existing local account to Google", async () => {

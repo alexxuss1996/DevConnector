@@ -5,8 +5,27 @@ import User from "#modules/users/user.model";
 import { profileService } from "#modules/profile/profile.service";
 import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
 import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import type { FastifyInstance } from "fastify";
+
+function stubMongooseSession() {
+  let inTxn = false;
+  const session: any = {
+    startTransaction: mock.fn(() => {
+      inTxn = true;
+    }),
+    abortTransaction: mock.fn(async () => {
+      inTxn = false;
+    }),
+    commitTransaction: mock.fn(async () => {
+      inTxn = false;
+    }),
+    endSession: mock.fn(async () => {}),
+    inTransaction: mock.fn(() => inTxn),
+  };
+  stubMethod(mongoose as any, "startSession", async () => session);
+  return session;
+}
 
 let app: FastifyInstance;
 
@@ -168,6 +187,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
   });
 
   test("accepts cookie token", async () => {
+    stubMongooseSession();
     const userId = newId();
     const token = signAccessToken(app, { sub: userId.toString() });
     const prof = mkProfile({ userId });
@@ -184,6 +204,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
   });
 
   test("returns 404 PROFILE_NOT_FOUND when profile missing", async () => {
+    stubMongooseSession();
     stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(null));
     const reply = await app.inject({
       method: "DELETE",
@@ -195,6 +216,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
   });
 
   test("returns 404 when profile deleted but user missing (96-106 second branch)", async () => {
+    stubMongooseSession();
     const prof = mkProfile({});
     stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(prof as any));
     stubMethod(User, "findOneAndDelete", () => Promise.resolve(null));
@@ -209,6 +231,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
   });
 
   test("returns 204 on success and deletes both", async () => {
+    const session = stubMongooseSession();
     const userId = newId();
     const prof = mkProfile({ userId });
     const usr = { _id: userId } as any;
@@ -229,9 +252,15 @@ describe("DELETE /profile/ — authentication and logic", () => {
     assert.equal(delUser.mock.callCount(), 1);
     const [uFilter] = delUser.mock.calls[0].arguments as any[];
     assert.deepEqual(uFilter, { _id: userId.toString() });
+    // Verify transaction was used: session passed to both operations and committed
+    assert.equal(delProfile.mock.calls[0].arguments[1]?.session, session);
+    assert.equal(delUser.mock.calls[0].arguments[1]?.session, session);
+    assert.equal(session.commitTransaction.mock.callCount(), 1);
+    assert.equal(session.endSession.mock.callCount(), 1);
   });
 
   test("returns 500 on unexpected error", async () => {
+    stubMongooseSession();
     stubMethod(Profile, "findOneAndDelete", () => {
       throw new Error("boom");
     });

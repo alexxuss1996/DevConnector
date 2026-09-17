@@ -54,7 +54,7 @@ class AuthService {
     }
 
     if (!user.sub || !user.email) {
-      throw new Error("Google User is invalid");
+      throw new AppError(401, "GOOGLE_AUTH_FAILED", "Google User is invalid");
     }
 
     return user;
@@ -127,7 +127,11 @@ class AuthService {
       throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
-    const isPasswordCorrect = await argon2.verify(user.passwordHash!, password);
+    if (!user.passwordHash) {
+      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
+    }
+
+    const isPasswordCorrect = await argon2.verify(user.passwordHash, password);
 
     if (!isPasswordCorrect) {
       throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
@@ -203,7 +207,7 @@ class AuthService {
 
     let user = await User.findOne({
       $or: [{ googleId: googleUser.sub }, { email }],
-    });
+    }).select("+googleId");
 
     if (!user) {
       user = await User.create({

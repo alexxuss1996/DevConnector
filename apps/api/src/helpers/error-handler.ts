@@ -18,6 +18,13 @@ export const errorHandler = async (
     const statusCode = (error as any).statusCode as number;
     const code = (error as any).code as string;
     const message = (error as any).message as string;
+    if (statusCode >= 500) {
+      request.log.error(error);
+      return reply.status(500).send({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Internal server error",
+      });
+    }
     return reply.status(statusCode).send({
       code,
       message,
