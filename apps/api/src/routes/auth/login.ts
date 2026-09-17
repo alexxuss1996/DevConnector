@@ -11,7 +11,11 @@ const login: FastifyPluginAsyncTypebox = async (
   fastify.post(
     "/login",
 
-    { preValidation: [trimEmail], schema: { body: LoginUserSchema } },
+    {
+      preValidation: [trimEmail],
+      schema: { body: LoginUserSchema },
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    },
     async function (request, reply) {
       const result = await authService.login(fastify, request.body);
       return setAuthCookies(

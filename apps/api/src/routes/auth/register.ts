@@ -11,7 +11,11 @@ const register: FastifyPluginAsyncTypebox = async (
   fastify.post(
     "/register",
 
-    { preValidation: [trimEmail], schema: { body: RegisterUserSchema } },
+    {
+      preValidation: [trimEmail],
+      schema: { body: RegisterUserSchema },
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    },
     async function (request, reply) {
       const result = await authService.register(fastify, request.body);
       return setAuthCookies(reply, result.accessToken, result.refreshToken)
