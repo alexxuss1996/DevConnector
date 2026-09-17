@@ -1,6 +1,14 @@
 import { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import AppError from "#helpers/app-error";
 
+/**
+ * Converts application, validation, and unexpected errors into API responses.
+ *
+ * @param error - Error raised while processing the request.
+ * @param request - Fastify request used to log unexpected errors.
+ * @param reply - Fastify reply used to send the error response.
+ * @returns The completed error response.
+ */
 export const errorHandler = async (
   error: FastifyError | AppError,
   request: FastifyRequest,
