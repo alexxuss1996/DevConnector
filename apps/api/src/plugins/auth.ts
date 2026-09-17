@@ -1,3 +1,4 @@
+import AppError from "#helpers/app-error";
 import { FastifyRequest, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 
@@ -8,15 +9,11 @@ export default fp(async (fastify) => {
       try {
         await request.jwtVerify();
       } catch {
-        return reply.status(401).send({
-          message: "Unauthorized",
-        });
+        throw new AppError(401, "FAILED_AUTHENTICATION", "Unauthorized");
       }
 
       if (request.user.type !== "access") {
-        return reply.status(401).send({
-          message: "Unauthorized",
-        });
+        throw new AppError(401, "FAILED_AUTHENTICATION", "Unauthorized");
       }
     },
   );

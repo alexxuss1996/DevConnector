@@ -2,6 +2,7 @@ import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { authService } from "#modules/auth/auth.service";
 import AppError from "#helpers/app-error";
 import { setAuthCookies } from "#helpers/auth.cookies";
+import env from "#config/env";
 
 const googleCallback: FastifyPluginAsyncTypebox = async (fastify) => {
   fastify.get("/google/callback", async (request, reply) => {
@@ -20,7 +21,7 @@ const googleCallback: FastifyPluginAsyncTypebox = async (fastify) => {
         reply,
         result.accessToken,
         result.refreshToken,
-      ).redirect(process.env.FRONTEND_URL!);
+      ).redirect(env.FRONTEND_URL!);
     } catch (err) {
       fastify.log.error(err);
 

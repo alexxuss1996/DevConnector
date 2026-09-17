@@ -1,8 +1,10 @@
+import "#config/env";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
 import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
 import { errorHandler } from "#helpers/error-handler";
+import AjvErrors from "ajv-errors";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,6 +14,14 @@ export interface AppOptions
 // Pass --options via CLI arguments in command to enable these options.
 const options: AppOptions = {
   logger: true,
+  ajv: {
+    customOptions: {
+      coerceTypes: false,
+      allErrors: true,
+      strict: false,
+    },
+    plugins: [AjvErrors as any],
+  },
 };
 
 const app: FastifyPluginAsync<AppOptions> = async (
@@ -41,6 +51,9 @@ const app: FastifyPluginAsync<AppOptions> = async (
   });
   // Custom error handler
   void fastify.setErrorHandler(errorHandler);
+  fastify.ready(async () => {
+    console.log(fastify.printRoutes());
+  });
 };
 
 export default app;

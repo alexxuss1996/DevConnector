@@ -67,6 +67,7 @@ type ChainableQuery<T> = Promise<T | null> & {
   limit: () => ChainableQuery<T>;
   lean: () => ChainableQuery<T>;
   exec: () => Promise<T | null>;
+  populate: (...args: any[]) => ChainableQuery<T>;
 };
 
 export function mkQuery<T>(value: T | null): ChainableQuery<T> {
@@ -76,7 +77,122 @@ export function mkQuery<T>(value: T | null): ChainableQuery<T> {
   q.sort = () => q;
   q.lean = () => q;
   q.limit = () => q;
+  q.populate = () => q;
   return q;
+}
+
+export interface ProfileDoc {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId | string;
+  company?: string;
+  website?: string;
+  location?: string;
+  status: string;
+  skills: string[];
+  bio?: string;
+  githubusername?: string;
+  social?: Record<string, string>;
+  experience?: any[];
+  education?: any[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  toJSON: () => Record<string, unknown>;
+}
+
+export function mkProfile(overrides: Partial<ProfileDoc> = {}): ProfileDoc {
+  const doc: ProfileDoc = {
+    _id: newId(),
+    userId: newId(),
+    status: "Developer",
+    skills: ["JavaScript"],
+    social: {},
+    experience: [],
+    education: [],
+    toJSON() {
+      const { toJSON, ...rest } = this as any;
+      return { ...rest };
+    },
+    ...overrides,
+  };
+  // Ensure toJSON is always present even if overridden
+  if (!doc.toJSON) {
+    doc.toJSON = function () {
+      const { toJSON, ...rest } = this as any;
+      return { ...rest };
+    };
+  }
+  return doc;
+}
+
+export interface PostDoc {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  name: string;
+  text: string;
+  avatar?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  likes?: any[];
+  comments?: any[];
+  save: Mock<() => Promise<PostDoc>>;
+  toJSON: () => Record<string, unknown>;
+}
+
+export interface CommentDoc {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  text: string;
+  name: string;
+  avatar?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export function mkComment(overrides: Partial<CommentDoc> = {}): CommentDoc {
+  return {
+    _id: newId(),
+    userId: newId(),
+    text: "Nice post!",
+    name: "Commenter",
+    avatar: "https://example.com/avatar.png",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+export function mkPost(overrides: Partial<PostDoc> = {}): PostDoc {
+  const doc: PostDoc = {
+    _id: newId(),
+    userId: newId(),
+    name: "Test User",
+    text: "Hello world",
+    avatar: "https://example.com/avatar.png",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    likes: [],
+    comments: [],
+    save: mock.fn(async function (this: PostDoc) {
+      return this;
+    }),
+    toJSON() {
+      const { toJSON, save, ...rest } = this as any;
+      return { ...rest };
+    },
+    ...overrides,
+  };
+  if (!doc.toJSON) {
+    doc.toJSON = function () {
+      const { toJSON, save, ...rest } = this as any;
+      return { ...rest };
+    };
+  }
+  if (!doc.save) {
+    doc.save = mock.fn(async function (this: PostDoc) {
+      return this;
+    });
+  }
+  return doc;
 }
 
 export function stubMethod<T extends object>(

@@ -1,3 +1,4 @@
+import env from "#config/env";
 import fp from "fastify-plugin";
 import mongoose from "mongoose";
 
@@ -8,7 +9,7 @@ declare module "fastify" {
 }
 
 export default fp(async (fastify) => {
-  const uri = process.env.MONGODB_URI;
+  const uri = env.MONGODB_URI;
 
   if (!uri) {
     throw new Error("MONGODB_URI is not set");

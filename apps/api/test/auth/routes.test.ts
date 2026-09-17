@@ -289,7 +289,7 @@ describe("GET /protected (authenticate decorator)", () => {
     const reply = await app.inject({ method: "GET", url: "/protected" });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
   });
 
   test("returns 200 for a valid access token", async () => {
@@ -331,7 +331,7 @@ describe("GET /protected (authenticate decorator)", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
   });
 
   test("returns 401 for a tampered access token", async () => {
@@ -344,7 +344,7 @@ describe("GET /protected (authenticate decorator)", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
   });
 });
 
@@ -964,6 +964,7 @@ describe("GET /protected — additional cases", () => {
 
     assert.equal(reply.statusCode, 401);
     assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
     });
   });
@@ -983,6 +984,7 @@ describe("GET /protected — additional cases", () => {
 
     assert.equal(reply.statusCode, 401);
     assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
     });
   });
@@ -998,6 +1000,7 @@ describe("GET /protected — additional cases", () => {
 
     assert.equal(reply.statusCode, 401);
     assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
     });
   });

@@ -8,12 +8,13 @@
     "test": "test"
   },
   "scripts": {
+    "clean": "rm -rf dist",
     "test": "npm run build:ts && tsc -p test/tsconfig.json && c8 node --env-file=.env --test \"test/**/*.test.ts\"",
-    "start": "npm run build:ts && fastify start -l info -p 4000 dist/app.js",
+    "start": "npm run clean && npm run build:ts && fastify start -l info -p 4000 dist/app.js --options",
     "build:ts": "tsc",
     "watch:ts": "tsc -w",
-    "dev": "npm run build:ts && concurrently -k -p \"[{name}]\" -n \"TypeScript,App\" -c \"yellow.bold,cyan.bold\" \"npm:watch:ts\" \"npm:dev:start\"",
-    "dev:start": "fastify start --ignore-watch=.ts$ -w -l info -P -p 4000 dist/app.js"
+    "dev": "npm run clean && npm run build:ts && concurrently -k -p \"[{name}]\" -n \"TypeScript,App\" -c \"yellow.bold,cyan.bold\" \"npm:watch:ts\" \"npm:dev:start\"",
+    "dev:start": "fastify start --ignore-watch=.ts$ -w -l info -P -p 4000 dist/app.js --options"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +26,7 @@
     "@fastify/oauth2": "^8.3.0",
     "@fastify/sensible": "^6.0.0",
     "@fastify/type-provider-typebox": "^6.1.0",
+    "ajv-errors": "^3.0.0",
     "argon2": "^0.45.1",
     "fastify": "^5.0.0",
     "fastify-cli": "^8.0.0",

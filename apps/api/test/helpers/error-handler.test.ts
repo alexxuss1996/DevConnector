@@ -52,14 +52,20 @@ describe("errorHandler", () => {
     await errorHandler(validationError, fakeRequest(), reply);
 
     assert.equal(captured.status, 400);
-    assert.deepEqual(captured.body, {
-      code: "VALIDATION_ERROR",
-      message: "Request validation failed",
-      errors: [
-        { field: "email", keyword: "format", message: "must match format" },
-        { field: "password", keyword: "minLength", message: "too short" },
-      ],
-    });
+    const body = captured.body as any;
+    assert.equal(body.code, "VALIDATION_ERROR");
+    assert.equal(body.message, "Request validation failed");
+    assert.deepEqual(body.errors, [
+      { field: "email", keyword: "format", message: "must match format" },
+      { field: "password", keyword: "minLength", message: "too short" },
+    ]);
+    // Zod-like additional fields
+    assert.ok(Array.isArray(body.issues));
+    assert.equal(body.issues.length, 2);
+    assert.deepEqual(body.issues[0].path, ["email"]);
+    assert.equal(body.issues[0].code, "format");
+    assert.ok(body.fieldErrors);
+    assert.deepEqual(body.fieldErrors.email, ["must match format"]);
   });
 
   test("maps unexpected errors to 500 INTERNAL_SERVER_ERROR and logs them", async () => {

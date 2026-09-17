@@ -1,5 +1,6 @@
 import fp from "fastify-plugin";
 import oauthPlugin from "@fastify/oauth2";
+import env from "#config/env";
 
 export default fp(async (fastify) => {
   await fastify.register(oauthPlugin, {
@@ -9,8 +10,8 @@ export default fp(async (fastify) => {
 
     credentials: {
       client: {
-        id: process.env.GOOGLE_CLIENT_ID!,
-        secret: process.env.GOOGLE_CLIENT_SECRET!,
+        id: env.GOOGLE_CLIENT_ID!,
+        secret: env.GOOGLE_CLIENT_SECRET!,
       },
     },
 
@@ -19,7 +20,7 @@ export default fp(async (fastify) => {
     },
 
     startRedirectPath: "/auth/google",
-    callbackUri: process.env.GOOGLE_CALLBACK_URL!,
+    callbackUri: env.GOOGLE_CALLBACK_URL!,
 
     pkce: "S256",
   });

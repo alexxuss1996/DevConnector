@@ -1,7 +1,7 @@
 import mongoose, { Schema, Types } from "mongoose";
 
 export interface IProfile {
-  user: Types.ObjectId;
+  userId: Types.ObjectId;
   company?: string;
   website?: string;
   location?: string;
@@ -10,6 +10,7 @@ export interface IProfile {
   bio?: string;
   githubusername?: string;
   experience: {
+    _id?: Types.ObjectId;
     title: string;
     company: string;
     location?: string;
@@ -19,6 +20,7 @@ export interface IProfile {
     description?: string;
   }[];
   education: {
+    _id?: Types.ObjectId;
     school: string;
     degree: string;
     fieldofstudy: string;
@@ -38,9 +40,11 @@ export interface IProfile {
 
 const profileSchema = new Schema<IProfile>(
   {
-    user: {
+    userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
+      unique: true,
     },
     company: {
       type: String,
