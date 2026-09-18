@@ -7,11 +7,14 @@ class AppError extends Error {
    * @param message - Human-readable error message.
    */
   constructor(
-    public statusCode: number,
-    public code: string,
+    public readonly statusCode: number,
+    public readonly code: string,
     message: string,
+    options?: { cause?: unknown },
   ) {
-    super(message);
+    super(message, options as ErrorOptions);
+    this.name = "AppError";
+    Object.setPrototypeOf(this, AppError.prototype);
   }
 }
 

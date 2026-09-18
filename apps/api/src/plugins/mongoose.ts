@@ -2,12 +2,6 @@ import env from "#config/env";
 import fp from "fastify-plugin";
 import mongoose from "mongoose";
 
-declare module "fastify" {
-  interface FastifyInstance {
-    db: typeof mongoose.connection;
-  }
-}
-
 export default fp(async (fastify) => {
   const uri = env.MONGODB_URI;
 
@@ -16,15 +10,21 @@ export default fp(async (fastify) => {
   }
   fastify.log.info("Connecting to MongoDB...");
 
-  await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 5000,
-  });
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 5000,
+    });
+  }
 
-  fastify.log.info("Connected to MongoDB Atlas");
+  fastify.log.info("Connected to MongoDB");
 
-  fastify.decorate("db", mongoose.connection);
+  if (!fastify.hasDecorator("db")) {
+    fastify.decorate("db", mongoose.connection);
+  }
 
   fastify.addHook("onClose", async () => {
-    await mongoose.disconnect();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
   });
 });

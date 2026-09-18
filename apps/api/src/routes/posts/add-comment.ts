@@ -1,14 +1,6 @@
-import { Type } from "typebox";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { postService } from "#modules/posts/posts.service";
-import { CreatePostCommentSchema } from "#modules/posts/posts.schemas";
-
-const ParamsSchema = Type.Object({
-  id: Type.String({
-    minLength: 1,
-    errorMessage: "ID must be at least 1 character",
-  }),
-});
+import { CreatePostCommentSchema, PostIdParamsSchema } from "@dev-conn/contracts";
 
 const addPostComment: FastifyPluginAsyncTypebox = async (
   fastify,
@@ -18,7 +10,7 @@ const addPostComment: FastifyPluginAsyncTypebox = async (
     "/:id/comments",
     {
       onRequest: [fastify.authenticate],
-      schema: { params: ParamsSchema, body: CreatePostCommentSchema },
+      schema: { params: PostIdParamsSchema, body: CreatePostCommentSchema },
     },
     async function (request, reply) {
       const { id } = request.params;
@@ -28,7 +20,7 @@ const addPostComment: FastifyPluginAsyncTypebox = async (
         id,
         text,
       );
-      return reply.status(200).send(result);
+      return reply.status(201).send(result);
     },
   );
 };

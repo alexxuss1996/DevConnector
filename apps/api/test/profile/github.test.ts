@@ -1,6 +1,6 @@
 import { describe, test, before, after, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { profileService } from "#modules/profile/profile.service";
+import { profileService, clearGithubReposCache } from "#modules/profile/profile.service";
 import { newId } from "../helpers/stubs.ts";
 import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import type { FastifyInstance } from "fastify";
@@ -24,6 +24,8 @@ afterEach(() => {
   if ((global.fetch as any).mock) {
     try { (global.fetch as any).mock.restore(); } catch {}
   }
+  // service caches GitHub responses for 60s — clear so mocked fetches re-run
+  clearGithubReposCache();
 });
 
 function authHeader(userId?: string) {
@@ -177,7 +179,7 @@ describe("GET /profile/github/:username — logic", () => {
     const [, opts] = fetchMock.mock.calls[0].arguments as any[];
     assert.equal(opts.headers["User-Agent"], "node.js");
     assert.equal(opts.headers.Accept, "application/vnd.github.v3+json");
-    assert.equal(opts.headers.Authorization, "token test-pat-123");
+    assert.equal(opts.headers.Authorization, "Bearer test-pat-123");
 
     // restore
     if (original === undefined) delete process.env.GITHUB_ACCESS_TOKEN;
@@ -257,7 +259,7 @@ describe("profileService.getGithubReposForProfile — unit", () => {
       assert.equal(url, "https://api.github.com/users/octocat/repos?per_page=5&sort=created&direction=asc");
       assert.equal(opts.headers["User-Agent"], "node.js");
       assert.equal(opts.headers.Accept, "application/vnd.github.v3+json");
-      assert.equal(opts.headers.Authorization, "token unit-test-token");
+      assert.equal(opts.headers.Authorization, "Bearer unit-test-token");
       return { ok: true, status: 200, json: async () => expected } as any;
     });
 
@@ -299,20 +301,47 @@ describe("profileService.getGithubReposForProfile — unit", () => {
     );
   });
 
-  test("handles Authorization header when GITHUB_ACCESS_TOKEN is undefined (token undefined)", async () => {
+  test("throws GITHUB_CONFIG_ERROR when GITHUB_ACCESS_TOKEN is missing", async () => {
     const original = process.env.GITHUB_ACCESS_TOKEN;
     delete process.env.GITHUB_ACCESS_TOKEN;
 
-    let capturedAuth: string | undefined;
-    mock.method(global, "fetch", async (_url: string, opts: any) => {
-      capturedAuth = opts.headers.Authorization;
-      return { ok: true, json: async () => [] } as any;
-    });
-
-    const result = await profileService.getGithubReposForProfile("octocat");
-    assert.deepEqual(result, []);
-    assert.equal(capturedAuth, "token undefined");
+    await assert.rejects(
+      () => profileService.getGithubReposForProfile("octocat"),
+      (err: any) => {
+        assert.equal(err.statusCode, 500);
+        assert.equal(err.code, "GITHUB_CONFIG_ERROR");
+        return true;
+      },
+    );
 
     if (original !== undefined) process.env.GITHUB_ACCESS_TOKEN = original;
+  });
+
+  test("caches successful responses and skips fetch on repeat", async () => {
+    const repos = [{ id: 7, name: "cached" }];
+    const fetchMock = mock.method(global, "fetch", async () => ({
+      ok: true,
+      status: 200,
+      json: async () => repos,
+    }) as any);
+
+    const first = await profileService.getGithubReposForProfile("cache-user");
+    const second = await profileService.getGithubReposForProfile("cache-user");
+    assert.deepEqual(first, repos);
+    assert.deepEqual(second, repos);
+    assert.equal(fetchMock.mock.callCount(), 1);
+  });
+
+  test("does not cache failed responses", async () => {
+    mock.method(global, "fetch", async () => ({
+      ok: false,
+      status: 404,
+      json: async () => ({ message: "Not Found" }),
+    }) as any);
+
+    await assert.rejects(() => profileService.getGithubReposForProfile("missing-user"));
+    await assert.rejects(() => profileService.getGithubReposForProfile("missing-user"));
+    // second call re-fetched instead of serving the 404 from cache
+    assert.equal((global.fetch as any).mock.callCount(), 2);
   });
 });

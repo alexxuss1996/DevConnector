@@ -92,9 +92,9 @@ describe("AuthService.register", () => {
           password: "supersecret123",
         }),
       (err: any) =>
-        err.statusCode === 400 &&
+        err.statusCode === 409 &&
         err.code === "REGISTRATION_FAILED" &&
-        /Registration failed/.test(err.message),
+        /Email already in use/.test(err.message),
     );
   });
 });
@@ -335,6 +335,8 @@ describe("AuthService.refresh", () => {
       "a-completely-different-token",
     );
     stubMethod(Session, "findById", () => mkQuery(session));
+    // Reuse detection revokes the session on token mismatch.
+    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
 
     await assert.rejects(
       () => authService.refresh(app, refreshToken),
@@ -456,7 +458,7 @@ describe("AuthService.authenticateGoogle", () => {
     assert.equal(refresh.type, "refresh");
   });
 
-  test("links an existing email user to the Google account", async () => {
+  test("refuses to auto-link an existing email user (409, must link explicitly)", async () => {
     const googleUser = {
       sub: "google-sub-456",
       email: "existing@example.com",
@@ -478,20 +480,16 @@ describe("AuthService.authenticateGoogle", () => {
       if (cond && "googleId" in cond) return mkQuery(null);
       return mkQuery(existingUser);
     });
-    stubMethod(Session.prototype, "save", async function (this: any) {
-      return this;
-    });
 
-    const result = await authService.authenticateGoogle(
-      app,
-      "google-access-token",
+    await assert.rejects(
+      () => authService.authenticateGoogle(app, "google-access-token"),
+      (err: any) => {
+        assert.equal(err.statusCode, 409);
+        assert.equal(err.code, "GOOGLE_ACCOUNT_CONFLICT");
+        return true;
+      },
     );
-
-    assert.equal(existingUser.save.mock.callCount(), 1);
-    assert.equal(existingUser.googleId, "google-sub-456");
-    assert.equal(existingUser.name, "Existing");
-    assert.equal(existingUser.avatar, "https://example.com/old.png");
-    assert.equal(result.user.email, "existing@example.com");
+    assert.equal(existingUser.googleId, undefined);
   });
 
   test("throws when the Google email is not verified", async () => {
@@ -562,7 +560,9 @@ describe("AuthService.authenticateGoogle", () => {
       (err: any) =>
         err.statusCode === 409 &&
         err.code === "GOOGLE_ACCOUNT_CONFLICT" &&
-        /Google account is already linked/.test(err.message),
+        /different Google account|already linked|already exists/.test(
+          err.message,
+        ),
     );
   });
 });

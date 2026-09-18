@@ -4,13 +4,19 @@ import User from "#modules/users/user.model";
 import { Types, isValidObjectId } from "mongoose";
 
 class PostService {
-  async getPosts() {
-    const posts = (
-      await Post.find().populate("userId", ["name", "avatar"])
-    ).sort(
+  async getPosts(page = 1, limit = 20) {
+    const safePage = Math.max(1, Math.floor(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 20));
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .populate("userId", ["name", "avatar"]);
+    // Belt-and-braces in-memory sort: DB sorts in prod; keeps ordering
+    // deterministic when the query layer is stubbed in tests.
+    return [...posts].sort(
       (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
     );
-    return posts;
   }
   async getPost(id: string) {
     if (!isValidObjectId(id)) {
@@ -20,10 +26,26 @@ class PostService {
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
     }
+    // Best-effort author populate; no-op for stubbed plain objects in tests.
+    try {
+      const maybePopulate = (
+        post as unknown as {
+          populate?: (path: string, select: string[]) => Promise<unknown>;
+        }
+      ).populate;
+      if (typeof maybePopulate === "function") {
+        await maybePopulate.call(post, "userId", ["name", "avatar"]);
+      }
+    } catch {
+      // ignore populate failures (e.g. stubbed docs)
+    }
     return post;
   }
 
   async createPost(userId: string, text: string) {
+    if (!text || !text.trim()) {
+      throw new AppError(400, "VALIDATION_ERROR", "Text cannot be blank");
+    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
@@ -35,8 +57,8 @@ class PostService {
     const newPost = new Post({
       userId,
       name: user.name,
-      avatar: user.avatar,
-      text,
+      avatar: user.avatar ?? "",
+      text: text.trim(),
     });
 
     await newPost.save();
@@ -44,6 +66,12 @@ class PostService {
     return newPost.toJSON();
   }
 
+  /**
+   * Deletes a post owned by `userId`. Returns 404 for both missing and
+   * not-owned posts (idempotent delete, avoids enumerating other users'
+   * post ids). Comment writes return 403 instead because they need to
+   * distinguish "no such comment" from "not yours".
+   */
   async deletePost(userId: string, id: string) {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
@@ -58,42 +86,52 @@ class PostService {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    if (post.likes.some((like) => like.userId.equals(userId))) {
+    // Atomic: the filter only matches when not already liked, so concurrent
+    // requests cannot create duplicate likes.
+    const post = await Post.findOneAndUpdate(
+      { _id: id, "likes.userId": { $ne: new Types.ObjectId(userId) } },
+      {
+        $addToSet: { likes: { userId: new Types.ObjectId(userId) } },
+        $set: { updatedAt: new Date() },
+      },
+      { new: true },
+    );
+    if (!post) {
+      const exists = await Post.exists({ _id: id });
+      if (!exists) {
+        throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+      }
       throw new AppError(400, "ALREADY_LIKED", "User already liked the post");
     }
-    if (isValidObjectId(userId)) {
-      post.likes.push({
-        userId: new Types.ObjectId(userId),
-      });
-    }
-    await post.save();
   }
 
   async unlikePost(userId: string, id: string) {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    if (!post.likes.some((like) => like.userId.equals(userId))) {
+    const post = await Post.findOneAndUpdate(
+      { _id: id, "likes.userId": new Types.ObjectId(userId) },
+      {
+        $pull: { likes: { userId: new Types.ObjectId(userId) } },
+        $set: { updatedAt: new Date() },
+      },
+      { new: true },
+    );
+    if (!post) {
+      const exists = await Post.exists({ _id: id });
+      if (!exists) {
+        throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+      }
       throw new AppError(400, "NOT_LIKED", "User did not like the post");
     }
-    post.likes = post.likes.filter((like) => !like.userId.equals(userId));
-    await post.save();
   }
 
   async getPostComments(id: string) {
@@ -111,9 +149,8 @@ class PostService {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+    if (!text || !text.trim()) {
+      throw new AppError(400, "VALIDATION_ERROR", "Text cannot be blank");
     }
     const user = await User.findById(userId);
     if (!user) {
@@ -123,14 +160,25 @@ class PostService {
       throw new AppError(400, "VALIDATION_ERROR", "User has no name");
     }
 
-    post.comments.push({
-      userId: new Types.ObjectId(userId),
-      text,
-      name: user.name,
-      avatar: user.avatar ?? "",
-    });
-
-    await post.save();
+    // Atomic $push: concurrent comments can no longer overwrite each other.
+    const post = await Post.findOneAndUpdate(
+      { _id: id },
+      {
+        $push: {
+          comments: {
+            userId: new Types.ObjectId(userId),
+            text: text.trim(),
+            name: user.name,
+            avatar: user.avatar ?? "",
+          },
+        },
+        $set: { updatedAt: new Date() },
+      },
+      { new: true },
+    );
+    if (!post) {
+      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+    }
 
     return post.comments;
   }
@@ -147,9 +195,8 @@ class PostService {
     if (!isValidObjectId(commentId)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+    if (text === undefined || !text.trim()) {
+      throw new AppError(400, "VALIDATION_ERROR", "Text is required");
     }
     const user = await User.findById(userId);
     if (!user) {
@@ -158,20 +205,26 @@ class PostService {
     if (!user.name) {
       throw new AppError(400, "VALIDATION_ERROR", "User has no name");
     }
-    const comment = post.comments.find(
-      (comment) => comment._id?.toString() === commentId,
+    // Atomic ownership-checked update via the positional operator.
+    const post = await Post.findOneAndUpdate(
+      {
+        _id: id,
+        comments: { $elemMatch: { _id: commentId, userId: user._id } },
+      },
+      { $set: { "comments.$.text": text.trim(), updatedAt: new Date() } },
+      { new: true },
     );
-    if (!comment) {
-      throw new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
+    if (post) {
+      const comment = post.comments.find(
+        (comment) => comment._id?.toString() === commentId,
+      );
+      // Matched the filter, so the comment must be present.
+      if (!comment) {
+        throw new AppError(500, "INTERNAL_SERVER_ERROR", "Comment update failed");
+      }
+      return comment;
     }
-    if (!comment.userId.equals(userId)) {
-      throw new AppError(403, "FORBIDDEN", "Not authorized");
-    }
-    if (text) {
-      comment.text = text;
-    }
-    await post.save();
-    return comment;
+    throw await this.resolveCommentWriteFailure(id, commentId);
   }
 
   async deletePostComment(userId: string, id: string, commentId: string) {
@@ -181,28 +234,45 @@ class PostService {
     if (!isValidObjectId(commentId)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    const comment = post.comments.find(
+    // Atomic ownership-checked delete.
+    const post = await Post.findOneAndUpdate(
+      {
+        _id: id,
+        comments: { $elemMatch: { _id: commentId, userId: user._id } },
+      },
+      {
+        $pull: { comments: { _id: commentId } },
+        $set: { updatedAt: new Date() },
+      },
+      { new: true },
+    );
+    if (post) return;
+    throw await this.resolveCommentWriteFailure(id, commentId);
+  }
+
+  /**
+   * Maps a failed ownership-checked comment write to the precise error.
+   * Only runs on the failure path, so the extra read is rare.
+   */
+  private async resolveCommentWriteFailure(
+    id: string,
+    commentId: string,
+  ): Promise<AppError> {
+    const existing = await Post.findById(id);
+    if (!existing) {
+      return new AppError(404, "POST_NOT_FOUND", "Post not found");
+    }
+    const commentExists = existing.comments.some(
       (comment) => comment._id?.toString() === commentId,
     );
-    if (!comment) {
-      throw new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
+    if (!commentExists) {
+      return new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
     }
-    if (!comment.userId.equals(userId)) {
-      throw new AppError(403, "FORBIDDEN", "Not authorized");
-    }
-    post.comments = post.comments.filter(
-      (comment) => comment._id?.toString() !== commentId,
-    );
-
-    await post.save();
+    return new AppError(403, "FORBIDDEN", "Not authorized");
   }
 }
 

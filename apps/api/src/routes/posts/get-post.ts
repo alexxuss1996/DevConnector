@@ -1,22 +1,16 @@
-import { Type } from "typebox";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { postService } from "#modules/posts/posts.service";
+import { PostIdParamsSchema } from "@dev-conn/contracts";
 
-const ParamsSchema = Type.Object({
-  id: Type.String({
-    minLength: 1,
-    errorMessage: "ID must be at least 1 character",
-  }),
-});
-
-const getProfileById: FastifyPluginAsyncTypebox = async (
+const getPost: FastifyPluginAsyncTypebox = async (
   fastify,
   opts,
 ): Promise<void> => {
   fastify.get(
     "/:id",
     {
-      schema: { params: ParamsSchema },
+      onRequest: [fastify.authenticate],
+      schema: { params: PostIdParamsSchema },
     },
     async function (request, reply) {
       const { id } = request.params;
@@ -28,4 +22,4 @@ const getProfileById: FastifyPluginAsyncTypebox = async (
   );
 };
 
-export default getProfileById;
+export default getPost;

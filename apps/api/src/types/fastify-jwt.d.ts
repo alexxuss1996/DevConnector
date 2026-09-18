@@ -5,6 +5,8 @@ declare module "@fastify/jwt" {
     payload: {
       sub: string;
       type: "access" | "refresh";
+      // Optional in types for legacy tokens; the `authenticate` guard
+      // rejects access tokens without a sessionId at runtime.
       sessionId?: string;
       jti?: string;
     };
@@ -13,6 +15,7 @@ declare module "@fastify/jwt" {
       sub: string;
       type: "access" | "refresh";
       sessionId?: string;
+      jti?: string;
     };
   }
 }

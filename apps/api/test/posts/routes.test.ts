@@ -104,7 +104,7 @@ describe("POST /posts/ — authentication", () => {
       cookies: { access_token: accessToken },
       payload: { text: "Hello from cookie" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 
   test("returns 401 for invalid authorization scheme", async () => {
@@ -144,7 +144,14 @@ describe("POST /posts/ — validation", () => {
     assert.equal(reply.statusCode, 400);
     assert.equal(reply.json().code, "VALIDATION_ERROR");
     const body = reply.json() as any;
-    assert.ok(body.errors.some((e: any) => e.field === "text" || e.message.includes("Text")));
+    const details = [...(body.issues ?? []), ...Object.values(body.fieldErrors ?? {}).flat()] as any[];
+    assert.ok(
+      details.some((e: any) =>
+        typeof e === "string"
+          ? e.includes("Text")
+          : (e.path ?? []).includes("text") || (e.message ?? "").includes("Text"),
+      ),
+    );
   });
 
   test("returns 400 when text is not a string", async () => {
@@ -182,7 +189,7 @@ describe("POST /posts/ — validation", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { text: "Valid post text" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 
   test("accepts text with spaces and special chars", async () => {
@@ -198,7 +205,7 @@ describe("POST /posts/ — validation", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { text: "Hello 🌍! Special chars: @#$%^&*()" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 });
 
@@ -206,7 +213,7 @@ describe("POST /posts/ — validation", () => {
 // POST /posts/ — createPost logic
 // ============================================================
 describe("POST /posts/ — createPost logic", () => {
-  test("creates post and returns 200 with persisted document", async () => {
+  test("creates post and returns 201 with persisted document", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
     const user = mkUser({ _id: userId, name: "Jane Doe", avatar: "https://example.com/avatar.png" });
@@ -241,7 +248,7 @@ describe("POST /posts/ — createPost logic", () => {
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const body = reply.json() as any;
     assert.equal(body.text, "My first post");
     assert.equal(body.name, "Jane Doe");
@@ -269,13 +276,13 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hijack attempt", userId: attackerId } as any,
     });
 
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [idArg] = findByIdStub.mock.calls[0].arguments as any[];
     assert.equal(idArg.toString(), userId.toString());
     assert.notEqual(idArg.toString(), attackerId);
   });
 
-  test("returns 500 when user not found", async () => {
+  test("returns 404 when user not found", async () => {
     stubMethod(User, "findById", () => mkQuery(null));
     const reply = await app.inject({
       method: "POST",
@@ -287,7 +294,7 @@ describe("POST /posts/ — createPost logic", () => {
     assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
   });
 
-  test("returns 500 when user has no name", async () => {
+  test("returns 400 when user has no name", async () => {
     const userId = newId();
     const user = mkUser({ _id: userId, name: undefined as any });
     stubMethod(User, "findById", () => mkQuery(user as any));
@@ -347,7 +354,7 @@ describe("POST /posts/ — createPost logic", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { text: "Check avatar" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     assert.equal(capturedText, "Check avatar");
     assert.equal((reply.json() as any).avatar, "https://example.com/avatar2.png");
   });

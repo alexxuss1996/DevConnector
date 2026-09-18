@@ -1,4 +1,4 @@
-import { LoginUserSchema } from "#modules/auth/auth.schemas";
+import { LoginUserSchema } from "@dev-conn/contracts";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { authService } from "#modules/auth/auth.service";
 import { setAuthCookies } from "#helpers/auth.cookies";

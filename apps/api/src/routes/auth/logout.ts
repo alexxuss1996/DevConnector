@@ -7,27 +7,31 @@ const logout: FastifyPluginAsyncTypebox = async (
   fastify,
   opts,
 ): Promise<void> => {
-  fastify.post("/logout", async function (request, reply) {
-    const token = request.cookies.refresh_token;
-    try {
-      if (token) {
-        await authService.logout(fastify, token);
+  fastify.post(
+    "/logout",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async function (request, reply) {
+      const token = request.cookies.refresh_token;
+      try {
+        if (token) {
+          await authService.logout(fastify, token);
+        }
+      } catch (err) {
+        if (
+          !(err instanceof AppError) ||
+          err.statusCode !== 401 ||
+          err.code !== "INVALID_CREDENTIALS"
+        ) {
+          throw err;
+        }
+        fastify.log.warn({ err }, "logout: session could not be revoked");
+      } finally {
+        clearAuthCookies(reply);
       }
-    } catch (err) {
-      if (
-        !(err instanceof AppError) ||
-        err.statusCode !== 401 ||
-        err.code !== "INVALID_CREDENTIALS"
-      ) {
-        throw err;
-      }
-      fastify.log.warn({ err }, "logout: session could not be revoked");
-    } finally {
-      clearAuthCookies(reply);
-    }
 
-    return reply.status(204).send();
-  });
+      return reply.status(204).send();
+    },
+  );
 };
 
 export default logout;

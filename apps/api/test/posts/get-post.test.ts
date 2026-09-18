@@ -26,11 +26,16 @@ afterEach(() => {
   restoreAllStubs();
 });
 
+function authHeader() {
+  return { authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}` };
+}
+
+
 // ============================================================
-// GET /posts/:id — success (public, no auth required)
+// GET /posts/:id — success (requires auth, like the posts feed)
 // ============================================================
 describe("GET /posts/:id — success", () => {
-  test("returns 200 with post when found (no auth)", async () => {
+  test("returns 200 with post when found (with auth)", async () => {
     const postId = newId();
     const post = mkPost({ _id: postId, text: "Hello single post" });
     stubMethod(Post, "findById", () => mkQuery(post as any));
@@ -38,6 +43,7 @@ describe("GET /posts/:id — success", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${postId.toString()}`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 200);
@@ -45,6 +51,18 @@ describe("GET /posts/:id — success", () => {
     assert.ok(body.post);
     assert.equal(body.post.text, "Hello single post");
     assert.equal(body.post._id.toString(), postId.toString());
+  });
+
+  test("returns 401 without a token", async () => {
+    const reply = await app.inject({
+      method: "GET",
+      url: `/posts/${newId().toString()}`,
+    });
+    assert.equal(reply.statusCode, 401);
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 200 with post when accessed with auth token", async () => {
@@ -71,6 +89,7 @@ describe("GET /posts/:id — success", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${postId.toString()}`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 200);
@@ -97,6 +116,7 @@ describe("GET /posts/:id — success", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${postId.toString()}`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 200);
@@ -119,6 +139,7 @@ describe("GET /posts/:id — success", () => {
     const replyA = await app.inject({
       method: "GET",
       url: `/posts/${postIdA.toString()}`,
+      headers: authHeader(),
     });
     assert.equal(replyA.statusCode, 200);
     assert.equal((replyA.json() as any).post.text, "Post A");
@@ -126,6 +147,7 @@ describe("GET /posts/:id — success", () => {
     const replyB = await app.inject({
       method: "GET",
       url: `/posts/${postIdB.toString()}`,
+      headers: authHeader(),
     });
     assert.equal(replyB.statusCode, 404);
   });
@@ -141,13 +163,14 @@ describe("GET /posts/:id — not found", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${newId().toString()}`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 404);
     assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
   });
 
-  test("returns 404 when Post.findById throws generic Error", async () => {
+  test("returns 500 when Post.findById throws generic Error", async () => {
     stubMethod(Post, "findById", () => {
       throw new Error("Post not found");
     });
@@ -155,6 +178,7 @@ describe("GET /posts/:id — not found", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${newId().toString()}`,
+      headers: authHeader(),
     });
 
     // Generic errors not from AppError are treated as 500 by errorHandler
@@ -163,19 +187,20 @@ describe("GET /posts/:id — not found", () => {
     assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
   });
 
-  test("returns 404 when Post.findById rejects (DB error — route maps all errors to 404)", async () => {
+  test("returns 500 when Post.findById rejects (DB error)", async () => {
     stubMethod(Post, "findById", () => Promise.reject(new Error("DB boom")));
 
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${newId().toString()}`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 500);
     assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
   });
 
-  test("returns 404 when findById throws unexpected error", async () => {
+  test("returns 500 when findById throws unexpected error", async () => {
     stubMethod(Post, "findById", () => {
       throw new Error("unexpected");
     });
@@ -183,6 +208,7 @@ describe("GET /posts/:id — not found", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${newId().toString()}`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 500);
@@ -195,6 +221,7 @@ describe("GET /posts/:id — not found", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${newId().toString()}`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 404);
@@ -204,6 +231,7 @@ describe("GET /posts/:id — not found", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/not-a-valid-objectid`,
+      headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 400);
@@ -232,14 +260,12 @@ describe("GET /posts/:id — routing", () => {
     const reply = await app.inject({
       method: "GET",
       url: `/posts/${postId.toString()}/`,
+      headers: authHeader(),
     });
 
-    // Fastify by default handles trailing slash; should still return 200
-    // If 404, the handler wasn't matched — adjust assertion accordingly
-    assert.ok([200, 404].includes(reply.statusCode));
-    if (reply.statusCode === 200) {
-      assert.equal((reply.json() as any).post.text, "trailing slash");
-    }
+    // Fastify matches trailing slashes to the same route.
+    assert.equal(reply.statusCode, 200);
+    assert.equal((reply.json() as any).post.text, "trailing slash");
   });
 });
 

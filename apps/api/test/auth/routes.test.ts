@@ -100,10 +100,10 @@ describe("POST /auth/register", () => {
       },
     });
 
-    assert.equal(reply.statusCode, 400);
+    assert.equal(reply.statusCode, 409);
     const body = reply.json();
     assert.equal(body.code, "REGISTRATION_FAILED");
-    assert.equal(body.message, "Registration failed");
+    assert.equal(body.message, "Email already in use");
     assert.deepEqual(Object.keys(body).sort(), ["code", "message"]);
   });
 });
@@ -223,7 +223,10 @@ describe("POST /auth/refresh", () => {
     const reply = await app.inject({ method: "POST", url: "/auth/refresh" });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 INVALID_CREDENTIALS when the refresh token is invalid", async () => {
@@ -379,7 +382,7 @@ describe("GET /auth/google/callback", () => {
     ]);
   });
 
-  test("returns 401 when Google rejects the code exchange", async () => {
+  test("redirects with error param when Google rejects the code exchange", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: false,
       json: async () => ({}),
@@ -390,8 +393,8 @@ describe("GET /auth/google/callback", () => {
       url: "/auth/google/callback?code=bad-code",
     });
 
-    assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { message: "Google authentication failed" });
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 });
 
@@ -444,10 +447,10 @@ describe("POST /auth/register — additional cases", () => {
       },
     });
 
-    assert.equal(reply.statusCode, 400);
+    assert.equal(reply.statusCode, 409);
     assert.deepEqual(reply.json(), {
       code: "REGISTRATION_FAILED",
-      message: "Registration failed",
+      message: "Email already in use",
     });
 
     assert.equal(create.mock.callCount(), 0);
@@ -660,6 +663,8 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     stubMethod(Session, "findById", () => mkQuery(session));
+    // Reuse detection revokes the session on token mismatch.
+    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -786,6 +791,8 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     stubMethod(Session, "findById", () => mkQuery(session));
+    // Reuse detection revokes the session when the old token is replayed.
+    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
 
     stubMethod(User, "findById", () =>
       mkQuery(
@@ -1007,7 +1014,7 @@ describe("GET /protected — additional cases", () => {
 });
 
 describe("GET /auth/google/callback — additional cases", () => {
-  test("returns 401 when Google access token is invalid", async () => {
+  test("redirects with error param when Google access token is invalid", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: false,
       json: async () => ({}),
@@ -1018,13 +1025,11 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=bad-code",
     });
 
-    assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
-      message: "Google authentication failed",
-    });
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 
-  test("returns 401 when Google email is not verified", async () => {
+  test("redirects with error param when Google email is not verified", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: true,
       json: async () => ({
@@ -1045,11 +1050,12 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 401);
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
     assert.equal(create.mock.callCount(), 0);
   });
 
-  test("returns 401 when Google user does not contain sub", async () => {
+  test("redirects with error param when Google user does not contain sub", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: true,
       json: async () => ({
@@ -1064,10 +1070,11 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 401);
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 
-  test("returns 401 when Google user does not contain email", async () => {
+  test("redirects with error param when Google user does not contain email", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: true,
       json: async () => ({
@@ -1082,10 +1089,11 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 401);
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 
-  test("links an existing local account to Google", async () => {
+  test("redirects with conflict error instead of auto-linking an existing local account", async () => {
     const user: any = mkUser({
       email: "g.user@example.com",
       googleId: undefined,
@@ -1104,7 +1112,12 @@ describe("GET /auth/google/callback — additional cases", () => {
       }),
     }));
 
-    stubMethod(User, "findOne", () => mkQuery(user));
+    // Realistic: no user holds this googleId; the email belongs to a
+    // password account — must NOT merge.
+    stubMethod(User, "findOne", (cond: any) => {
+      if (cond && "googleId" in cond) return mkQuery(null);
+      return mkQuery(user);
+    });
 
     const save = stubMethod(user, "save", async function (this: any) {
       return this;
@@ -1119,15 +1132,17 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
+    // No silent merge: owner logs in with password and links explicitly.
     assert.equal(reply.statusCode, 302);
-    assert.equal(save.mock.callCount(), 1);
-
-    assert.equal(user.googleId, "google-sub-789");
-    assert.equal(user.name, "G User");
-    assert.equal(user.avatar, "https://example.com/g.png");
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_account_conflict`,
+    );
+    assert.equal(save.mock.callCount(), 0);
+    assert.equal(user.googleId, undefined);
   });
 
-  test("returns 409 when local account is linked to another Google account", async () => {
+  test("redirects with conflict error when email belongs to a password account", async () => {
     const user = mkUser({
       email: "g.user@example.com",
       googleId: "different-google-sub",
@@ -1143,7 +1158,10 @@ describe("GET /auth/google/callback — additional cases", () => {
       }),
     }));
 
-    stubMethod(User, "findOne", () => mkQuery(user));
+    stubMethod(User, "findOne", (cond: any) => {
+      if (cond && "googleId" in cond) return mkQuery(null);
+      return mkQuery(user);
+    });
 
     const create = stubMethod(User, "create", () => {
       throw new Error("User.create should not be called");
@@ -1154,11 +1172,15 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 409);
+    assert.equal(reply.statusCode, 302);
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_account_conflict`,
+    );
     assert.equal(create.mock.callCount(), 0);
   });
 
-  test("does not overwrite existing name or avatar when linking Google account", async () => {
+  test("redirects with conflict error instead of merging into an existing account", async () => {
     const user: any = mkUser({
       email: "g.user@example.com",
       googleId: undefined,
@@ -1177,7 +1199,10 @@ describe("GET /auth/google/callback — additional cases", () => {
       }),
     }));
 
-    stubMethod(User, "findOne", () => mkQuery(user));
+    stubMethod(User, "findOne", (cond: any) => {
+      if (cond && "googleId" in cond) return mkQuery(null);
+      return mkQuery(user);
+    });
 
     stubMethod(user, "save", async function (this: any) {
       return this;
@@ -1193,8 +1218,12 @@ describe("GET /auth/google/callback — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 302);
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_account_conflict`,
+    );
 
-    assert.equal(user.googleId, "google-sub-789");
+    assert.equal(user.googleId, undefined);
     assert.equal(user.name, "Existing Name");
     assert.equal(user.avatar, "https://example.com/existing.png");
   });
@@ -1233,5 +1262,138 @@ describe("GET /auth/google/callback — additional cases", () => {
 
     assert.equal(reply.statusCode, 302);
     assert.equal(create.mock.callCount(), 0);
+  });
+});
+
+describe("POST /auth/google/link", () => {
+  function googleUserStubs(overrides: Record<string, unknown> = {}) {
+    stubMethod(globalThis, "fetch", async () => ({
+      ok: true,
+      json: async () => ({
+        sub: "google-sub-789",
+        email: "g.user@example.com",
+        email_verified: true,
+        ...overrides,
+      }),
+    }));
+  }
+
+  test("returns 401 without a token", async () => {
+    const reply = await app.inject({
+      method: "POST",
+      url: "/auth/google/link",
+      payload: { accessToken: "x" },
+    });
+    assert.equal(reply.statusCode, 401);
+  });
+
+  test("links Google to the authenticated user", async () => {
+    const userId = newId();
+    const user: any = mkUser({ _id: userId, googleId: undefined });
+    googleUserStubs();
+    // findOne({googleId}) -> null; findById -> user; findOne({email}) -> null
+    stubMethod(User, "findOne", () => mkQuery(null));
+    stubMethod(User, "findById", () => mkQuery(user));
+    const save = stubMethod(user, "save", async function (this: any) {
+      return this;
+    });
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/auth/google/link",
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+      payload: { accessToken: "google-token" },
+    });
+
+    assert.equal(reply.statusCode, 200);
+    assert.equal(save.mock.callCount(), 1);
+    assert.equal(user.googleId, "google-sub-789");
+  });
+
+  test("returns 409 when the Google account belongs to someone else", async () => {
+    const userId = newId();
+    googleUserStubs();
+    stubMethod(User, "findOne", () =>
+      mkQuery(mkUser({ googleId: "google-sub-789" }) as any),
+    );
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/auth/google/link",
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+      payload: { accessToken: "google-token" },
+    });
+
+    assert.equal(reply.statusCode, 409);
+    assert.equal(reply.json().code, "GOOGLE_ACCOUNT_CONFLICT");
+  });
+
+  test("returns 400 when accessToken is missing", async () => {
+    const reply = await app.inject({
+      method: "POST",
+      url: "/auth/google/link",
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}`,
+      },
+      payload: {},
+    });
+    assert.equal(reply.statusCode, 400);
+    assert.equal(reply.json().code, "VALIDATION_ERROR");
+  });
+});
+
+describe("DELETE /auth/google/link", () => {
+  test("returns 401 without a token", async () => {
+    const reply = await app.inject({
+      method: "DELETE",
+      url: "/auth/google/link",
+    });
+    assert.equal(reply.statusCode, 401);
+  });
+
+  test("unlinks Google when a password is set", async () => {
+    const userId = newId();
+    stubMethod(User, "findById", () =>
+      mkQuery(
+        mkUser({ _id: userId, googleId: "g-sub", passwordHash: "hash" }) as any,
+      ),
+    );
+    const updateOne = stubMethod(User, "updateOne", () =>
+      Promise.resolve({ acknowledged: true }) as any,
+    );
+
+    const reply = await app.inject({
+      method: "DELETE",
+      url: "/auth/google/link",
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+    });
+
+    assert.equal(reply.statusCode, 204);
+    assert.equal(updateOne.mock.callCount(), 1);
+  });
+
+  test("returns 400 when unlinking a Google-only account", async () => {
+    const userId = newId();
+    stubMethod(User, "findById", () =>
+      mkQuery(
+        mkUser({ _id: userId, googleId: "g-sub", passwordHash: undefined }) as any,
+      ),
+    );
+
+    const reply = await app.inject({
+      method: "DELETE",
+      url: "/auth/google/link",
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+    });
+
+    assert.equal(reply.statusCode, 400);
   });
 });

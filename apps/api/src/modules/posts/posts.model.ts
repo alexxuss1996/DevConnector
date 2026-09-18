@@ -56,6 +56,7 @@ const postSchema = new Schema<IPost>({
       userId: {
         type: Schema.Types.ObjectId,
         ref: "User",
+        required: true,
       },
     },
   ],
@@ -64,6 +65,7 @@ const postSchema = new Schema<IPost>({
       userId: {
         type: Schema.Types.ObjectId,
         ref: "User",
+        required: true,
       },
       text: {
         type: String,
@@ -87,6 +89,10 @@ const postSchema = new Schema<IPost>({
     },
   ],
 });
+
+postSchema.index({ userId: 1, createdAt: -1 });
+postSchema.index({ "likes.userId": 1 });
+postSchema.index({ "comments.userId": 1 });
 
 const Post = mongoose.model<IPost>("Post", postSchema);
 

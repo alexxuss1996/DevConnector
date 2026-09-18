@@ -1,4 +1,4 @@
-import { AddEducationSchema } from "#modules/profile/profile.schemas";
+import { AddEducationSchema } from "@dev-conn/contracts";
 import { profileService } from "#modules/profile/profile.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
@@ -17,7 +17,7 @@ const addEducation: FastifyPluginAsyncTypebox = async (
         request.user.sub,
         request.body,
       );
-      return reply.status(200).send(result);
+      return reply.status(201).send(result);
     },
   );
 };

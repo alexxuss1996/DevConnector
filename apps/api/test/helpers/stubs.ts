@@ -2,7 +2,44 @@ import { mock } from "node:test";
 import type { Mock } from "node:test";
 import { Types } from "mongoose";
 
-const restorers: Array<() => void> = [];
+const sessionUserMap = new Map<string, string>();
+
+/** Records a sessionId -> sub mapping for auto-stubbed auth sessions. */
+export function recordSessionToken(sessionId: string, sub: string): void {
+  sessionUserMap.set(sessionId, sub);
+}
+
+/** Looks up the sub recorded for a sessionId (test helper only). */
+export function lookupSessionUser(sessionId: string): string | undefined {
+  return sessionUserMap.get(sessionId);
+}
+
+export function clearSessionTokens(): void {
+  sessionUserMap.clear();
+}
+
+const restorers: Array<{ key: object; restore: () => void }> = [];
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 1;
+
+function stubKey(obj: object, name: string | symbol): object {
+  // Identity-based key: two different objects stubbing the same method name
+  // must never collide (e.g. `user.save` vs `Session.prototype.save`).
+  let id = objectIds.get(obj);
+  if (id === undefined) {
+    id = nextObjectId++;
+    objectIds.set(obj, id);
+  }
+  return { id, name: String(name), obj };
+}
+
+function sameKey(a: object, b: object): boolean {
+  return (
+    (a as any).id === (b as any).id &&
+    (a as any).name === (b as any).name &&
+    (a as any).obj === (b as any).obj
+  );
+}
 
 export type MockFn<T extends (...args: any[]) => any = (...args: any[]) => any> = Mock<T>;
 
@@ -63,8 +100,9 @@ export function mkSessionDoc(overrides: Partial<SessionDoc> = {}): SessionDoc & 
 
 type ChainableQuery<T> = Promise<T | null> & {
   select: (s: string) => ChainableQuery<T>;
-  sort: () => ChainableQuery<T>;
-  limit: () => ChainableQuery<T>;
+  sort: (...args: any[]) => ChainableQuery<T>;
+  skip: (...args: any[]) => ChainableQuery<T>;
+  limit: (...args: any[]) => ChainableQuery<T>;
   lean: () => ChainableQuery<T>;
   exec: () => Promise<T | null>;
   populate: (...args: any[]) => ChainableQuery<T>;
@@ -75,6 +113,7 @@ export function mkQuery<T>(value: T | null): ChainableQuery<T> {
   q.select = () => q;
   q.exec = () => Promise.resolve(value);
   q.sort = () => q;
+  q.skip = () => q;
   q.lean = () => q;
   q.limit = () => q;
   q.populate = () => q;
@@ -200,13 +239,39 @@ export function stubMethod<T extends object>(
   name: keyof T,
   impl?: (...args: any[]) => any,
 ): Mock<any> {
+  const key = stubKey(obj as object, name as string);
+  // Replace a previous stub for the same target (e.g. auto-installed session
+  // stub overridden by an explicit per-test stub).
+  const existing = restorers.findIndex((r) => sameKey(r.key, key));
+  if (existing !== -1) {
+    try {
+      restorers[existing].restore();
+    } catch {
+      // ignore — already restored
+    }
+    restorers.splice(existing, 1);
+  }
   const m = mock.method(obj as any, name as any, impl as any);
-  restorers.push(() => m.mock.restore());
+  restorers.push({
+    key,
+    restore: () => {
+      try {
+        m.mock.restore();
+      } catch {
+        // ignore double-restore
+      }
+    },
+  });
   return m;
 }
 
 export function restoreAllStubs(): void {
   while (restorers.length > 0) {
-    restorers.pop()!();
+    try {
+      restorers.pop()!.restore();
+    } catch {
+      // ignore
+    }
   }
+  clearSessionTokens();
 }

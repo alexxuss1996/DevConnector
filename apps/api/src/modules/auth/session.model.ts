@@ -14,12 +14,14 @@ const sessionSchema = new Schema<ISession>({
     select: false,
     ref: "User",
   },
-  refreshTokenHash: { type: String, select: false },
+  refreshTokenHash: { type: String, required: true, select: false },
   expiresAt: { type: Date, required: true },
   revokedAt: { type: Date },
 });
 
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+sessionSchema.index({ userId: 1 });
+sessionSchema.index({ revokedAt: 1 });
 
 const Session = mongoose.model<ISession>("Session", sessionSchema);
 

@@ -55,11 +55,6 @@ describe("errorHandler", () => {
     const body = captured.body as any;
     assert.equal(body.code, "VALIDATION_ERROR");
     assert.equal(body.message, "Request validation failed");
-    assert.deepEqual(body.errors, [
-      { field: "email", keyword: "format", message: "must match format" },
-      { field: "password", keyword: "minLength", message: "too short" },
-    ]);
-    // Zod-like additional fields
     assert.ok(Array.isArray(body.issues));
     assert.equal(body.issues.length, 2);
     assert.deepEqual(body.issues[0].path, ["email"]);

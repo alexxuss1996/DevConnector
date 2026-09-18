@@ -1,19 +1,6 @@
 import { postService } from "#modules/posts/posts.service";
-import {
-  FastifyPluginAsyncTypebox,
-  Type,
-} from "@fastify/type-provider-typebox";
-
-const ParamsSchema = Type.Object({
-  id: Type.String({
-    minLength: 1,
-    errorMessage: "ID must be at least 1 character",
-  }),
-  commentId: Type.String({
-    minLength: 1,
-    errorMessage: "Comment ID must be at least 1 character",
-  }),
-});
+import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
+import { PostCommentIdParamsSchema } from "@dev-conn/contracts";
 const deletePostComment: FastifyPluginAsyncTypebox = async (
   fastify,
   opts,
@@ -22,14 +9,12 @@ const deletePostComment: FastifyPluginAsyncTypebox = async (
     "/:id/comments/:commentId",
     {
       onRequest: [fastify.authenticate],
-      schema: { params: ParamsSchema },
+      schema: { params: PostCommentIdParamsSchema },
     },
     async function (request, reply) {
       const { id, commentId } = request.params;
       await postService.deletePostComment(request.user.sub, id, commentId);
-      return reply.status(204).send({
-        message: "The comment was deleted",
-      });
+      return reply.status(204).send();
     },
   );
 };
