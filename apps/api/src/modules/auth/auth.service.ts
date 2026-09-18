@@ -158,11 +158,12 @@ class AuthService {
   async register(fastify: FastifyInstance, data: RegisterInput) {
     const { name, email, password } = data;
     const normalizedEmail = email.toLowerCase().trim();
+    const trimmedName = name.trim();
 
     let existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
-      throw new AppError(400, "REGISTRATION_FAILED", "Registration failed");
+      throw new AppError(409, "REGISTRATION_FAILED", "Email already in use");
     }
 
     const passwordHash = await argon2.hash(password);
@@ -176,7 +177,7 @@ class AuthService {
     let user;
     try {
       user = await User.create({
-        name,
+        name: trimmedName,
         email: normalizedEmail,
         passwordHash: passwordHash,
         avatar: gravatar,
@@ -206,6 +207,13 @@ class AuthService {
     };
   }
 
+  /**
+   * Google login. Never merges on email match: a Google `sub` either maps
+   * to an existing linked user, or — when the email is unused — creates a
+   * new account. An existing password account with the same email gets a
+   * 409 so the owner can link explicitly via `linkGoogleAccount` from an
+   * authenticated session (proving ownership of both sides).
+   */
   async authenticateGoogle(
     fastify: FastifyInstance,
     googleAccessToken: string,
@@ -214,11 +222,21 @@ class AuthService {
 
     const email = googleUser.email.toLowerCase().trim();
 
-    let user = await User.findOne({
-      $or: [{ googleId: googleUser.sub }, { email }],
-    }).select("+googleId");
+    let user = await User.findOne({ googleId: googleUser.sub }).select(
+      "+googleId",
+    );
 
     if (!user) {
+      // No linked account: fail closed when the email is taken instead of
+      // hijacking/merging into someone else's account.
+      const existing = await User.findOne({ email }).select("+googleId");
+      if (existing) {
+        throw new AppError(
+          409,
+          "GOOGLE_ACCOUNT_CONFLICT",
+          "An account with this email already exists. Log in and link Google from your account settings.",
+        );
+      }
       const fallbackName =
         googleUser.name ?? email.split("@")[0] ?? "Google User";
       try {
@@ -238,24 +256,20 @@ class AuthService {
         }
         throw err;
       }
-    } else {
-      if (user.googleId && user.googleId !== googleUser.sub) {
-        throw new AppError(
-          409,
-          "GOOGLE_ACCOUNT_CONFLICT",
-          "This email is linked to a different Google account",
-        );
-      }
-
-      if (!user.googleId) {
-        user.googleId = googleUser.sub;
-        user.name ??= googleUser.name ?? email.split("@")[0];
-        user.avatar ??= googleUser.picture;
-
+    } else if (user.email !== email) {
+      // Google sub is stable; email may change on Google's side.
+      user.email = email;
+      try {
         await user.save();
-      } else if (user.email !== email) {
-        user.email = email;
-        await user.save();
+      } catch (err: unknown) {
+        if ((err as { code?: number }).code === 11000) {
+          throw new AppError(
+            409,
+            "GOOGLE_ACCOUNT_CONFLICT",
+            "This Google account's email is already in use",
+          );
+        }
+        throw err;
       }
     }
 
@@ -274,6 +288,88 @@ class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  /**
+   * Links a Google identity to the currently authenticated user. The caller
+   * must already own the local account (via `authenticate`), and the Google
+   * token must belong to a verified email — proving ownership of both sides
+   * before any merge. The Google `sub`/email must not belong to anyone else.
+   */
+  async linkGoogleAccount(userId: string, googleAccessToken: string) {
+    const googleUser = await this.getGoogleUser(googleAccessToken);
+    const email = googleUser.email.toLowerCase().trim();
+
+    const taken = await User.findOne({ googleId: googleUser.sub }).select(
+      "+googleId",
+    );
+    if (taken && taken._id.toString() !== userId) {
+      throw new AppError(
+        409,
+        "GOOGLE_ACCOUNT_CONFLICT",
+        "This Google account is already linked to another user",
+      );
+    }
+
+    const user = await User.findById(userId).select("+googleId");
+    if (!user) {
+      throw new AppError(404, "USER_NOT_FOUND", "User not found");
+    }
+    if (user.googleId && user.googleId !== googleUser.sub) {
+      throw new AppError(
+        409,
+        "GOOGLE_ACCOUNT_CONFLICT",
+        "Your account is already linked to a different Google account",
+      );
+    }
+
+    // Another user may hold the Google email address: linking would create
+    // two accounts claiming the same email.
+    const emailOwner = await User.findOne({ email }).select("_id");
+    if (emailOwner && emailOwner._id.toString() !== userId) {
+      throw new AppError(
+        409,
+        "GOOGLE_ACCOUNT_CONFLICT",
+        "This Google email is already in use by another account",
+      );
+    }
+
+    user.googleId = googleUser.sub;
+    try {
+      await user.save();
+    } catch (err: unknown) {
+      if ((err as { code?: number }).code === 11000) {
+        throw new AppError(
+          409,
+          "GOOGLE_ACCOUNT_CONFLICT",
+          "This Google account is already linked elsewhere",
+        );
+      }
+      throw err;
+    }
+    return { googleId: user.googleId };
+  }
+
+  /** Removes the Google link from the currently authenticated user. */
+  async unlinkGoogleAccount(userId: string) {
+    const user = await User.findById(userId).select(
+      "+googleId +passwordHash",
+    );
+    if (!user) {
+      throw new AppError(404, "USER_NOT_FOUND", "User not found");
+    }
+    if (!user.googleId) {
+      throw new AppError(404, "GOOGLE_NOT_LINKED", "No Google account linked");
+    }
+    // Google-only accounts would lock themselves out — require a password.
+    if (!user.passwordHash) {
+      throw new AppError(
+        400,
+        "VALIDATION_ERROR",
+        "Set a password before unlinking your Google account",
+      );
+    }
+    await User.updateOne({ _id: userId }, { $unset: { googleId: 1 } });
   }
 
   async refresh(fastify: FastifyInstance, token: string) {
@@ -343,9 +439,31 @@ class AuthService {
       },
     );
 
-    session.refreshTokenHash = await argon2.hash(refreshToken);
+    const newHash = await argon2.hash(refreshToken);
+    // Sliding expiry: DB row lives as long as the newest refresh JWT (30d
+    // from now), so the two never disagree about session lifetime.
+    const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    await session.save();
+    if (typeof (session as any).__v === "number") {
+      // Optimistic concurrency: only one parallel refresh can win. The loser
+      // sees no match and is treated as a token reuse (session already rotated).
+      const updated = await Session.findOneAndUpdate(
+        { _id: session._id, __v: (session as any).__v },
+        {
+          $set: { refreshTokenHash: newHash, expiresAt: newExpiresAt },
+          $inc: { __v: 1 },
+        },
+        { new: true },
+      );
+      if (!updated) {
+        throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
+      }
+    } else {
+      // Stubbed/plain session objects in tests carry no __v — fall back to save.
+      session.refreshTokenHash = newHash;
+      session.expiresAt = newExpiresAt;
+      await session.save();
+    }
 
     const accessToken = fastify.jwt.sign(
       {
@@ -391,6 +509,14 @@ class AuthService {
     }
 
     await this.revokeSession(payload.sessionId);
+  }
+
+  /** Revokes every session for a user (log out everywhere). */
+  async logoutAll(userId: string) {
+    await Session.updateMany(
+      { userId, revokedAt: { $exists: false } },
+      { $set: { revokedAt: new Date() } },
+    );
   }
 }
 

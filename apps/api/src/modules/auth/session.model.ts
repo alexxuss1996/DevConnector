@@ -14,7 +14,7 @@ const sessionSchema = new Schema<ISession>({
     select: false,
     ref: "User",
   },
-  refreshTokenHash: { type: String, select: false },
+  refreshTokenHash: { type: String, required: true, select: false },
   expiresAt: { type: Date, required: true },
   revokedAt: { type: Date },
 });

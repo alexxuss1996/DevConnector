@@ -232,7 +232,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.equal((reply.json() as any).code, "PROFILE_NOT_FOUND");
+    assert.equal((reply.json() as any).code, "USER_NOT_FOUND");
   });
 
   test("returns 204 on success and deletes both", async () => {
@@ -306,7 +306,7 @@ describe("POST /profile/experience — authentication", () => {
       cookies: { access_token: token },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 });
 
@@ -366,7 +366,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
     assert.equal((reply.json() as any).code, "PROFILE_NOT_FOUND");
   });
 
-  test("pushes experience atomically with all fields and returns 200", async () => {
+  test("pushes experience atomically with all fields and returns 201", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: [] });
     const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
@@ -387,7 +387,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload,
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const body = reply.json() as any;
     assert.ok(body.profile);
     // atomic $push carries Date-converted fields
@@ -413,7 +413,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [, omittedPush] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(omittedPush.$push.experience.title, "Dev");
     assert.equal(omittedPush.$push.experience.to, undefined);
@@ -431,7 +431,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01", current: true },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [, currentPush] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(currentPush.$push.experience.current, true);
     assert.equal(currentPush.$push.experience.to, undefined);
@@ -449,7 +449,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 
   test("returns 500 on update error", async () => {
@@ -535,7 +535,7 @@ describe("POST /profile/education — logic (139-167)", () => {
     assert.equal(reply.statusCode, 404);
   });
 
-  test("pushes education atomically with all fields and returns 200", async () => {
+  test("pushes education atomically with all fields and returns 201", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: [] });
     const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
@@ -556,7 +556,7 @@ describe("POST /profile/education — logic (139-167)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload,
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [, eduPush] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(eduPush.$push.education.school, "MIT");
     assert.equal(eduPush.$push.education.degree, "Master");
@@ -578,7 +578,7 @@ describe("POST /profile/education — logic (139-167)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [, omittedEduPush] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(omittedEduPush.$push.education.to, undefined);
   });
@@ -594,7 +594,7 @@ describe("POST /profile/education — logic (139-167)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01", current: true },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [, currentEduPush] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(currentEduPush.$push.education.current, true);
   });
@@ -610,7 +610,7 @@ describe("POST /profile/education — logic (139-167)", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 
   test("returns 500 on update error", async () => {

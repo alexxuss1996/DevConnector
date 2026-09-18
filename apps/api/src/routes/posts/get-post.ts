@@ -9,6 +9,7 @@ const getPost: FastifyPluginAsyncTypebox = async (
   fastify.get(
     "/:id",
     {
+      onRequest: [fastify.authenticate],
       schema: { params: PostIdParamsSchema },
     },
     async function (request, reply) {

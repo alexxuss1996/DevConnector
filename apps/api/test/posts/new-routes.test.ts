@@ -326,17 +326,23 @@ describe("PUT /posts/:id/unlike — logic", () => {
 });
 
 // ============================================================
-// GET /posts/:id/comments — public, no auth required
+// GET /posts/:id/comments — requires auth (like the posts feed)
 // ============================================================
-describe("GET /posts/:id/comments — public", () => {
-  test("returns 200 with comments without auth", async () => {
+describe("GET /posts/:id/comments — authentication", () => {
+  test("returns 401 without a token", async () => {
+    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments` });
+    assert.equal(reply.statusCode, 401);
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+  });
+
+  test("returns 200 with comments with auth", async () => {
     const postId = newId();
     const c1 = mkComment({ text: "c1" });
     const c2 = mkComment({ text: "c2" });
     const post = mkPost({ _id: postId, comments: [c1 as any, c2 as any] });
     stubMethod(Post, "findById", () => mkQuery(post as any));
 
-    const reply = await app.inject({ method: "GET", url: `/posts/${postId}/comments` });
+    const reply = await app.inject({ method: "GET", url: `/posts/${postId}/comments`, headers: authHeader() });
     assert.equal(reply.statusCode, 200);
     const body = reply.json() as any;
     assert.ok(Array.isArray(body.comments));
@@ -357,7 +363,7 @@ describe("GET /posts/:id/comments — public", () => {
 
   test("returns 404 when post not found", async () => {
     stubMethod(Post, "findById", () => mkQuery(null));
-    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments` });
+    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments`, headers: authHeader() });
     assert.equal(reply.statusCode, 404);
     assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
   });
@@ -365,7 +371,7 @@ describe("GET /posts/:id/comments — public", () => {
   test("returns 200 with empty array when no comments", async () => {
     const post = mkPost({ comments: [] });
     stubMethod(Post, "findById", () => mkQuery(post as any));
-    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments` });
+    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments`, headers: authHeader() });
     assert.equal(reply.statusCode, 200);
     assert.deepEqual((reply.json() as any).comments, []);
   });
@@ -374,7 +380,7 @@ describe("GET /posts/:id/comments — public", () => {
     const postId = newId();
     const post = mkPost({ _id: postId, comments: [] });
     const stub = stubMethod(Post, "findById", () => mkQuery(post as any));
-    const reply = await app.inject({ method: "GET", url: `/posts/${postId}/comments` });
+    const reply = await app.inject({ method: "GET", url: `/posts/${postId}/comments`, headers: authHeader() });
     assert.equal(reply.statusCode, 200);
     assert.equal(stub.mock.callCount(), 1);
     assert.equal(stub.mock.calls[0].arguments[0].toString(), postId.toString());
@@ -382,7 +388,7 @@ describe("GET /posts/:id/comments — public", () => {
 
   test("returns 500 for DB error", async () => {
     stubMethod(Post, "findById", () => { throw new Error("boom"); });
-    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments` });
+    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments`, headers: authHeader() });
     assert.equal(reply.statusCode, 500);
   });
 });
@@ -423,7 +429,7 @@ describe("POST /posts/:id/comments — authentication", () => {
       cookies: { access_token: token },
       payload: { text: "cookie comment" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 });
 
@@ -472,7 +478,7 @@ describe("POST /posts/:id/comments — validation", () => {
       headers: authHeader(userId.toString()),
       payload: { text: "valid comment" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 });
 
@@ -480,7 +486,7 @@ describe("POST /posts/:id/comments — validation", () => {
 // POST /posts/:id/comments — logic
 // ============================================================
 describe("POST /posts/:id/comments — logic", () => {
-  test("creates comment and returns 200", async () => {
+  test("creates comment and returns 201", async () => {
     const userId = newId();
     const postId = newId();
     const user = mkUser({ _id: userId, name: "Jane", avatar: "https://example.com/j.png" });
@@ -494,7 +500,7 @@ describe("POST /posts/:id/comments — logic", () => {
       headers: authHeader(userId.toString()),
       payload: { text: "my comment" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     // Atomic $push carries the denormalized author fields
     const [, pushUpdate] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(pushUpdate.$push.comments.text, "my comment");
@@ -516,7 +522,7 @@ describe("POST /posts/:id/comments — logic", () => {
       headers: authHeader(userId.toString()),
       payload: { text: "fallback" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [, fallbackUpdate] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(fallbackUpdate.$push.comments.avatar, "");
   });
@@ -583,7 +589,7 @@ describe("POST /posts/:id/comments — logic", () => {
       headers: authHeader(userId.toString()),
       payload: { text: "hijack", userId: newId().toString() } as any,
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     assert.equal(findUserStub.mock.calls[0].arguments[0].toString(), userId.toString());
   });
 });

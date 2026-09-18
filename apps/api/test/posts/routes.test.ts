@@ -104,7 +104,7 @@ describe("POST /posts/ — authentication", () => {
       cookies: { access_token: accessToken },
       payload: { text: "Hello from cookie" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 
   test("returns 401 for invalid authorization scheme", async () => {
@@ -189,7 +189,7 @@ describe("POST /posts/ — validation", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { text: "Valid post text" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 
   test("accepts text with spaces and special chars", async () => {
@@ -205,7 +205,7 @@ describe("POST /posts/ — validation", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { text: "Hello 🌍! Special chars: @#$%^&*()" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 });
 
@@ -213,7 +213,7 @@ describe("POST /posts/ — validation", () => {
 // POST /posts/ — createPost logic
 // ============================================================
 describe("POST /posts/ — createPost logic", () => {
-  test("creates post and returns 200 with persisted document", async () => {
+  test("creates post and returns 201 with persisted document", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
     const user = mkUser({ _id: userId, name: "Jane Doe", avatar: "https://example.com/avatar.png" });
@@ -248,7 +248,7 @@ describe("POST /posts/ — createPost logic", () => {
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const body = reply.json() as any;
     assert.equal(body.text, "My first post");
     assert.equal(body.name, "Jane Doe");
@@ -276,7 +276,7 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hijack attempt", userId: attackerId } as any,
     });
 
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const [idArg] = findByIdStub.mock.calls[0].arguments as any[];
     assert.equal(idArg.toString(), userId.toString());
     assert.notEqual(idArg.toString(), attackerId);
@@ -354,7 +354,7 @@ describe("POST /posts/ — createPost logic", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { text: "Check avatar" },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     assert.equal(capturedText, "Check avatar");
     assert.equal((reply.json() as any).avatar, "https://example.com/avatar2.png");
   });

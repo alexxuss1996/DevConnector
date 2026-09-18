@@ -17,7 +17,7 @@ const addEducation: FastifyPluginAsyncTypebox = async (
         request.user.sub,
         request.body,
       );
-      return reply.status(200).send(result);
+      return reply.status(201).send(result);
     },
   );
 };

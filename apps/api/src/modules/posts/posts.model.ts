@@ -56,6 +56,7 @@ const postSchema = new Schema<IPost>({
       userId: {
         type: Schema.Types.ObjectId,
         ref: "User",
+        required: true,
       },
     },
   ],
@@ -64,6 +65,7 @@ const postSchema = new Schema<IPost>({
       userId: {
         type: Schema.Types.ObjectId,
         ref: "User",
+        required: true,
       },
       text: {
         type: String,

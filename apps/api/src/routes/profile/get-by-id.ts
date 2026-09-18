@@ -12,8 +12,10 @@ const getProfileById: FastifyPluginAsyncTypebox = async (
       schema: { params: ProfileIdParamsSchema },
     },
     async function (request, reply) {
-      const { id } = request.params;
-      const profile = await profileService.getProfile(id);
+      // `:id` accepts either the user id or the profile `_id`
+      // (see profileService.getProfile fallback).
+      const { id: userId } = request.params;
+      const profile = await profileService.getProfile(userId);
       return {
         profile,
       };

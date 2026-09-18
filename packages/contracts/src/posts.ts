@@ -43,16 +43,14 @@ export const UpdatePostSchema = Type.Object(
 
 export const UpdatePostCommentSchema = Type.Object(
   {
-    text: Type.Optional(
-      Type.String({
-        minLength: 1,
-        maxLength: 1000,
-        pattern: NON_BLANK_PATTERN,
-        errorMessage: "Text cannot be blank, max 1000 chars",
-      }),
-    ),
+    text: Type.String({
+      minLength: 1,
+      maxLength: 1000,
+      pattern: NON_BLANK_PATTERN,
+      errorMessage: "Text cannot be blank, max 1000 chars",
+    }),
   },
-  { additionalProperties: false, minProperties: 1 },
+  { additionalProperties: false },
 );
 
 export type CreatePostInput = Static<typeof CreatePostSchema>;

@@ -179,7 +179,7 @@ describe("GET /profile/github/:username — logic", () => {
     const [, opts] = fetchMock.mock.calls[0].arguments as any[];
     assert.equal(opts.headers["User-Agent"], "node.js");
     assert.equal(opts.headers.Accept, "application/vnd.github.v3+json");
-    assert.equal(opts.headers.Authorization, "token test-pat-123");
+    assert.equal(opts.headers.Authorization, "Bearer test-pat-123");
 
     // restore
     if (original === undefined) delete process.env.GITHUB_ACCESS_TOKEN;
@@ -259,7 +259,7 @@ describe("profileService.getGithubReposForProfile — unit", () => {
       assert.equal(url, "https://api.github.com/users/octocat/repos?per_page=5&sort=created&direction=asc");
       assert.equal(opts.headers["User-Agent"], "node.js");
       assert.equal(opts.headers.Accept, "application/vnd.github.v3+json");
-      assert.equal(opts.headers.Authorization, "token unit-test-token");
+      assert.equal(opts.headers.Authorization, "Bearer unit-test-token");
       return { ok: true, status: 200, json: async () => expected } as any;
     });
 

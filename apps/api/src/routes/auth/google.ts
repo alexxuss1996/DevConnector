@@ -28,13 +28,24 @@ const googleCallback: FastifyPluginAsyncTypebox = async (fastify) => {
       } catch (err) {
         fastify.log.error(err);
 
-        if (err instanceof AppError && err.statusCode === 401) {
-          // Browser OAuth flow: signal failure via redirect so the
-          // frontend can display it instead of a raw API error page.
-          return reply.redirect(`${env.FRONTEND_URL}?error=google_auth_failed`);
+        // Browser OAuth flow: signal failure via redirect so the frontend
+        // can display it instead of a raw API error page. 409 (email taken)
+        // is the expected path for existing password users — they log in
+        // normally and link Google from account settings.
+        if (err instanceof AppError) {
+          if (err.statusCode === 409) {
+            return reply.redirect(
+              `${env.FRONTEND_URL}?error=google_account_conflict`,
+            );
+          }
+          if (err.statusCode === 401) {
+            return reply.redirect(
+              `${env.FRONTEND_URL}?error=google_auth_failed`,
+            );
+          }
         }
 
-        throw err;
+        return reply.redirect(`${env.FRONTEND_URL}?error=google_failed`);
       }
     },
   );

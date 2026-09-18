@@ -31,6 +31,18 @@ export const CompleteOnboardingSchema = Type.Object({
   }),
 });
 
+export const LinkGoogleSchema = Type.Object(
+  {
+    accessToken: Type.String({
+      minLength: 1,
+      description: "Google OAuth2 access token to link",
+    }),
+  },
+  { additionalProperties: false },
+);
+
+export type LinkGoogleInput = Static<typeof LinkGoogleSchema>;
+
 export type RegisterUserInput = Static<typeof RegisterUserSchema>;
 export type LoginUserInput = Static<typeof LoginUserSchema>;
 export type CompleteOnboardingInput = Static<typeof CompleteOnboardingSchema>;

@@ -191,48 +191,67 @@ export const CreateProfileSchema = Type.Object(
   },
 );
 
-export const UpdateProfileSchema = Type.Partial(CreateProfileSchema);
-
-export const AddExperienceSchema = Type.Object({
-  title: Type.String({ description: "Job title", examples: ["Senior Developer"], example: "Senior Developer" }),
-  company: Type.String({ description: "Company name", examples: ["Acme Corp"], example: "Acme Corp" }),
-  location: Type.Optional(Type.String({ description: "Location", examples: ["Seattle, WA"], example: "Seattle, WA" })),
-  from: Type.String({
-    format: "date",
-    description: "Start date (YYYY-MM-DD)",
-    examples: ["2022-01-15"],
-    example: "2022-01-15",
-  }),
-  to: Type.Optional(
-    Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2024-06-30"], example: "2024-06-30" }),
-  ),
-  current: Type.Optional(Type.Boolean({ description: "Current job", default: false, examples: [false], example: false })),
-  description: Type.Optional(
-    Type.String({
-      description: "Role description",
-      examples: ["Built scalable APIs with Fastify and MongoDB"],
-      example: "Built scalable APIs with Fastify and MongoDB",
-    }),
-  ),
+export const UpdateProfileSchema = Type.Partial(CreateProfileSchema, {
+  additionalProperties: false,
+  minProperties: 1,
 });
 
-export const AddEducationSchema = Type.Object({
-  school: Type.String({ description: "School or university", examples: ["MIT"], example: "MIT" }),
-  degree: Type.String({ description: "Degree", examples: ["Bachelor of Science"], example: "Bachelor of Science" }),
-  fieldofstudy: Type.String({ description: "Field of study", examples: ["Computer Science"], example: "Computer Science" }),
-  from: Type.String({ format: "date", description: "Start date (YYYY-MM-DD)", examples: ["2018-09-01"], example: "2018-09-01" }),
-  to: Type.Optional(
-    Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2022-06-15"], example: "2022-06-15" }),
-  ),
-  current: Type.Optional(Type.Boolean({ description: "Currently studying", default: false, examples: [false], example: false })),
-  description: Type.Optional(
-    Type.String({
-      description: "Program description",
-      examples: ["Focused on distributed systems and databases"],
-      example: "Focused on distributed systems and databases",
+const NonBlankString = (description: string, examples: string[]) =>
+  Type.String({
+    minLength: 1,
+    pattern: ".*\\S.*",
+    description,
+    examples,
+    example: examples[0],
+    errorMessage: `${description} is required and cannot be blank`,
+  });
+
+export const AddExperienceSchema = Type.Object(
+  {
+    title: NonBlankString("Job title", ["Senior Developer"]),
+    company: NonBlankString("Company name", ["Acme Corp"]),
+    location: Type.Optional(Type.String({ description: "Location", examples: ["Seattle, WA"], example: "Seattle, WA" })),
+    from: Type.String({
+      format: "date",
+      description: "Start date (YYYY-MM-DD)",
+      examples: ["2022-01-15"],
+      example: "2022-01-15",
     }),
-  ),
-});
+    to: Type.Optional(
+      Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2024-06-30"], example: "2024-06-30" }),
+    ),
+    current: Type.Optional(Type.Boolean({ description: "Current job", default: false, examples: [false], example: false })),
+    description: Type.Optional(
+      Type.String({
+        description: "Role description",
+        examples: ["Built scalable APIs with Fastify and MongoDB"],
+        example: "Built scalable APIs with Fastify and MongoDB",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export const AddEducationSchema = Type.Object(
+  {
+    school: NonBlankString("School or university", ["MIT"]),
+    degree: NonBlankString("Degree", ["Bachelor of Science"]),
+    fieldofstudy: NonBlankString("Field of study", ["Computer Science"]),
+    from: Type.String({ format: "date", description: "Start date (YYYY-MM-DD)", examples: ["2018-09-01"], example: "2018-09-01" }),
+    to: Type.Optional(
+      Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2022-06-15"], example: "2022-06-15" }),
+    ),
+    current: Type.Optional(Type.Boolean({ description: "Currently studying", default: false, examples: [false], example: false })),
+    description: Type.Optional(
+      Type.String({
+        description: "Program description",
+        examples: ["Focused on distributed systems and databases"],
+        example: "Focused on distributed systems and databases",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
 
 // Params schemas used by profile routes
 export const ProfileIdParamsSchema = Type.Object({

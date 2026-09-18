@@ -9,6 +9,7 @@ const getPostComments: FastifyPluginAsyncTypebox = async (
   fastify.get(
     "/:id/comments",
     {
+      onRequest: [fastify.authenticate],
       schema: { params: PostIdParamsSchema },
     },
     async function (request, reply) {

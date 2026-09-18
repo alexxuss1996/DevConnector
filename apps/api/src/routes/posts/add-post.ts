@@ -12,7 +12,7 @@ const addPost: FastifyPluginAsyncTypebox = async (fastify) => {
     async (request, reply) => {
       const { text } = request.body;
       const post = await postService.createPost(request.user.sub, text);
-      return reply.status(200).send(post);
+      return reply.status(201).send(post);
     },
   );
 };

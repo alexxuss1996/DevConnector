@@ -590,13 +590,13 @@ describe("GET /profile/me — authentication", () => {
 
   test("accepts token from cookie", async () => {
     const userId = newId();
-    const accessToken = signAccessToken(app, { sub: userId.toString() });
     const mockProfile = mkProfile({ userId });
-    stubMethod(Profile, "findOne", () => mkQuery({ ...mockProfile, populate: () => mkQuery(mockProfile as any) } as any));
 
     // Simpler: stub findOne to return query with populate that resolves to mockProfile
     restoreAllStubs();
     stubMethod(Profile, "findOne", () => mkQuery(mockProfile as any));
+    // Re-sign after the stub reset so the session auto-stub is reinstalled.
+    const accessToken = signAccessToken(app, { sub: userId.toString() });
 
     const reply = await app.inject({
       method: "GET",

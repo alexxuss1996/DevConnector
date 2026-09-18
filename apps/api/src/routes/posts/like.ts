@@ -4,7 +4,7 @@ import { PostIdParamsSchema } from "@dev-conn/contracts";
 
 const likePost: FastifyPluginAsyncTypebox = async (fastify) => {
 
-  (fastify.put(
+  fastify.put(
     "/:id/like",
     {
       onRequest: [fastify.authenticate],
@@ -15,19 +15,19 @@ const likePost: FastifyPluginAsyncTypebox = async (fastify) => {
       await postService.likePost(request.user.sub, id);
       return reply.status(204).send();
     },
-  ),
-    fastify.put(
-      "/:id/unlike",
-      {
-        onRequest: [fastify.authenticate],
-        schema: { params: PostIdParamsSchema },
-      },
-      async function (request, reply) {
-        const { id } = request.params;
-        await postService.unlikePost(request.user.sub, id);
-        return reply.status(204).send();
-      },
-    ));
+  );
+  fastify.put(
+    "/:id/unlike",
+    {
+      onRequest: [fastify.authenticate],
+      schema: { params: PostIdParamsSchema },
+    },
+    async function (request, reply) {
+      const { id } = request.params;
+      await postService.unlikePost(request.user.sub, id);
+      return reply.status(204).send();
+    },
+  );
 };
 
 export default likePost;

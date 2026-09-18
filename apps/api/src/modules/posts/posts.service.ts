@@ -57,7 +57,7 @@ class PostService {
     const newPost = new Post({
       userId,
       name: user.name,
-      avatar: user.avatar,
+      avatar: user.avatar ?? "",
       text: text.trim(),
     });
 
@@ -66,6 +66,12 @@ class PostService {
     return newPost.toJSON();
   }
 
+  /**
+   * Deletes a post owned by `userId`. Returns 404 for both missing and
+   * not-owned posts (idempotent delete, avoids enumerating other users'
+   * post ids). Comment writes return 403 instead because they need to
+   * distinguish "no such comment" from "not yours".
+   */
   async deletePost(userId: string, id: string) {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
@@ -88,7 +94,10 @@ class PostService {
     // requests cannot create duplicate likes.
     const post = await Post.findOneAndUpdate(
       { _id: id, "likes.userId": { $ne: new Types.ObjectId(userId) } },
-      { $addToSet: { likes: { userId: new Types.ObjectId(userId) } } },
+      {
+        $addToSet: { likes: { userId: new Types.ObjectId(userId) } },
+        $set: { updatedAt: new Date() },
+      },
       { new: true },
     );
     if (!post) {
@@ -110,7 +119,10 @@ class PostService {
     }
     const post = await Post.findOneAndUpdate(
       { _id: id, "likes.userId": new Types.ObjectId(userId) },
-      { $pull: { likes: { userId: new Types.ObjectId(userId) } } },
+      {
+        $pull: { likes: { userId: new Types.ObjectId(userId) } },
+        $set: { updatedAt: new Date() },
+      },
       { new: true },
     );
     if (!post) {
@@ -160,6 +172,7 @@ class PostService {
             avatar: user.avatar ?? "",
           },
         },
+        $set: { updatedAt: new Date() },
       },
       { new: true },
     );
@@ -198,7 +211,7 @@ class PostService {
         _id: id,
         comments: { $elemMatch: { _id: commentId, userId: user._id } },
       },
-      { $set: { "comments.$.text": text.trim() } },
+      { $set: { "comments.$.text": text.trim(), updatedAt: new Date() } },
       { new: true },
     );
     if (post) {
@@ -231,7 +244,10 @@ class PostService {
         _id: id,
         comments: { $elemMatch: { _id: commentId, userId: user._id } },
       },
-      { $pull: { comments: { _id: commentId } } },
+      {
+        $pull: { comments: { _id: commentId } },
+        $set: { updatedAt: new Date() },
+      },
       { new: true },
     );
     if (post) return;

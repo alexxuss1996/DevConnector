@@ -20,7 +20,7 @@ const addPostComment: FastifyPluginAsyncTypebox = async (
         id,
         text,
       );
-      return reply.status(200).send(result);
+      return reply.status(201).send(result);
     },
   );
 };

@@ -1,4 +1,5 @@
 import AppError from "#helpers/app-error";
+import env from "#config/env";
 import Profile from "#modules/profile/profile.model";
 import User from "#modules/users/user.model";
 import Post from "#modules/posts/posts.model";
@@ -7,15 +8,61 @@ import {
   AddEducationInput,
   AddExperienceInput,
   CreateProfileInput,
+  UpdateProfileInput,
 } from "#modules/profile/profile.schemas";
 import mongoose, { Types } from "mongoose";
 
+/**
+ * Validates experience/education date combinations that JSON Schema
+ * cannot express (cross-field rules). Throws 400 instead of letting
+ * `new Date()` produce `Invalid Date` cast errors (500s).
+ */
+function validateDateRange(
+  from: string,
+  to: string | undefined,
+  current: boolean | undefined,
+  kind: "Experience" | "Education",
+): { fromDate: Date; toDate?: Date } {
+  const fromDate = new Date(from);
+  if (Number.isNaN(fromDate.getTime())) {
+    throw new AppError(400, "VALIDATION_ERROR", `${kind} 'from' is not a valid date`);
+  }
+  let toDate: Date | undefined;
+  if (to !== undefined) {
+    toDate = new Date(to);
+    if (Number.isNaN(toDate.getTime())) {
+      throw new AppError(400, "VALIDATION_ERROR", `${kind} 'to' is not a valid date`);
+    }
+    if (toDate < fromDate) {
+      throw new AppError(400, "VALIDATION_ERROR", `${kind} 'to' must be after 'from'`);
+    }
+  }
+  if (current === true && toDate !== undefined) {
+    throw new AppError(
+      400,
+      "VALIDATION_ERROR",
+      `${kind} cannot have both 'current: true' and a 'to' date`,
+    );
+  }
+  return { fromDate, toDate };
+}
+
 class ProfileService {
-  async getProfile(userId: string) {
-    const profile = await Profile.findOne({ userId }).populate("userId", [
+  /**
+   * Looks up by user id first, then falls back to profile `_id`, so
+   * `GET /profile/user/:id` works regardless of which id the client holds.
+   */
+  async getProfile(id: string) {
+    let profile = await Profile.findOne({ userId: id }).populate("userId", [
       "name",
       "avatar",
     ]);
+    if (!profile && Types.ObjectId.isValid(id)) {
+      profile = await Profile.findById(id).populate("userId", [
+        "name",
+        "avatar",
+      ]);
+    }
 
     if (!profile) {
       throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
@@ -108,6 +155,95 @@ class ProfileService {
     }
     return profile.toJSON();
   }
+
+  /**
+   * Partial update (PUT /profile). Unlike POST create-or-update, this never
+   * upserts: the profile must already exist (created via POST with required
+   * `status`/`skills`), so a partial payload cannot insert an invalid doc.
+   */
+  async updateProfile(userId: string, data: UpdateProfileInput) {
+    if (!data || Object.keys(data).length === 0) {
+      throw new AppError(400, "VALIDATION_ERROR", "At least one field is required");
+    }
+    // Reuse the same $set/$unset builder, but without upsert.
+    const existing = await Profile.findOne({ userId });
+    if (!existing) {
+      throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
+    }
+    const updated = await this.createOrUpdateProfileNoUpsert(userId, data);
+    return updated;
+  }
+
+  private async createOrUpdateProfileNoUpsert(
+    userId: string,
+    data: UpdateProfileInput,
+  ) {
+    const { facebook, instagram, linkedin, twitter, youtube, ...rest } =
+      data as Record<string, unknown>;
+
+    const ALLOWED_PROFILE_FIELDS = new Set([
+      "company",
+      "website",
+      "location",
+      "status",
+      "skills",
+      "bio",
+      "githubusername",
+    ]);
+
+    const toSet: Record<string, unknown> = {};
+    const toUnset: Record<string, 1> = {};
+
+    for (const [key, value] of Object.entries(rest)) {
+      if (!ALLOWED_PROFILE_FIELDS.has(key)) continue;
+      if (value === null || (typeof value === "string" && value.trim() === "")) {
+        toUnset[key] = 1;
+      } else if (value !== undefined) {
+        toSet[key] = value;
+      }
+    }
+
+    for (const [key, value] of Object.entries({
+      facebook,
+      instagram,
+      linkedin,
+      twitter,
+      youtube,
+    })) {
+      if (value === null || (typeof value === "string" && value.trim() === "")) {
+        toUnset[`social.${key}`] = 1;
+      } else if (value !== undefined) {
+        toSet[`social.${key}`] = value;
+      }
+    }
+
+    // Strip attempts to wipe required fields — schema rejects ""/null for
+    // them, but direct service callers bypass validation.
+    delete toUnset.status;
+    delete toUnset.skills;
+
+    const update: Record<string, Record<string, unknown>> = {};
+    if (Object.keys(toSet).length) update.$set = toSet;
+    if (Object.keys(toUnset).length) update.$unset = toUnset;
+    if (!Object.keys(update).length) {
+      const current = await Profile.findOne({ userId });
+      if (!current) {
+        throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
+      }
+      return current.toJSON();
+    }
+
+    const profile = await Profile.findOneAndUpdate({ userId }, update, {
+      returnDocument: "after",
+      upsert: false,
+      runValidators: true,
+      context: "query",
+    });
+    if (!profile) {
+      throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
+    }
+    return profile.toJSON();
+  }
   async deleteProfileAndUser(userId: string) {
     // Try transactional cascade; fall back to non-transactional on standalone Mongo.
     let session: mongoose.ClientSession | null = null;
@@ -131,17 +267,24 @@ class ProfileService {
       const user = await User.findOneAndDelete({ _id: userId }, opts);
       if (!user) {
         if (session && useTransaction) await session.abortTransaction();
-        throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
+        throw new AppError(404, "USER_NOT_FOUND", "User not found");
       }
 
       // Cascade: remove user's posts/comments/likes remnants and sessions.
-      await Post.deleteMany({ userId }, opts);
+      // Match both ObjectId and legacy string forms of userId.
+      const uid = new Types.ObjectId(userId);
+      await Post.deleteMany({ userId: uid }, opts);
       await Post.updateMany(
         {},
-        { $pull: { likes: { userId }, comments: { userId } } },
+        {
+          $pull: {
+            likes: { userId: { $in: [uid, userId] } },
+            comments: { userId: { $in: [uid, userId] } },
+          },
+        },
         opts,
       );
-      await Session.deleteMany({ userId }, opts);
+      await Session.deleteMany({ userId: uid }, opts);
 
       if (session && useTransaction) await session.commitTransaction();
     } catch (err) {
@@ -156,8 +299,7 @@ class ProfileService {
   async addExperience(userId: string, data: AddExperienceInput) {
     const { title, company, location, from, to, current, description } = data;
 
-    const toDate = to ? new Date(to) : undefined;
-    const fromDate = new Date(from);
+    const { fromDate, toDate } = validateDateRange(from, to, current, "Experience");
 
     // Atomic $push: concurrent adds can no longer lose entries.
     const profile = await Profile.findOneAndUpdate(
@@ -190,8 +332,7 @@ class ProfileService {
   async addEducation(userId: string, data: AddEducationInput) {
     const { school, degree, fieldofstudy, from, to, current, description } =
       data;
-    const toDate = to ? new Date(to) : undefined;
-    const fromDate = new Date(from);
+    const { fromDate, toDate } = validateDateRange(from, to, current, "Education");
 
     // Atomic $push: concurrent adds can no longer lose entries.
     const profile = await Profile.findOneAndUpdate(
@@ -273,7 +414,16 @@ class ProfileService {
 
   async getGithubReposForProfile(username: string) {
     // Fail fast instead of sending "token undefined" to GitHub.
-    const token = process.env.GITHUB_ACCESS_TOKEN;
+    let token: string;
+    try {
+      token = env.GITHUB_ACCESS_TOKEN;
+    } catch {
+      throw new AppError(
+        500,
+        "GITHUB_CONFIG_ERROR",
+        "GitHub integration is not configured",
+      );
+    }
     if (!token) {
       throw new AppError(
         500,
@@ -281,8 +431,11 @@ class ProfileService {
         "GitHub integration is not configured",
       );
     }
+    // Normalize cache key (GitHub logins are case-insensitive) to avoid
+    // duplicate entries for "OctoCat" vs "octocat".
     const safeUsername = encodeURIComponent(username);
-    const cached = getCachedGithubRepos(safeUsername);
+    const cacheKey = safeUsername.toLowerCase();
+    const cached = getCachedGithubRepos(cacheKey);
     if (cached) return cached;
     const response = await fetch(
       `https://api.github.com/users/${safeUsername}/repos?per_page=5&sort=created&direction=asc`,
@@ -291,7 +444,7 @@ class ProfileService {
         headers: {
           "User-Agent": "node.js",
           Accept: "application/vnd.github.v3+json",
-          Authorization: `token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       },
     );
@@ -312,7 +465,7 @@ class ProfileService {
       throw new AppError(502, "GITHUB_UPSTREAM_ERROR", "GitHub upstream error");
     }
     const repos = await response.json();
-    setCachedGithubRepos(safeUsername, repos);
+    setCachedGithubRepos(cacheKey, repos);
     return repos;
   }
 }
