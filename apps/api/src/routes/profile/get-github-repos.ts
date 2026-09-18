@@ -1,15 +1,6 @@
 import { profileService } from "#modules/profile/profile.service";
-import {
-  FastifyPluginAsyncTypebox,
-  Type,
-} from "@fastify/type-provider-typebox";
-
-const ParamsSchema = Type.Object({
-  username: Type.String({
-    minLength: 1,
-    errorMessage: "Username must be at least 1 character",
-  }),
-});
+import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
+import { GithubUsernameParamsSchema } from "@dev-conn/contracts";
 
 const getLastGithubRepos: FastifyPluginAsyncTypebox = async (
   fastify,
@@ -19,7 +10,7 @@ const getLastGithubRepos: FastifyPluginAsyncTypebox = async (
     "/github/:username",
     {
       onRequest: [fastify.authenticate],
-      schema: { params: ParamsSchema },
+      schema: { params: GithubUsernameParamsSchema },
     },
     async function (request, reply) {
       const profile = await profileService.getGithubReposForProfile(

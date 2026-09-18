@@ -1,15 +1,6 @@
 import { profileService } from "#modules/profile/profile.service";
-import {
-  FastifyPluginAsyncTypebox,
-  Type,
-} from "@fastify/type-provider-typebox";
-
-const ParamsSchema = Type.Object({
-  educationId: Type.String({
-    pattern: "^[0-9a-fA-F]{24}$",
-    errorMessage: "Invalid ObjectId",
-  }),
-});
+import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
+import { EducationIdParamsSchema } from "@dev-conn/contracts";
 
 const deleteEducation: FastifyPluginAsyncTypebox = async (
   fastify,
@@ -19,7 +10,7 @@ const deleteEducation: FastifyPluginAsyncTypebox = async (
     "/education/:educationId",
     {
       onRequest: [fastify.authenticate],
-      schema: { params: ParamsSchema },
+      schema: { params: EducationIdParamsSchema },
     },
     async function (request, reply) {
       const result = await profileService.deleteEducation(

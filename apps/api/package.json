@@ -11,7 +11,9 @@
     "clean": "rm -rf dist",
     "test": "npm run build:ts && tsc -p test/tsconfig.json && c8 node --env-file=.env --test \"test/**/*.test.ts\"",
     "start": "npm run clean && npm run build:ts && fastify start -l info -p 4000 dist/app.js --options",
+    "build": "tsc",
     "build:ts": "tsc",
+    "check-types": "tsc --noEmit",
     "watch:ts": "tsc -w",
     "dev": "npm run clean && npm run build:ts && concurrently -k -p \"[{name}]\" -n \"TypeScript,App\" -c \"yellow.bold,cyan.bold\" \"npm:watch:ts\" \"npm:dev:start\"",
     "dev:start": "fastify start --ignore-watch=.ts$ -w -l info -P -p 4000 dist/app.js --options"
@@ -29,6 +31,7 @@
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.1",
     "@fastify/type-provider-typebox": "^6.1.0",
+    "@dev-conn/contracts": "workspace:*",
     "@scalar/fastify-api-reference": "^1.69.0",
     "ajv-errors": "^3.0.0",
     "ajv-formats": "3.0.1",

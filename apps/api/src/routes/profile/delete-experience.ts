@@ -1,15 +1,6 @@
 import { profileService } from "#modules/profile/profile.service";
-import {
-  FastifyPluginAsyncTypebox,
-  Type,
-} from "@fastify/type-provider-typebox";
-
-const ParamsSchema = Type.Object({
-  experienceId: Type.String({
-    pattern: "^[0-9a-fA-F]{24}$",
-    errorMessage: "Invalid ObjectId",
-  }),
-});
+import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
+import { ExperienceIdParamsSchema } from "@dev-conn/contracts";
 
 const deleteExperience: FastifyPluginAsyncTypebox = async (
   fastify,
@@ -19,7 +10,7 @@ const deleteExperience: FastifyPluginAsyncTypebox = async (
     "/experience/:experienceId",
     {
       onRequest: [fastify.authenticate],
-      schema: { params: ParamsSchema },
+      schema: { params: ExperienceIdParamsSchema },
     },
     async function (request, reply) {
       const result = await profileService.deleteExperience(

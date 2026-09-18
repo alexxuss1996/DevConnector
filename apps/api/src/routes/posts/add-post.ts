@@ -1,5 +1,5 @@
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
-import { CreatePostSchema } from "#modules/posts/posts.schemas";
+import { CreatePostSchema } from "@dev-conn/contracts";
 import { postService } from "#modules/posts/posts.service";
 
 const addPost: FastifyPluginAsyncTypebox = async (fastify) => {

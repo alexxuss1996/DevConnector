@@ -1,4 +1,4 @@
-import { AddEducationSchema } from "#modules/profile/profile.schemas";
+import { AddEducationSchema } from "@dev-conn/contracts";
 import { profileService } from "#modules/profile/profile.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
