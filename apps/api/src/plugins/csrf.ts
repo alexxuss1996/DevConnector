@@ -1,4 +1,5 @@
 import fp from "fastify-plugin";
+import env from "#config/env";
 
 /**
  * Lax CSRF guard for cookie-authenticated mutations.
@@ -9,8 +10,14 @@ import fp from "fastify-plugin";
  * cross-site POSTs) to match `FRONTEND_URL`'s origin. Requests without any
  * Origin/Referer (same-origin navigations, curl, tests, mobile apps) pass
  * through; Bearer-header requests are unaffected since they need no cookie.
+ *
+ * `FRONTEND_URL` is resolved once at registration from the validated env
+ * helper, so a malformed/missing value fails closed at boot instead of
+ * silently allowing every cookie-authenticated mutation.
  */
 export default fp(async (fastify) => {
+  const allowedOrigin = new URL(env.FRONTEND_URL).origin;
+
   fastify.addHook("onRequest", async (request, reply) => {
     if (
       request.method === "GET" ||
@@ -36,12 +43,6 @@ export default fp(async (fastify) => {
       return reply
         .status(403)
         .send({ code: "FORBIDDEN", message: "Invalid origin" });
-    }
-    let allowedOrigin: string;
-    try {
-      allowedOrigin = new URL(process.env.FRONTEND_URL ?? "").origin;
-    } catch {
-      return;
     }
     if (requestOrigin !== allowedOrigin) {
       return reply

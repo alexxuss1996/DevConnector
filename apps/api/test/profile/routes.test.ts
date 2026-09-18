@@ -43,7 +43,10 @@ describe("POST /profile — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for an empty Bearer token", async () => {
@@ -54,7 +57,10 @@ describe("POST /profile — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for a refresh token (must be access)", async () => {
@@ -69,7 +75,10 @@ describe("POST /profile — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for a tampered access token", async () => {
@@ -81,14 +90,19 @@ describe("POST /profile — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("accepts access token from cookie", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
     const mockDoc = mkProfile({ userId, status: "Developer", skills: ["JS"] });
-    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mockDoc as any));
+    stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(mockDoc as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
@@ -102,7 +116,9 @@ describe("POST /profile — authentication", () => {
 
 describe("POST /profile — validation", () => {
   function authHeader() {
-    return { authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}` };
+    return {
+      authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}`,
+    };
   }
 
   test("returns 400 when status is missing", async () => {
@@ -115,12 +131,16 @@ describe("POST /profile — validation", () => {
     assert.equal(reply.statusCode, 400);
     const body = reply.json() as any;
     assert.equal(body.code, "VALIDATION_ERROR");
-    const details = [...(body.issues ?? []), ...Object.values(body.fieldErrors ?? {}).flat()] as any[];
+    const details = [
+      ...(body.issues ?? []),
+      ...Object.values(body.fieldErrors ?? {}).flat(),
+    ] as any[];
     assert.ok(
       details.some((e: any) =>
         typeof e === "string"
           ? e.includes("status")
-          : (e.path ?? []).includes("status") || (e.message ?? "").includes("status"),
+          : (e.path ?? []).includes("status") ||
+            (e.message ?? "").includes("status"),
       ),
     );
   });
@@ -157,18 +177,28 @@ describe("POST /profile — validation", () => {
     assert.equal(reply.statusCode, 400);
     const body = reply.json() as any;
     assert.equal(body.code, "VALIDATION_ERROR");
-    const details = [...(body.issues ?? []), ...Object.values(body.fieldErrors ?? {}).flat()] as any[];
+    const details = [
+      ...(body.issues ?? []),
+      ...Object.values(body.fieldErrors ?? {}).flat(),
+    ] as any[];
     assert.ok(
       details.some((e: any) =>
         typeof e === "string"
           ? e.includes("website")
-          : (e.path ?? []).includes("website") || (e.message ?? "").includes("website"),
+          : (e.path ?? []).includes("website") ||
+            (e.message ?? "").includes("website"),
       ),
     );
   });
 
   test("returns 400 when social uris are invalid", async () => {
-    for (const field of ["youtube", "twitter", "facebook", "linkedin", "instagram"]) {
+    for (const field of [
+      "youtube",
+      "twitter",
+      "facebook",
+      "linkedin",
+      "instagram",
+    ]) {
       const reply = await app.inject({
         method: "POST",
         url: "/profile/",
@@ -194,12 +224,16 @@ describe("POST /profile — validation", () => {
   test("accepts minimal valid payload (only required fields)", async () => {
     const userId = newId();
     const mockDoc = mkProfile({ userId, status: "Developer", skills: ["JS"] });
-    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mockDoc as any));
+    stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(mockDoc as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
       url: "/profile/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { status: "Developer", skills: ["JS"] },
     });
     assert.equal(reply.statusCode, 200);
@@ -223,7 +257,10 @@ describe("POST /profile — createOrUpdate logic", () => {
     const persisted = mkProfile({
       userId,
       ...(payload as any),
-      social: { twitter: (payload as any).twitter as string, linkedin: (payload as any).linkedin as string },
+      social: {
+        twitter: (payload as any).twitter as string,
+        linkedin: (payload as any).linkedin as string,
+      },
     });
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
@@ -245,7 +282,8 @@ describe("POST /profile — createOrUpdate logic", () => {
     assert.deepEqual(body.profile.skills, ["JavaScript", "Node.js"]);
     // Verify service was called with correct filter and $set using dot-notation for social
     assert.equal(findOneAndUpdate.mock.callCount(), 1);
-    const [filter, update, options] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    const [filter, update, options] = findOneAndUpdate.mock.calls[0]
+      .arguments as any[];
     assert.deepEqual(filter, { userId: userId.toString() });
     assert.equal(options.upsert, true);
     assert.equal(options.returnDocument, "after");
@@ -253,7 +291,10 @@ describe("POST /profile — createOrUpdate logic", () => {
     assert.equal(update.$set.status, "Developer");
     assert.equal(update.$set.company, "Acme");
     assert.equal(update.$set["social.twitter"], "https://twitter.com/jane");
-    assert.equal(update.$set["social.linkedin"], "https://linkedin.com/in/jane");
+    assert.equal(
+      update.$set["social.linkedin"],
+      "https://linkedin.com/in/jane",
+    );
     // top-level fields should be present, social should not be a nested object
     assert.equal(update.$set.social, undefined);
   });
@@ -261,8 +302,13 @@ describe("POST /profile — createOrUpdate logic", () => {
   test("merges social fields via dot-notation instead of overwriting whole social object", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
-    const payload = validProfilePayload({ facebook: "https://facebook.com/jane" });
-    const persisted = mkProfile({ userId, social: { facebook: (payload as any).facebook as string } });
+    const payload = validProfilePayload({
+      facebook: "https://facebook.com/jane",
+    });
+    const persisted = mkProfile({
+      userId,
+      social: { facebook: (payload as any).facebook as string },
+    });
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
@@ -301,7 +347,9 @@ describe("POST /profile — createOrUpdate logic", () => {
 
     assert.equal(reply.statusCode, 200);
     const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
-    assert.ok(!Object.keys(update.$set).some((k: string) => k.startsWith("social.")));
+    assert.ok(
+      !Object.keys(update.$set).some((k: string) => k.startsWith("social.")),
+    );
     assert.equal(update.$set.social, undefined);
   });
 
@@ -343,7 +391,10 @@ describe("POST /profile — createOrUpdate logic", () => {
       linkedin: "https://linkedin.com/in/jane",
       instagram: "https://instagram.com/jane",
     });
-    const persisted = mkProfile({ userId, social: { youtube: (payload as any).youtube as string } });
+    const persisted = mkProfile({
+      userId,
+      social: { youtube: (payload as any).youtube as string },
+    });
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
@@ -360,8 +411,100 @@ describe("POST /profile — createOrUpdate logic", () => {
     assert.equal(update.$set["social.youtube"], "https://youtube.com/c/jane");
     assert.equal(update.$set["social.twitter"], "https://twitter.com/jane");
     assert.equal(update.$set["social.facebook"], "https://facebook.com/jane");
-    assert.equal(update.$set["social.linkedin"], "https://linkedin.com/in/jane");
+    assert.equal(
+      update.$set["social.linkedin"],
+      "https://linkedin.com/in/jane",
+    );
     assert.equal(update.$set["social.instagram"], "https://instagram.com/jane");
+  });
+
+  test("accepts http website URLs", async () => {
+    const userId = newId();
+    const accessToken = signAccessToken(app, { sub: userId.toString() });
+    const payload = validProfilePayload({ website: "http://example.com" });
+    const persisted = mkProfile({ userId, website: "http://example.com" });
+    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(persisted as any),
+    );
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/profile/",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload,
+    });
+
+    assert.equal(reply.statusCode, 200);
+    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(update.$set.website, "http://example.com");
+  });
+
+  test("unsets a website with a non-http(s) scheme instead of storing it", async () => {
+    const userId = newId();
+    const accessToken = signAccessToken(app, { sub: userId.toString() });
+    const payload = validProfilePayload({ website: "mailto:test@example.com" });
+    const persisted = mkProfile({ userId });
+    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(persisted as any),
+    );
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/profile/",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload,
+    });
+
+    assert.equal(reply.statusCode, 200);
+    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(update.$set.website, undefined);
+    assert.equal(update.$unset.website, 1);
+  });
+
+  test("unsets a github username that sanitizes to nothing", async () => {
+    const userId = newId();
+    const accessToken = signAccessToken(app, { sub: userId.toString() });
+    const persisted = mkProfile({ userId });
+    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(persisted as any),
+    );
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/profile/",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload: validProfilePayload({ githubusername: "<script>x</script>" }),
+    });
+
+    assert.equal(reply.statusCode, 200);
+    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(update.$set.githubusername, undefined);
+    assert.equal(update.$unset.githubusername, 1);
+  });
+
+  test("stores plain-text fields with ampersands intact", async () => {
+    const userId = newId();
+    const accessToken = signAccessToken(app, { sub: userId.toString() });
+    const payload = validProfilePayload({
+      company: "R&D",
+      bio: "Likes JS & TS",
+    });
+    const persisted = mkProfile({ userId, ...(payload as any) });
+    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(persisted as any),
+    );
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/profile/",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload,
+    });
+
+    assert.equal(reply.statusCode, 200);
+    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(update.$set.company, "R&D");
+    assert.equal(update.$set.bio, "Likes JS & TS");
   });
 
   test("uses userId from JWT sub, not from payload", async () => {
@@ -396,7 +539,9 @@ describe("POST /profile — createOrUpdate logic", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/profile/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: validProfilePayload(),
     });
 
@@ -442,7 +587,12 @@ describe("POST /profile — wipe via null", () => {
       method: "POST",
       url: "/profile/",
       headers: { authorization: `Bearer ${accessToken}` },
-      payload: validProfilePayload({ company: null, website: null, twitter: null, linkedin: null }),
+      payload: validProfilePayload({
+        company: null,
+        website: null,
+        twitter: null,
+        linkedin: null,
+      }),
     });
 
     assert.equal(reply.statusCode, 200);
@@ -488,7 +638,11 @@ describe("POST /profile — wipe via null", () => {
       method: "POST",
       url: "/profile/",
       headers: { authorization: `Bearer ${accessToken}` },
-      payload: validProfilePayload({ company: "NewCo", website: null, facebook: "https://facebook.com/new" }),
+      payload: validProfilePayload({
+        company: "NewCo",
+        website: null,
+        facebook: "https://facebook.com/new",
+      }),
     });
 
     assert.equal(reply.statusCode, 200);
@@ -500,22 +654,34 @@ describe("POST /profile — wipe via null", () => {
 
   test("wipes optional fields when empty string is sent (form-friendly)", async () => {
     const userId = newId();
-    const cases: Array<{ payload: Record<string, unknown>; unsetKey: string }> = [
-      { payload: validProfilePayload({ company: "" }), unsetKey: "company" },
-      { payload: validProfilePayload({ bio: "" }), unsetKey: "bio" },
-      { payload: validProfilePayload({ website: "" }), unsetKey: "website" },
-      { payload: validProfilePayload({ twitter: "" }), unsetKey: "social.twitter" },
-    ];
+    const cases: Array<{ payload: Record<string, unknown>; unsetKey: string }> =
+      [
+        { payload: validProfilePayload({ company: "" }), unsetKey: "company" },
+        { payload: validProfilePayload({ bio: "" }), unsetKey: "bio" },
+        { payload: validProfilePayload({ website: "" }), unsetKey: "website" },
+        {
+          payload: validProfilePayload({ twitter: "" }),
+          unsetKey: "social.twitter",
+        },
+      ];
     for (const { payload, unsetKey } of cases) {
       const persisted = mkProfile({ userId });
-      const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(persisted as any));
+      const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+        Promise.resolve(persisted as any),
+      );
       const reply = await app.inject({
         method: "POST",
         url: "/profile/",
-        headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+        headers: {
+          authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+        },
         payload,
       });
-      assert.equal(reply.statusCode, 200, `should 200 for ${JSON.stringify(payload)}`);
+      assert.equal(
+        reply.statusCode,
+        200,
+        `should 200 for ${JSON.stringify(payload)}`,
+      );
       const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
       assert.equal(update.$unset[unsetKey], 1, `should unset ${unsetKey}`);
       restoreAllStubs();
@@ -525,11 +691,15 @@ describe("POST /profile — wipe via null", () => {
   test("wipes with whitespace string as well", async () => {
     const userId = newId();
     const persisted = mkProfile({ userId });
-    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(persisted as any));
+    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(persisted as any),
+    );
     const reply = await app.inject({
       method: "POST",
       url: "/profile/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: validProfilePayload({ company: "   " }),
     });
     assert.equal(reply.statusCode, 200);
@@ -539,26 +709,41 @@ describe("POST /profile — wipe via null", () => {
 
   test("returns 400 for empty required fields", async () => {
     const userId = newId();
-    const cases = [validProfilePayload({ status: "" }), validProfilePayload({ skills: [""] }), validProfilePayload({ status: "   " })];
+    const cases = [
+      validProfilePayload({ status: "" }),
+      validProfilePayload({ skills: [""] }),
+      validProfilePayload({ status: "   " }),
+    ];
     for (const payload of cases) {
       const reply = await app.inject({
         method: "POST",
         url: "/profile/",
-        headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+        headers: {
+          authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+        },
         payload,
       });
-      assert.equal(reply.statusCode, 400, `should 400 for ${JSON.stringify(payload)}`);
+      assert.equal(
+        reply.statusCode,
+        400,
+        `should 400 for ${JSON.stringify(payload)}`,
+      );
       assert.equal(reply.json().code, "VALIDATION_ERROR");
     }
   });
 
   test("returns 400 when required fields are nulled", async () => {
     const userId = newId();
-    for (const payload of [{ status: null, skills: ["JS"] }, { status: "Dev", skills: null }]) {
+    for (const payload of [
+      { status: null, skills: ["JS"] },
+      { status: "Dev", skills: null },
+    ]) {
       const reply = await app.inject({
         method: "POST",
         url: "/profile/",
-        headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+        headers: {
+          authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+        },
         payload: payload as any,
       });
       assert.equal(reply.statusCode, 400);
@@ -571,7 +756,10 @@ describe("GET /profile/me — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({ method: "GET", url: "/profile/me" });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for a refresh token", async () => {
@@ -585,7 +773,10 @@ describe("GET /profile/me — authentication", () => {
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("accepts token from cookie", async () => {
@@ -643,7 +834,9 @@ describe("GET /profile/me — logic", () => {
     const reply = await app.inject({
       method: "GET",
       url: "/profile/me",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 404);
@@ -655,12 +848,16 @@ describe("GET /profile/me — logic", () => {
   test("populates userId with name and avatar", async () => {
     const userId = newId();
     const mockProfile = mkProfile({ userId });
-    const findOneStub = stubMethod(Profile, "findOne", () => mkQuery(mockProfile as any));
+    const findOneStub = stubMethod(Profile, "findOne", () =>
+      mkQuery(mockProfile as any),
+    );
 
     const reply = await app.inject({
       method: "GET",
       url: "/profile/me",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 200);
@@ -680,7 +877,9 @@ describe("GET /profile/me — logic", () => {
     const reply = await app.inject({
       method: "GET",
       url: "/profile/me",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 500);

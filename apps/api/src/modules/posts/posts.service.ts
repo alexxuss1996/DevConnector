@@ -2,6 +2,7 @@ import AppError from "#helpers/app-error";
 import Post from "#modules/posts/posts.model";
 import User from "#modules/users/user.model";
 import { Types, isValidObjectId } from "mongoose";
+import { sanitizeText } from "#helpers/sanitize";
 
 class PostService {
   async getPosts(page = 1, limit = 20) {
@@ -43,7 +44,8 @@ class PostService {
   }
 
   async createPost(userId: string, text: string) {
-    if (!text || !text.trim()) {
+    const sanitizedText = sanitizeText(text);
+    if (!sanitizedText || !sanitizedText.trim()) {
       throw new AppError(400, "VALIDATION_ERROR", "Text cannot be blank");
     }
     const user = await User.findById(userId);
@@ -58,7 +60,7 @@ class PostService {
       userId,
       name: user.name,
       avatar: user.avatar ?? "",
-      text: text.trim(),
+      text: sanitizedText,
     });
 
     await newPost.save();
@@ -149,7 +151,8 @@ class PostService {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    if (!text || !text.trim()) {
+    const sanitizedText = sanitizeText(text);
+    if (!sanitizedText || !sanitizedText.trim()) {
       throw new AppError(400, "VALIDATION_ERROR", "Text cannot be blank");
     }
     const user = await User.findById(userId);
@@ -167,7 +170,7 @@ class PostService {
         $push: {
           comments: {
             userId: new Types.ObjectId(userId),
-            text: text.trim(),
+            text: sanitizedText,
             name: user.name,
             avatar: user.avatar ?? "",
           },
@@ -195,7 +198,8 @@ class PostService {
     if (!isValidObjectId(commentId)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    if (text === undefined || !text.trim()) {
+    const sanitizedText = text ? sanitizeText(text) : undefined;
+    if (sanitizedText === undefined || !sanitizedText.trim()) {
       throw new AppError(400, "VALIDATION_ERROR", "Text is required");
     }
     const user = await User.findById(userId);
@@ -211,7 +215,7 @@ class PostService {
         _id: id,
         comments: { $elemMatch: { _id: commentId, userId: user._id } },
       },
-      { $set: { "comments.$.text": text.trim(), updatedAt: new Date() } },
+      { $set: { "comments.$.text": sanitizedText, updatedAt: new Date() } },
       { new: true },
     );
     if (post) {
