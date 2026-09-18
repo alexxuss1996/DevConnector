@@ -11,6 +11,11 @@ import {
   UpdateProfileInput,
 } from "#modules/profile/profile.schemas";
 import mongoose, { Types } from "mongoose";
+import {
+  sanitizePlainText,
+  sanitizeUrl,
+  sanitizeGithubUsername,
+} from "#helpers/sanitize";
 
 /**
  * Validates experience/education date combinations that JSON Schema
@@ -25,16 +30,28 @@ function validateDateRange(
 ): { fromDate: Date; toDate?: Date } {
   const fromDate = new Date(from);
   if (Number.isNaN(fromDate.getTime())) {
-    throw new AppError(400, "VALIDATION_ERROR", `${kind} 'from' is not a valid date`);
+    throw new AppError(
+      400,
+      "VALIDATION_ERROR",
+      `${kind} 'from' is not a valid date`,
+    );
   }
   let toDate: Date | undefined;
   if (to !== undefined) {
     toDate = new Date(to);
     if (Number.isNaN(toDate.getTime())) {
-      throw new AppError(400, "VALIDATION_ERROR", `${kind} 'to' is not a valid date`);
+      throw new AppError(
+        400,
+        "VALIDATION_ERROR",
+        `${kind} 'to' is not a valid date`,
+      );
     }
     if (toDate < fromDate) {
-      throw new AppError(400, "VALIDATION_ERROR", `${kind} 'to' must be after 'from'`);
+      throw new AppError(
+        400,
+        "VALIDATION_ERROR",
+        `${kind} 'to' must be after 'from'`,
+      );
     }
   }
   if (current === true && toDate !== undefined) {
@@ -106,12 +123,28 @@ class ProfileService {
         value === null ||
         (typeof value === "string" && value.trim() === "")
       ) {
-        // Required fields are validated by schema (CreateProfileSchema) — never wipe them here;
-        // for direct service calls, preserve existing value instead of throwing
         if (key === "status" || key === "skills") continue;
         toUnset[key] = 1;
       } else if (value !== undefined) {
-        toSet[key] = value;
+        if (key === "website") {
+          const sanitized = sanitizeUrl(value as string | undefined | null);
+          if (sanitized) toSet[key] = sanitized;
+          else toUnset[key] = 1;
+        } else if (key === "githubusername") {
+          const sanitized = sanitizeGithubUsername(
+            value as string | undefined | null,
+          );
+          if (sanitized) toSet[key] = sanitized;
+          else toUnset[key] = 1;
+        } else if (typeof value === "string") {
+          toSet[key] = sanitizePlainText(value);
+        } else if (Array.isArray(value)) {
+          toSet[key] = value.map((v) =>
+            sanitizePlainText(v as string | undefined | null),
+          );
+        } else {
+          toSet[key] = value;
+        }
       }
     }
 
@@ -128,7 +161,9 @@ class ProfileService {
       ) {
         toUnset[`social.${key}`] = 1;
       } else if (value !== undefined) {
-        toSet[`social.${key}`] = value;
+        const sanitized = sanitizeUrl(value as string | undefined | null);
+        if (sanitized) toSet[`social.${key}`] = sanitized;
+        else toUnset[`social.${key}`] = 1;
       }
     }
 
@@ -163,7 +198,11 @@ class ProfileService {
    */
   async updateProfile(userId: string, data: UpdateProfileInput) {
     if (!data || Object.keys(data).length === 0) {
-      throw new AppError(400, "VALIDATION_ERROR", "At least one field is required");
+      throw new AppError(
+        400,
+        "VALIDATION_ERROR",
+        "At least one field is required",
+      );
     }
     // Reuse the same $set/$unset builder, but without upsert.
     const existing = await Profile.findOne({ userId });
@@ -196,10 +235,31 @@ class ProfileService {
 
     for (const [key, value] of Object.entries(rest)) {
       if (!ALLOWED_PROFILE_FIELDS.has(key)) continue;
-      if (value === null || (typeof value === "string" && value.trim() === "")) {
+      if (
+        value === null ||
+        (typeof value === "string" && value.trim() === "")
+      ) {
         toUnset[key] = 1;
       } else if (value !== undefined) {
-        toSet[key] = value;
+        if (key === "website") {
+          const sanitized = sanitizeUrl(value as string | undefined | null);
+          if (sanitized) toSet[key] = sanitized;
+          else toUnset[key] = 1;
+        } else if (key === "githubusername") {
+          const sanitized = sanitizeGithubUsername(
+            value as string | undefined | null,
+          );
+          if (sanitized) toSet[key] = sanitized;
+          else toUnset[key] = 1;
+        } else if (typeof value === "string") {
+          toSet[key] = sanitizePlainText(value);
+        } else if (Array.isArray(value)) {
+          toSet[key] = value.map((v) =>
+            sanitizePlainText(v as string | undefined | null),
+          );
+        } else {
+          toSet[key] = value;
+        }
       }
     }
 
@@ -210,10 +270,15 @@ class ProfileService {
       twitter,
       youtube,
     })) {
-      if (value === null || (typeof value === "string" && value.trim() === "")) {
+      if (
+        value === null ||
+        (typeof value === "string" && value.trim() === "")
+      ) {
         toUnset[`social.${key}`] = 1;
       } else if (value !== undefined) {
-        toSet[`social.${key}`] = value;
+        const sanitized = sanitizeUrl(value as string | undefined | null);
+        if (sanitized) toSet[`social.${key}`] = sanitized;
+        else toUnset[`social.${key}`] = 1;
       }
     }
 
@@ -299,22 +364,32 @@ class ProfileService {
   async addExperience(userId: string, data: AddExperienceInput) {
     const { title, company, location, from, to, current, description } = data;
 
-    const { fromDate, toDate } = validateDateRange(from, to, current, "Experience");
+    const { fromDate, toDate } = validateDateRange(
+      from,
+      to,
+      current,
+      "Experience",
+    );
+
+    // Build experience object, only including optional fields when provided
+    const experience: Record<string, unknown> = {
+      title: sanitizePlainText(title),
+      company: sanitizePlainText(company),
+      from: fromDate,
+      current,
+    };
+    if (location !== undefined)
+      experience.location = sanitizePlainText(location);
+    if (toDate !== undefined) experience.to = toDate;
+    if (description !== undefined)
+      experience.description = sanitizePlainText(description);
 
     // Atomic $push: concurrent adds can no longer lose entries.
     const profile = await Profile.findOneAndUpdate(
       { userId },
       {
         $push: {
-          experience: {
-            title,
-            company,
-            location,
-            from: fromDate,
-            to: toDate,
-            current,
-            description,
-          },
+          experience,
         },
       },
       { new: true },
@@ -332,22 +407,31 @@ class ProfileService {
   async addEducation(userId: string, data: AddEducationInput) {
     const { school, degree, fieldofstudy, from, to, current, description } =
       data;
-    const { fromDate, toDate } = validateDateRange(from, to, current, "Education");
+    const { fromDate, toDate } = validateDateRange(
+      from,
+      to,
+      current,
+      "Education",
+    );
+
+    // Build education object, only including optional fields when provided
+    const education: Record<string, unknown> = {
+      school: sanitizePlainText(school),
+      degree: sanitizePlainText(degree),
+      fieldofstudy: sanitizePlainText(fieldofstudy),
+      from: fromDate,
+      current,
+    };
+    if (toDate !== undefined) education.to = toDate;
+    if (description !== undefined)
+      education.description = sanitizePlainText(description);
 
     // Atomic $push: concurrent adds can no longer lose entries.
     const profile = await Profile.findOneAndUpdate(
       { userId },
       {
         $push: {
-          education: {
-            school,
-            degree,
-            fieldofstudy,
-            from: fromDate,
-            to: toDate,
-            current,
-            description,
-          },
+          education,
         },
       },
       { new: true },
@@ -454,10 +538,18 @@ class ProfileService {
         throw new AppError(404, "GITHUB_REPOS_NOT_FOUND", "No repos found");
       }
       if (response.status === 401) {
-        throw new AppError(401, "GITHUB_AUTH_FAILED", "GitHub authentication failed");
+        throw new AppError(
+          401,
+          "GITHUB_AUTH_FAILED",
+          "GitHub authentication failed",
+        );
       }
       if (response.status === 403 || response.status === 429) {
-        throw new AppError(response.status, "GITHUB_RATE_LIMITED", "GitHub rate limit exceeded");
+        throw new AppError(
+          response.status,
+          "GITHUB_RATE_LIMITED",
+          "GitHub rate limit exceeded",
+        );
       }
       if (response.status >= 500) {
         throw new AppError(502, "GITHUB_UPSTREAM_ERROR", "GitHub server error");
@@ -472,7 +564,10 @@ class ProfileService {
 
 const GITHUB_CACHE_TTL_MS = 60_000;
 const GITHUB_CACHE_MAX_ENTRIES = 200;
-const githubReposCache = new Map<string, { expiresAt: number; data: unknown }>();
+const githubReposCache = new Map<
+  string,
+  { expiresAt: number; data: unknown }
+>();
 
 function getCachedGithubRepos(key: string): unknown | undefined {
   const entry = githubReposCache.get(key);
@@ -490,7 +585,10 @@ function setCachedGithubRepos(key: string, data: unknown): void {
     const oldest = githubReposCache.keys().next();
     if (!oldest.done) githubReposCache.delete(oldest.value);
   }
-  githubReposCache.set(key, { expiresAt: Date.now() + GITHUB_CACHE_TTL_MS, data });
+  githubReposCache.set(key, {
+    expiresAt: Date.now() + GITHUB_CACHE_TTL_MS,
+    data,
+  });
 }
 
 /** Clears the GitHub repos cache. Exported for tests. */

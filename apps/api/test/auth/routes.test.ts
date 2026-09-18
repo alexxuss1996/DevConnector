@@ -455,6 +455,46 @@ describe("POST /auth/register — additional cases", () => {
 
     assert.equal(create.mock.callCount(), 0);
   });
+
+  test("rejects a whitespace-only name", async () => {
+    const create = stubMethod(User, "create", (data: any) => mkUser(data));
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: {
+        name: "   ",
+        email: "jane.doe@example.com",
+        password: "supersecret123",
+      },
+    });
+
+    assert.equal(reply.statusCode, 400);
+    assert.equal(reply.json().code, "VALIDATION_ERROR");
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test("stores a sanitized name", async () => {
+    stubMethod(User, "findOne", () => mkQuery(null));
+    const create = stubMethod(User, "create", (data: any) => mkUser(data));
+    stubMethod(Session.prototype, "save", async function (this: any) {
+      return this;
+    });
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: {
+        name: "<b>Jane</b> Doe",
+        email: "jane.doe@example.com",
+        password: "supersecret123",
+      },
+    });
+
+    assert.equal(reply.statusCode, 201);
+    assert.equal(create.mock.calls[0].arguments[0].name, "Jane Doe");
+    assert.equal(reply.json().name, "Jane Doe");
+  });
 });
 
 describe("POST /auth/login — additional cases", () => {

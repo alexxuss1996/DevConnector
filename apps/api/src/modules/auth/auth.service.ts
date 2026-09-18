@@ -1,6 +1,7 @@
 import User from "#modules/users/user.model";
 import Session from "#modules/auth/session.model";
 import AppError from "#helpers/app-error";
+import { sanitizePlainText } from "#helpers/sanitize";
 import argon2 from "argon2";
 import gravatarUrl from "gravatar-url";
 import { FastifyInstance } from "fastify";
@@ -158,7 +159,14 @@ class AuthService {
   async register(fastify: FastifyInstance, data: RegisterInput) {
     const { name, email, password } = data;
     const normalizedEmail = email.toLowerCase().trim();
-    const trimmedName = name.trim();
+    const trimmedName = sanitizePlainText(name);
+    if (!trimmedName) {
+      throw new AppError(
+        400,
+        "VALIDATION_ERROR",
+        "Name is required and cannot be blank",
+      );
+    }
 
     let existingUser = await User.findOne({ email: normalizedEmail });
 
@@ -238,7 +246,9 @@ class AuthService {
         );
       }
       const fallbackName =
-        googleUser.name ?? email.split("@")[0] ?? "Google User";
+        sanitizePlainText(googleUser.name) ||
+        email.split("@")[0] ||
+        "Google User";
       try {
         user = await User.create({
           email,

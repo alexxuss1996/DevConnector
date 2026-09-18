@@ -1,9 +1,13 @@
 import { Static, Type } from "typebox";
 
+const NON_BLANK_PATTERN = ".*\\S.*";
+
 export const RegisterUserSchema = Type.Object({
   name: Type.String({
     minLength: 3,
     maxLength: 30,
+    pattern: NON_BLANK_PATTERN,
+    errorMessage: "Name must be 3-30 characters and cannot be blank",
   }),
   email: Type.String({
     format: "email",
@@ -28,6 +32,8 @@ export const CompleteOnboardingSchema = Type.Object({
   name: Type.String({
     minLength: 3,
     maxLength: 30,
+    pattern: NON_BLANK_PATTERN,
+    errorMessage: "Name must be 3-30 characters and cannot be blank",
   }),
 });
 
