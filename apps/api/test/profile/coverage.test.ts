@@ -298,7 +298,7 @@ describe("POST /profile/experience — authentication", () => {
     const userId = newId();
     const token = signAccessToken(app, { sub: userId.toString() });
     const prof = mkSavableProfile({ userId, experience: [] });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -355,7 +355,7 @@ describe("POST /profile/experience — validation", () => {
 
 describe("POST /profile/experience — logic (108-136)", () => {
   test("returns 404 when profile not found", async () => {
-    stubMethod(Profile, "findOne", () => mkQuery(null));
+    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null));
     const reply = await app.inject({
       method: "POST",
       url: "/profile/experience",
@@ -366,10 +366,10 @@ describe("POST /profile/experience — logic (108-136)", () => {
     assert.equal((reply.json() as any).code, "PROFILE_NOT_FOUND");
   });
 
-  test("pushes experience with all fields and returns 200 (covers 119-131 save)", async () => {
+  test("pushes experience atomically with all fields and returns 200", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: [] });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const payload = {
       title: "Engineer",
@@ -390,23 +390,22 @@ describe("POST /profile/experience — logic (108-136)", () => {
     assert.equal(reply.statusCode, 200);
     const body = reply.json() as any;
     assert.ok(body.profile);
-    assert.equal(prof.save.mock.callCount(), 1);
-    // experience pushed with Date conversion
-    assert.equal(prof.experience.length, 1);
-    const exp = prof.experience[0] as any;
-    assert.equal(exp.title, "Engineer");
-    assert.equal(exp.company, "Acme");
-    assert.equal(exp.location, "NYC");
-    assert.ok(exp.from instanceof Date);
-    assert.ok(exp.to instanceof Date);
-    assert.equal(exp.current, false);
-    assert.equal(exp.description, "Did stuff");
+    // atomic $push carries Date-converted fields
+    assert.equal(updateStub.mock.callCount(), 1);
+    const [, expPush] = updateStub.mock.calls[0].arguments as any[];
+    assert.equal(expPush.$push.experience.title, "Engineer");
+    assert.equal(expPush.$push.experience.company, "Acme");
+    assert.equal(expPush.$push.experience.location, "NYC");
+    assert.ok(expPush.$push.experience.from instanceof Date);
+    assert.ok(expPush.$push.experience.to instanceof Date);
+    assert.equal(expPush.$push.experience.current, false);
+    assert.equal(expPush.$push.experience.description, "Did stuff");
   });
 
   test("handles optional fields omitted (to/current undefined)", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: [] });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -415,18 +414,16 @@ describe("POST /profile/experience — logic (108-136)", () => {
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
     assert.equal(reply.statusCode, 200);
-    const exp = prof.experience[0] as any;
-    assert.equal(exp.title, "Dev");
-    assert.equal(exp.to, undefined);
-    // schema default injects false for current when omitted
-    assert.equal(exp.current, false);
-    assert.equal(exp.location, undefined);
+    const [, omittedPush] = updateStub.mock.calls[0].arguments as any[];
+    assert.equal(omittedPush.$push.experience.title, "Dev");
+    assert.equal(omittedPush.$push.experience.to, undefined);
+    assert.equal(omittedPush.$push.experience.location, undefined);
   });
 
   test("handles current=true without to date", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: [] });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -435,15 +432,16 @@ describe("POST /profile/experience — logic (108-136)", () => {
       payload: { title: "Dev", company: "Acme", from: "2023-01-01", current: true },
     });
     assert.equal(reply.statusCode, 200);
-    assert.equal(prof.experience[0].current, true);
-    assert.equal(prof.experience[0].to, undefined);
+    const [, currentPush] = updateStub.mock.calls[0].arguments as any[];
+    assert.equal(currentPush.$push.experience.current, true);
+    assert.equal(currentPush.$push.experience.to, undefined);
   });
 
-  test("handles null experience array defaults to []", async () => {
+  test("adds experience regardless of existing array state (atomic $push)", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: null as any });
-    // service does profile.experience ?? [] so null yields []
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    // atomic $push never reads the local array, so null state is irrelevant
+    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -454,12 +452,10 @@ describe("POST /profile/experience — logic (108-136)", () => {
     assert.equal(reply.statusCode, 200);
   });
 
-  test("returns 500 on save error", async () => {
-    const prof = mkSavableProfile({ experience: [] });
-    prof.save = mock.fn(async () => {
-      throw new Error("save boom");
+  test("returns 500 on update error", async () => {
+    stubMethod(Profile, "findOneAndUpdate", async () => {
+      throw new Error("update boom");
     });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -529,7 +525,7 @@ describe("POST /profile/education — validation", () => {
 
 describe("POST /profile/education — logic (139-167)", () => {
   test("returns 404 when profile not found", async () => {
-    stubMethod(Profile, "findOne", () => mkQuery(null));
+    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null));
     const reply = await app.inject({
       method: "POST",
       url: "/profile/education",
@@ -539,10 +535,10 @@ describe("POST /profile/education — logic (139-167)", () => {
     assert.equal(reply.statusCode, 404);
   });
 
-  test("pushes education with all fields and returns 200", async () => {
+  test("pushes education atomically with all fields and returns 200", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: [] });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const payload = {
       school: "MIT",
@@ -561,20 +557,20 @@ describe("POST /profile/education — logic (139-167)", () => {
       payload,
     });
     assert.equal(reply.statusCode, 200);
-    const edu = prof.education[0] as any;
-    assert.equal(edu.school, "MIT");
-    assert.equal(edu.degree, "Master");
-    assert.equal(edu.fieldofstudy, "CS");
-    assert.ok(edu.from instanceof Date);
-    assert.ok(edu.to instanceof Date);
-    assert.equal(edu.current, false);
-    assert.equal(edu.description, "Thesis");
+    const [, eduPush] = updateStub.mock.calls[0].arguments as any[];
+    assert.equal(eduPush.$push.education.school, "MIT");
+    assert.equal(eduPush.$push.education.degree, "Master");
+    assert.equal(eduPush.$push.education.fieldofstudy, "CS");
+    assert.ok(eduPush.$push.education.from instanceof Date);
+    assert.ok(eduPush.$push.education.to instanceof Date);
+    assert.equal(eduPush.$push.education.current, false);
+    assert.equal(eduPush.$push.education.description, "Thesis");
   });
 
   test("handles optional to/current omitted", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: [] });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -583,16 +579,14 @@ describe("POST /profile/education — logic (139-167)", () => {
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });
     assert.equal(reply.statusCode, 200);
-    const edu = prof.education[0] as any;
-    assert.equal(edu.to, undefined);
-    // schema default injects false
-    assert.equal(edu.current, false);
+    const [, omittedEduPush] = updateStub.mock.calls[0].arguments as any[];
+    assert.equal(omittedEduPush.$push.education.to, undefined);
   });
 
   test("handles current=true without to", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: [] });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -601,13 +595,14 @@ describe("POST /profile/education — logic (139-167)", () => {
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01", current: true },
     });
     assert.equal(reply.statusCode, 200);
-    assert.equal(prof.education[0].current, true);
+    const [, currentEduPush] = updateStub.mock.calls[0].arguments as any[];
+    assert.equal(currentEduPush.$push.education.current, true);
   });
 
-  test("handles null education array", async () => {
+  test("adds education regardless of existing array state (atomic $push)", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: null as any });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
+    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -618,12 +613,10 @@ describe("POST /profile/education — logic (139-167)", () => {
     assert.equal(reply.statusCode, 200);
   });
 
-  test("returns 500 on save error", async () => {
-    const prof = mkSavableProfile({ education: [] });
-    prof.save = mock.fn(async () => {
+  test("returns 500 on update error", async () => {
+    stubMethod(Profile, "findOneAndUpdate", async () => {
       throw new Error("boom");
     });
-    stubMethod(Profile, "findOne", () => mkQuery(prof as any));
 
     const reply = await app.inject({
       method: "POST",

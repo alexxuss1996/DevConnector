@@ -1,6 +1,6 @@
 import { describe, test, before, after, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { profileService } from "#modules/profile/profile.service";
+import { profileService, clearGithubReposCache } from "#modules/profile/profile.service";
 import { newId } from "../helpers/stubs.ts";
 import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import type { FastifyInstance } from "fastify";
@@ -24,6 +24,8 @@ afterEach(() => {
   if ((global.fetch as any).mock) {
     try { (global.fetch as any).mock.restore(); } catch {}
   }
+  // service caches GitHub responses for 60s — clear so mocked fetches re-run
+  clearGithubReposCache();
 });
 
 function authHeader(userId?: string) {
@@ -313,5 +315,33 @@ describe("profileService.getGithubReposForProfile — unit", () => {
     );
 
     if (original !== undefined) process.env.GITHUB_ACCESS_TOKEN = original;
+  });
+
+  test("caches successful responses and skips fetch on repeat", async () => {
+    const repos = [{ id: 7, name: "cached" }];
+    const fetchMock = mock.method(global, "fetch", async () => ({
+      ok: true,
+      status: 200,
+      json: async () => repos,
+    }) as any);
+
+    const first = await profileService.getGithubReposForProfile("cache-user");
+    const second = await profileService.getGithubReposForProfile("cache-user");
+    assert.deepEqual(first, repos);
+    assert.deepEqual(second, repos);
+    assert.equal(fetchMock.mock.callCount(), 1);
+  });
+
+  test("does not cache failed responses", async () => {
+    mock.method(global, "fetch", async () => ({
+      ok: false,
+      status: 404,
+      json: async () => ({ message: "Not Found" }),
+    }) as any);
+
+    await assert.rejects(() => profileService.getGithubReposForProfile("missing-user"));
+    await assert.rejects(() => profileService.getGithubReposForProfile("missing-user"));
+    // second call re-fetched instead of serving the 404 from cache
+    assert.equal((global.fetch as any).mock.callCount(), 2);
   });
 });

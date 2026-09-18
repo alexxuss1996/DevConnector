@@ -29,9 +29,9 @@ const googleCallback: FastifyPluginAsyncTypebox = async (fastify) => {
         fastify.log.error(err);
 
         if (err instanceof AppError && err.statusCode === 401) {
-          return reply.status(401).send({
-            message: "Google authentication failed",
-          });
+          // Browser OAuth flow: signal failure via redirect so the
+          // frontend can display it instead of a raw API error page.
+          return reply.redirect(`${env.FRONTEND_URL}?error=google_auth_failed`);
         }
 
         throw err;

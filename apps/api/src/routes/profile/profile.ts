@@ -15,7 +15,8 @@ const profile: FastifyPluginAsyncTypebox = async (fastify) => {
         request.user.sub,
         request.body,
       );
-      return reply.status(200).send(result);
+      // Envelope convention: every profile endpoint returns { profile }.
+      return reply.status(200).send({ profile: result });
     },
   ),
     fastify.get(

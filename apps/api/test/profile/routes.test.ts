@@ -203,7 +203,7 @@ describe("POST /profile — validation", () => {
       payload: { status: "Developer", skills: ["JS"] },
     });
     assert.equal(reply.statusCode, 200);
-    assert.equal((reply.json() as any).status, "Developer");
+    assert.equal((reply.json() as any).profile.status, "Developer");
   });
 });
 
@@ -238,10 +238,11 @@ describe("POST /profile — createOrUpdate logic", () => {
 
     assert.equal(reply.statusCode, 200);
     const body = reply.json() as any;
-    assert.equal(body.company, "Acme");
-    assert.equal(body.website, "https://example.com");
-    assert.equal(body.status, "Developer");
-    assert.deepEqual(body.skills, ["JavaScript", "Node.js"]);
+    assert.ok(body.profile);
+    assert.equal(body.profile.company, "Acme");
+    assert.equal(body.profile.website, "https://example.com");
+    assert.equal(body.profile.status, "Developer");
+    assert.deepEqual(body.profile.skills, ["JavaScript", "Node.js"]);
     // Verify service was called with correct filter and $set using dot-notation for social
     assert.equal(findOneAndUpdate.mock.callCount(), 1);
     const [filter, update, options] = findOneAndUpdate.mock.calls[0].arguments as any[];

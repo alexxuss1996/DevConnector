@@ -80,46 +80,46 @@ class PostService {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    // NOTE: read-modify-write; concurrent likes can race. For full safety use
-    // $addToSet with a "likes.userId != userId" filter (requires test updates).
-    if (post.likes.some((like) => String(like.userId) === String(userId))) {
+    // Atomic: the filter only matches when not already liked, so concurrent
+    // requests cannot create duplicate likes.
+    const post = await Post.findOneAndUpdate(
+      { _id: id, "likes.userId": { $ne: new Types.ObjectId(userId) } },
+      { $addToSet: { likes: { userId: new Types.ObjectId(userId) } } },
+      { new: true },
+    );
+    if (!post) {
+      const exists = await Post.exists({ _id: id });
+      if (!exists) {
+        throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+      }
       throw new AppError(400, "ALREADY_LIKED", "User already liked the post");
     }
-    if (isValidObjectId(userId)) {
-      post.likes.push({
-        userId: new Types.ObjectId(userId),
-      });
-    }
-    await post.save();
   }
 
   async unlikePost(userId: string, id: string) {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    if (!post.likes.some((like) => String(like.userId) === String(userId))) {
+    const post = await Post.findOneAndUpdate(
+      { _id: id, "likes.userId": new Types.ObjectId(userId) },
+      { $pull: { likes: { userId: new Types.ObjectId(userId) } } },
+      { new: true },
+    );
+    if (!post) {
+      const exists = await Post.exists({ _id: id });
+      if (!exists) {
+        throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+      }
       throw new AppError(400, "NOT_LIKED", "User did not like the post");
     }
-    post.likes = post.likes.filter(
-      (like) => String(like.userId) !== String(userId),
-    );
-    await post.save();
   }
 
   async getPostComments(id: string) {
@@ -140,10 +140,6 @@ class PostService {
     if (!text || !text.trim()) {
       throw new AppError(400, "VALIDATION_ERROR", "Text cannot be blank");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
@@ -152,14 +148,24 @@ class PostService {
       throw new AppError(400, "VALIDATION_ERROR", "User has no name");
     }
 
-    post.comments.push({
-      userId: new Types.ObjectId(userId),
-      text: text.trim(),
-      name: user.name,
-      avatar: user.avatar ?? "",
-    });
-
-    await post.save();
+    // Atomic $push: concurrent comments can no longer overwrite each other.
+    const post = await Post.findOneAndUpdate(
+      { _id: id },
+      {
+        $push: {
+          comments: {
+            userId: new Types.ObjectId(userId),
+            text: text.trim(),
+            name: user.name,
+            avatar: user.avatar ?? "",
+          },
+        },
+      },
+      { new: true },
+    );
+    if (!post) {
+      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+    }
 
     return post.comments;
   }
@@ -176,9 +182,8 @@ class PostService {
     if (!isValidObjectId(commentId)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
+    if (text === undefined || !text.trim()) {
+      throw new AppError(400, "VALIDATION_ERROR", "Text is required");
     }
     const user = await User.findById(userId);
     if (!user) {
@@ -187,21 +192,26 @@ class PostService {
     if (!user.name) {
       throw new AppError(400, "VALIDATION_ERROR", "User has no name");
     }
-    const comment = post.comments.find(
-      (comment) => comment._id?.toString() === commentId,
+    // Atomic ownership-checked update via the positional operator.
+    const post = await Post.findOneAndUpdate(
+      {
+        _id: id,
+        comments: { $elemMatch: { _id: commentId, userId: user._id } },
+      },
+      { $set: { "comments.$.text": text.trim() } },
+      { new: true },
     );
-    if (!comment) {
-      throw new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
+    if (post) {
+      const comment = post.comments.find(
+        (comment) => comment._id?.toString() === commentId,
+      );
+      // Matched the filter, so the comment must be present.
+      if (!comment) {
+        throw new AppError(500, "INTERNAL_SERVER_ERROR", "Comment update failed");
+      }
+      return comment;
     }
-    if (String(comment.userId) !== String(userId)) {
-      throw new AppError(403, "FORBIDDEN", "Not authorized");
-    }
-    if (text === undefined || !text.trim()) {
-      throw new AppError(400, "VALIDATION_ERROR", "Text is required");
-    }
-    comment.text = text.trim();
-    await post.save();
-    return comment;
+    throw await this.resolveCommentWriteFailure(id, commentId);
   }
 
   async deletePostComment(userId: string, id: string, commentId: string) {
@@ -211,28 +221,42 @@ class PostService {
     if (!isValidObjectId(commentId)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
-    if (!post) {
-      throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    const comment = post.comments.find(
+    // Atomic ownership-checked delete.
+    const post = await Post.findOneAndUpdate(
+      {
+        _id: id,
+        comments: { $elemMatch: { _id: commentId, userId: user._id } },
+      },
+      { $pull: { comments: { _id: commentId } } },
+      { new: true },
+    );
+    if (post) return;
+    throw await this.resolveCommentWriteFailure(id, commentId);
+  }
+
+  /**
+   * Maps a failed ownership-checked comment write to the precise error.
+   * Only runs on the failure path, so the extra read is rare.
+   */
+  private async resolveCommentWriteFailure(
+    id: string,
+    commentId: string,
+  ): Promise<AppError> {
+    const existing = await Post.findById(id);
+    if (!existing) {
+      return new AppError(404, "POST_NOT_FOUND", "Post not found");
+    }
+    const commentExists = existing.comments.some(
       (comment) => comment._id?.toString() === commentId,
     );
-    if (!comment) {
-      throw new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
+    if (!commentExists) {
+      return new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
     }
-    if (String(comment.userId) !== String(userId)) {
-      throw new AppError(403, "FORBIDDEN", "Not authorized");
-    }
-    post.comments = post.comments.filter(
-      (comment) => comment._id?.toString() !== commentId,
-    );
-
-    await post.save();
+    return new AppError(403, "FORBIDDEN", "Not authorized");
   }
 }
 

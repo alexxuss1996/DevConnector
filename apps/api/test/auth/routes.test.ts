@@ -379,7 +379,7 @@ describe("GET /auth/google/callback", () => {
     ]);
   });
 
-  test("returns 401 when Google rejects the code exchange", async () => {
+  test("redirects with error param when Google rejects the code exchange", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: false,
       json: async () => ({}),
@@ -390,8 +390,8 @@ describe("GET /auth/google/callback", () => {
       url: "/auth/google/callback?code=bad-code",
     });
 
-    assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { message: "Google authentication failed" });
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 });
 
@@ -1011,7 +1011,7 @@ describe("GET /protected — additional cases", () => {
 });
 
 describe("GET /auth/google/callback — additional cases", () => {
-  test("returns 401 when Google access token is invalid", async () => {
+  test("redirects with error param when Google access token is invalid", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: false,
       json: async () => ({}),
@@ -1022,13 +1022,11 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=bad-code",
     });
 
-    assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
-      message: "Google authentication failed",
-    });
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 
-  test("returns 401 when Google email is not verified", async () => {
+  test("redirects with error param when Google email is not verified", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: true,
       json: async () => ({
@@ -1049,11 +1047,12 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 401);
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
     assert.equal(create.mock.callCount(), 0);
   });
 
-  test("returns 401 when Google user does not contain sub", async () => {
+  test("redirects with error param when Google user does not contain sub", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: true,
       json: async () => ({
@@ -1068,10 +1067,11 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 401);
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 
-  test("returns 401 when Google user does not contain email", async () => {
+  test("redirects with error param when Google user does not contain email", async () => {
     stubMethod(globalThis, "fetch", async () => ({
       ok: true,
       json: async () => ({
@@ -1086,7 +1086,8 @@ describe("GET /auth/google/callback — additional cases", () => {
       url: "/auth/google/callback?code=some-code",
     });
 
-    assert.equal(reply.statusCode, 401);
+    assert.equal(reply.statusCode, 302);
+    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
   });
 
   test("links an existing local account to Google", async () => {

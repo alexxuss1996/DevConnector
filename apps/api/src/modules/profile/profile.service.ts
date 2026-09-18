@@ -159,27 +159,28 @@ class ProfileService {
     const toDate = to ? new Date(to) : undefined;
     const fromDate = new Date(from);
 
-    // NOTE: read-modify-write; concurrent adds can race. For full safety use
-    // atomic $push via findOneAndUpdate (requires test-harness updates).
-    const profile = await Profile.findOne({ userId });
+    // Atomic $push: concurrent adds can no longer lose entries.
+    const profile = await Profile.findOneAndUpdate(
+      { userId },
+      {
+        $push: {
+          experience: {
+            title,
+            company,
+            location,
+            from: fromDate,
+            to: toDate,
+            current,
+            description,
+          },
+        },
+      },
+      { new: true },
+    );
 
     if (!profile) {
       throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
     }
-
-    const experience = (profile.experience ??= []);
-
-    experience.push({
-      title,
-      company,
-      location,
-      from: fromDate,
-      to: toDate,
-      current,
-      description,
-    });
-
-    await profile.save();
 
     return {
       profile,
@@ -192,25 +193,28 @@ class ProfileService {
     const toDate = to ? new Date(to) : undefined;
     const fromDate = new Date(from);
 
-    const profile = await Profile.findOne({ userId });
+    // Atomic $push: concurrent adds can no longer lose entries.
+    const profile = await Profile.findOneAndUpdate(
+      { userId },
+      {
+        $push: {
+          education: {
+            school,
+            degree,
+            fieldofstudy,
+            from: fromDate,
+            to: toDate,
+            current,
+            description,
+          },
+        },
+      },
+      { new: true },
+    );
 
     if (!profile) {
       throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
     }
-
-    const education = (profile.education ??= []);
-
-    education.push({
-      school,
-      degree,
-      fieldofstudy,
-      from: fromDate,
-      to: toDate,
-      current,
-      description,
-    });
-
-    await profile.save();
 
     return {
       profile,
@@ -278,6 +282,8 @@ class ProfileService {
       );
     }
     const safeUsername = encodeURIComponent(username);
+    const cached = getCachedGithubRepos(safeUsername);
+    if (cached) return cached;
     const response = await fetch(
       `https://api.github.com/users/${safeUsername}/repos?per_page=5&sort=created&direction=asc`,
       {
@@ -306,8 +312,37 @@ class ProfileService {
       throw new AppError(502, "GITHUB_UPSTREAM_ERROR", "GitHub upstream error");
     }
     const repos = await response.json();
+    setCachedGithubRepos(safeUsername, repos);
     return repos;
   }
+}
+
+const GITHUB_CACHE_TTL_MS = 60_000;
+const GITHUB_CACHE_MAX_ENTRIES = 200;
+const githubReposCache = new Map<string, { expiresAt: number; data: unknown }>();
+
+function getCachedGithubRepos(key: string): unknown | undefined {
+  const entry = githubReposCache.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    githubReposCache.delete(key);
+    return undefined;
+  }
+  return entry.data;
+}
+
+function setCachedGithubRepos(key: string, data: unknown): void {
+  if (githubReposCache.size >= GITHUB_CACHE_MAX_ENTRIES) {
+    // Evict the oldest entry (Maps preserve insertion order).
+    const oldest = githubReposCache.keys().next();
+    if (!oldest.done) githubReposCache.delete(oldest.value);
+  }
+  githubReposCache.set(key, { expiresAt: Date.now() + GITHUB_CACHE_TTL_MS, data });
+}
+
+/** Clears the GitHub repos cache. Exported for tests. */
+export function clearGithubReposCache(): void {
+  githubReposCache.clear();
 }
 
 export const profileService = new ProfileService();
