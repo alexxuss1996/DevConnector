@@ -2,7 +2,7 @@ import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { postService } from "#modules/posts/posts.service";
 import { PostIdParamsSchema } from "@dev-conn/contracts";
 
-const getProfileById: FastifyPluginAsyncTypebox = async (
+const getPost: FastifyPluginAsyncTypebox = async (
   fastify,
   opts,
 ): Promise<void> => {
@@ -21,4 +21,4 @@ const getProfileById: FastifyPluginAsyncTypebox = async (
   );
 };
 
-export default getProfileById;
+export default getPost;

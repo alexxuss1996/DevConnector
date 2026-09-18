@@ -2,6 +2,8 @@ import { describe, test, before, after, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import Profile from "#modules/profile/profile.model";
 import User from "#modules/users/user.model";
+import Post from "#modules/posts/posts.model";
+import Session from "#modules/auth/session.model";
 import { profileService } from "#modules/profile/profile.service";
 import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
 import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
@@ -194,6 +196,9 @@ describe("DELETE /profile/ — authentication and logic", () => {
     const usr = { _id: userId } as any;
     stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(prof as any));
     stubMethod(User, "findOneAndDelete", () => Promise.resolve(usr as any));
+    stubMethod(Post, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
+    stubMethod(Post, "updateMany", () => Promise.resolve({ acknowledged: true } as any));
+    stubMethod(Session, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
 
     const reply = await app.inject({
       method: "DELETE",
@@ -237,6 +242,9 @@ describe("DELETE /profile/ — authentication and logic", () => {
     const usr = { _id: userId } as any;
     const delProfile = stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(prof as any));
     const delUser = stubMethod(User, "findOneAndDelete", () => Promise.resolve(usr as any));
+    stubMethod(Post, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
+    stubMethod(Post, "updateMany", () => Promise.resolve({ acknowledged: true } as any));
+    stubMethod(Session, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
 
     const reply = await app.inject({
       method: "DELETE",

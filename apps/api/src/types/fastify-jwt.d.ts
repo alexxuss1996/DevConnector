@@ -13,6 +13,7 @@ declare module "@fastify/jwt" {
       sub: string;
       type: "access" | "refresh";
       sessionId?: string;
+      jti?: string;
     };
   }
 }

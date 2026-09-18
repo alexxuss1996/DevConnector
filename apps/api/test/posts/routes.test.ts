@@ -144,7 +144,14 @@ describe("POST /posts/ — validation", () => {
     assert.equal(reply.statusCode, 400);
     assert.equal(reply.json().code, "VALIDATION_ERROR");
     const body = reply.json() as any;
-    assert.ok(body.errors.some((e: any) => e.field === "text" || e.message.includes("Text")));
+    const details = [...(body.issues ?? []), ...Object.values(body.fieldErrors ?? {}).flat()] as any[];
+    assert.ok(
+      details.some((e: any) =>
+        typeof e === "string"
+          ? e.includes("Text")
+          : (e.path ?? []).includes("text") || (e.message ?? "").includes("Text"),
+      ),
+    );
   });
 
   test("returns 400 when text is not a string", async () => {
@@ -275,7 +282,7 @@ describe("POST /posts/ — createPost logic", () => {
     assert.notEqual(idArg.toString(), attackerId);
   });
 
-  test("returns 500 when user not found", async () => {
+  test("returns 404 when user not found", async () => {
     stubMethod(User, "findById", () => mkQuery(null));
     const reply = await app.inject({
       method: "POST",
@@ -287,7 +294,7 @@ describe("POST /posts/ — createPost logic", () => {
     assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
   });
 
-  test("returns 500 when user has no name", async () => {
+  test("returns 400 when user has no name", async () => {
     const userId = newId();
     const user = mkUser({ _id: userId, name: undefined as any });
     stubMethod(User, "findById", () => mkQuery(user as any));

@@ -12,9 +12,7 @@ const deletePost: FastifyPluginAsyncTypebox = async (fastify) => {
     async function (request, reply) {
       const { id } = request.params;
       await postService.deletePost(request.user.sub, id);
-      return reply.status(204).send({
-        message: "The post was deleted",
-      });
+      return reply.status(204).send();
     },
   );
 };

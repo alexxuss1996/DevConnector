@@ -19,8 +19,8 @@ export default fp(async (fastify) => {
       },
       servers: [
         {
-          url: "http://localhost:4000",
-          description: "Development server",
+          url: process.env.API_URL ?? "http://localhost:4000",
+          description: "API server",
         },
       ],
       tags: [
@@ -40,7 +40,7 @@ export default fp(async (fastify) => {
           cookieAuth: {
             type: "apiKey",
             in: "cookie",
-            name: "refreshToken",
+            name: "refresh_token",
             description: "Refresh token is set as httpOnly cookie on login/register",
           },
         },
@@ -50,6 +50,10 @@ export default fp(async (fastify) => {
     // TypeBox schemas are JSON-Schema compatible, no custom transform needed
     // but we add a small transform to auto-hide docs routes themselves if needed
   });
+
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_DOCS !== "true") {
+    return;
+  }
 
   // Swagger UI at /docs
   await fastify.register(swaggerUi, {

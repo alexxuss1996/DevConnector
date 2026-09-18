@@ -20,6 +20,8 @@ const sessionSchema = new Schema<ISession>({
 });
 
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+sessionSchema.index({ userId: 1 });
+sessionSchema.index({ revokedAt: 1 });
 
 const Session = mongoose.model<ISession>("Session", sessionSchema);
 

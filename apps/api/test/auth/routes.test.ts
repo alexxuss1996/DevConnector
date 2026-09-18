@@ -660,6 +660,8 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     stubMethod(Session, "findById", () => mkQuery(session));
+    // Reuse detection revokes the session on token mismatch.
+    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
 
     const reply = await app.inject({
       method: "POST",
@@ -786,6 +788,8 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     stubMethod(Session, "findById", () => mkQuery(session));
+    // Reuse detection revokes the session when the old token is replayed.
+    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
 
     stubMethod(User, "findById", () =>
       mkQuery(

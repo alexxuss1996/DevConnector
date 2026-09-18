@@ -11,6 +11,7 @@ import logoutRoute from "#routes/auth/logout";
 import googleRoute from "#routes/auth/google";
 import profileRoute from "#routes/profile/profile";
 import meRoute from "#routes/profile/me";
+import getByIdRoute from "#routes/profile/get-by-id";
 import deleteExperienceRoute from "#routes/profile/delete-experience";
 import deleteEducationRoute from "#routes/profile/delete-education";
 import addExperienceRoute from "#routes/profile/add-experience";
@@ -41,6 +42,7 @@ export async function buildApp({
 }: { withRoutes?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false,
+    ignoreTrailingSlash: true,
     ajv: { customOptions: { coerceTypes: false, allErrors: true, strict: false }, plugins: [AjvErrors, addFormats] },
   });
 
@@ -68,6 +70,7 @@ export async function buildApp({
     app.register(googleRoute, { prefix: AUTH_PREFIX });
     app.register(profileRoute, { prefix: PROFILE_PREFIX });
     app.register(meRoute, { prefix: PROFILE_PREFIX });
+    app.register(getByIdRoute, { prefix: PROFILE_PREFIX });
     app.register(deleteExperienceRoute, { prefix: PROFILE_PREFIX });
     app.register(deleteEducationRoute, { prefix: PROFILE_PREFIX });
     app.register(addExperienceRoute, { prefix: PROFILE_PREFIX });

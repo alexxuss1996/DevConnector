@@ -147,7 +147,7 @@ describe("GET /posts/:id — not found", () => {
     assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
   });
 
-  test("returns 404 when Post.findById throws generic Error", async () => {
+  test("returns 500 when Post.findById throws generic Error", async () => {
     stubMethod(Post, "findById", () => {
       throw new Error("Post not found");
     });
@@ -163,7 +163,7 @@ describe("GET /posts/:id — not found", () => {
     assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
   });
 
-  test("returns 404 when Post.findById rejects (DB error — route maps all errors to 404)", async () => {
+  test("returns 500 when Post.findById rejects (DB error)", async () => {
     stubMethod(Post, "findById", () => Promise.reject(new Error("DB boom")));
 
     const reply = await app.inject({
@@ -175,7 +175,7 @@ describe("GET /posts/:id — not found", () => {
     assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
   });
 
-  test("returns 404 when findById throws unexpected error", async () => {
+  test("returns 500 when findById throws unexpected error", async () => {
     stubMethod(Post, "findById", () => {
       throw new Error("unexpected");
     });
@@ -234,12 +234,9 @@ describe("GET /posts/:id — routing", () => {
       url: `/posts/${postId.toString()}/`,
     });
 
-    // Fastify by default handles trailing slash; should still return 200
-    // If 404, the handler wasn't matched — adjust assertion accordingly
-    assert.ok([200, 404].includes(reply.statusCode));
-    if (reply.statusCode === 200) {
-      assert.equal((reply.json() as any).post.text, "trailing slash");
-    }
+    // Fastify matches trailing slashes to the same route.
+    assert.equal(reply.statusCode, 200);
+    assert.equal((reply.json() as any).post.text, "trailing slash");
   });
 });
 

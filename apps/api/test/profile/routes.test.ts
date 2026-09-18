@@ -113,9 +113,16 @@ describe("POST /profile — validation", () => {
       payload: { skills: ["JS"] },
     });
     assert.equal(reply.statusCode, 400);
-    const body = reply.json();
+    const body = reply.json() as any;
     assert.equal(body.code, "VALIDATION_ERROR");
-    assert.ok(body.errors.some((e: any) => e.message.includes("status") || e.field === "status"));
+    const details = [...(body.issues ?? []), ...Object.values(body.fieldErrors ?? {}).flat()] as any[];
+    assert.ok(
+      details.some((e: any) =>
+        typeof e === "string"
+          ? e.includes("status")
+          : (e.path ?? []).includes("status") || (e.message ?? "").includes("status"),
+      ),
+    );
   });
 
   test("returns 400 when skills is missing", async () => {
@@ -148,9 +155,16 @@ describe("POST /profile — validation", () => {
       payload: validProfilePayload({ website: "not-a-uri" }),
     });
     assert.equal(reply.statusCode, 400);
-    const body = reply.json();
+    const body = reply.json() as any;
     assert.equal(body.code, "VALIDATION_ERROR");
-    assert.ok(body.errors.some((e: any) => e.field === "website"));
+    const details = [...(body.issues ?? []), ...Object.values(body.fieldErrors ?? {}).flat()] as any[];
+    assert.ok(
+      details.some((e: any) =>
+        typeof e === "string"
+          ? e.includes("website")
+          : (e.path ?? []).includes("website") || (e.message ?? "").includes("website"),
+      ),
+    );
   });
 
   test("returns 400 when social uris are invalid", async () => {

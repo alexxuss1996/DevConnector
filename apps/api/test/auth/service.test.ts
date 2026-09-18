@@ -335,6 +335,8 @@ describe("AuthService.refresh", () => {
       "a-completely-different-token",
     );
     stubMethod(Session, "findById", () => mkQuery(session));
+    // Reuse detection revokes the session on token mismatch.
+    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
 
     await assert.rejects(
       () => authService.refresh(app, refreshToken),
@@ -562,7 +564,7 @@ describe("AuthService.authenticateGoogle", () => {
       (err: any) =>
         err.statusCode === 409 &&
         err.code === "GOOGLE_ACCOUNT_CONFLICT" &&
-        /Google account is already linked/.test(err.message),
+        /different Google account|already linked/.test(err.message),
     );
   });
 });

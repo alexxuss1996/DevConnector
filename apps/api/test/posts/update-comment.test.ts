@@ -130,7 +130,7 @@ describe("PUT /posts/:id/comments/:commentId — validation", () => {
     assert.equal(reply.json().code, "VALIDATION_ERROR");
   });
 
-  test("accepts empty body (Update schema is Partial)", async () => {
+  test("rejects empty body (Update schema requires minProperties: 1)", async () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "old" });
     const post: any = mkPost({ comments: [comment as any] });
@@ -144,9 +144,8 @@ describe("PUT /posts/:id/comments/:commentId — validation", () => {
       headers: authHeader(userId.toString()),
       payload: {},
     });
-    assert.equal(reply.statusCode, 200);
-    // text should remain unchanged
-    assert.equal((reply.json() as any).text, "old");
+    assert.equal(reply.statusCode, 400);
+    assert.equal(reply.json().code, "VALIDATION_ERROR");
   });
 
   test("accepts valid text", async () => {
@@ -209,7 +208,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.equal(findByIdStub.mock.calls[0].arguments[0].toString(), post._id.toString());
   });
 
-  test("does not overwrite text when body empty, still saves", async () => {
+  test("rejects empty body instead of no-op save", async () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "keep" });
     const post: any = mkPost({ comments: [comment as any] });
@@ -223,8 +222,8 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(userId.toString()),
       payload: {},
     });
-    assert.equal(reply.statusCode, 200);
-    assert.equal((reply.json() as any).text, "keep");
+    assert.equal(reply.statusCode, 400);
+    assert.equal(reply.json().code, "VALIDATION_ERROR");
     assert.equal(comment.text, "keep");
   });
 
@@ -403,7 +402,7 @@ describe("postService.updatePostComment — unit", () => {
     assert.equal(c.text, "new");
   });
 
-  test("returns same comment when text undefined (no update)", async () => {
+  test("throws VALIDATION_ERROR when text undefined (text required)", async () => {
     const { postService } = await import("#modules/posts/posts.service");
     const userId = newId();
     const c = mkComment({ userId, text: "keep" });
@@ -411,8 +410,14 @@ describe("postService.updatePostComment — unit", () => {
     post.save = async function () { return this; };
     stubMethod(Post, "findById", () => mkQuery(post as any));
     stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Tester" }) as any));
-    const result = await postService.updatePostComment(userId.toString(), newId().toString(), c._id.toString(), undefined);
-    assert.equal(result.text, "keep");
+    await assert.rejects(
+      () => postService.updatePostComment(userId.toString(), newId().toString(), c._id.toString(), undefined),
+      (err: any) => {
+        assert.equal(err.statusCode, 400);
+        assert.equal(err.code, "VALIDATION_ERROR");
+        return true;
+      },
+    );
   });
 
   test("throws POST_NOT_FOUND when post missing", async () => {

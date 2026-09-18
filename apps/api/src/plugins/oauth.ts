@@ -10,8 +10,8 @@ export default fp(async (fastify) => {
 
     credentials: {
       client: {
-        id: env.GOOGLE_CLIENT_ID!,
-        secret: env.GOOGLE_CLIENT_SECRET!,
+        id: env.GOOGLE_CLIENT_ID,
+        secret: env.GOOGLE_CLIENT_SECRET,
       },
     },
 
@@ -19,8 +19,10 @@ export default fp(async (fastify) => {
       issuer: "https://accounts.google.com",
     },
 
+    // Note: global path (not under /auth prefix) to avoid colliding with
+    // routes/auth/* which mounts GET /auth/google/callback.
     startRedirectPath: "/auth/google",
-    callbackUri: env.GOOGLE_CALLBACK_URL!,
+    callbackUri: env.GOOGLE_CALLBACK_URL,
 
     pkce: "S256",
   });

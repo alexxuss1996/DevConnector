@@ -162,6 +162,7 @@ export const CreateProfileSchema = Type.Object(
   },
   {
     description: "Profile creation payload",
+    additionalProperties: false,
     examples: [
       {
         company: "Acme Corp",
@@ -236,15 +237,17 @@ export const AddEducationSchema = Type.Object({
 // Params schemas used by profile routes
 export const ProfileIdParamsSchema = Type.Object({
   id: Type.String({
-    minLength: 1,
-    errorMessage: "ID must be at least 1 character",
+    pattern: "^[0-9a-fA-F]{24}$",
+    errorMessage: "Invalid ObjectId",
   }),
 });
 
 export const GithubUsernameParamsSchema = Type.Object({
   username: Type.String({
     minLength: 1,
-    errorMessage: "Username must be at least 1 character",
+    maxLength: 39,
+    pattern: "^[a-zA-Z0-9-]+$",
+    errorMessage: "Invalid GitHub username",
   }),
 });
 

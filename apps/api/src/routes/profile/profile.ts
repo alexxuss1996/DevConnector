@@ -1,6 +1,7 @@
 import { CreateProfileSchema } from "@dev-conn/contracts";
 import { profileService } from "#modules/profile/profile.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
+import { Type } from "typebox";
 
 const profile: FastifyPluginAsyncTypebox = async (fastify) => {
   (fastify.post(
@@ -17,12 +18,26 @@ const profile: FastifyPluginAsyncTypebox = async (fastify) => {
       return reply.status(200).send(result);
     },
   ),
-    fastify.get("/", async function (request, reply) {
-      const profiles = await profileService.getProfiles();
-      return {
-        profiles,
-      };
-    }),
+    fastify.get(
+      "/",
+      {
+        schema: {
+          querystring: Type.Object({
+            page: Type.Optional(Type.Integer({ minimum: 1, default: 1 })),
+            limit: Type.Optional(
+              Type.Integer({ minimum: 1, maximum: 100, default: 20 }),
+            ),
+          }),
+        },
+      },
+      async function (request, _reply) {
+        const { page, limit } = request.query;
+        const profiles = await profileService.getProfiles(page ?? 1, limit ?? 20);
+        return {
+          profiles,
+        };
+      },
+    ),
     fastify.delete(
       "/",
       {
@@ -30,9 +45,7 @@ const profile: FastifyPluginAsyncTypebox = async (fastify) => {
       },
       async function (request, reply) {
         await profileService.deleteProfileAndUser(request.user.sub);
-        return reply.status(204).send({
-          message: "The profile and user were deleted",
-        });
+        return reply.status(204).send();
       },
     ));
 };

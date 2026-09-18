@@ -84,6 +84,7 @@ class AuthService {
       {
         sub: userId,
         type: "access",
+        sessionId: session._id.toString(),
       },
       {
         expiresIn: "15m",
@@ -144,7 +145,7 @@ class AuthService {
 
     return {
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         avatar: user.avatar,
@@ -172,12 +173,20 @@ class AuthService {
       default: "retro",
     });
 
-    const user = await User.create({
-      name,
-      email: normalizedEmail,
-      passwordHash: passwordHash,
-      avatar: gravatar,
-    });
+    let user;
+    try {
+      user = await User.create({
+        name,
+        email: normalizedEmail,
+        passwordHash: passwordHash,
+        avatar: gravatar,
+      });
+    } catch (err: unknown) {
+      if ((err as { code?: number }).code === 11000) {
+        throw new AppError(409, "REGISTRATION_FAILED", "Email already in use");
+      }
+      throw err;
+    }
 
     const { accessToken, refreshToken } = await this.createSession(
       fastify,
@@ -186,7 +195,7 @@ class AuthService {
 
     return {
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         avatar: user.avatar,
@@ -210,26 +219,42 @@ class AuthService {
     }).select("+googleId");
 
     if (!user) {
-      user = await User.create({
-        email,
-        googleId: googleUser.sub,
-        name: googleUser.name,
-        avatar: googleUser.picture,
-      });
+      const fallbackName =
+        googleUser.name ?? email.split("@")[0] ?? "Google User";
+      try {
+        user = await User.create({
+          email,
+          googleId: googleUser.sub,
+          name: fallbackName,
+          avatar: googleUser.picture,
+        });
+      } catch (err: unknown) {
+        if ((err as { code?: number }).code === 11000) {
+          throw new AppError(
+            409,
+            "GOOGLE_ACCOUNT_CONFLICT",
+            "Account already exists",
+          );
+        }
+        throw err;
+      }
     } else {
       if (user.googleId && user.googleId !== googleUser.sub) {
         throw new AppError(
           409,
           "GOOGLE_ACCOUNT_CONFLICT",
-          "Google account is already linked",
+          "This email is linked to a different Google account",
         );
       }
 
       if (!user.googleId) {
         user.googleId = googleUser.sub;
-        user.name ??= googleUser.name;
+        user.name ??= googleUser.name ?? email.split("@")[0];
         user.avatar ??= googleUser.picture;
 
+        await user.save();
+      } else if (user.email !== email) {
+        user.email = email;
         await user.save();
       }
     }
@@ -241,7 +266,7 @@ class AuthService {
 
     return {
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         avatar: user.avatar,
@@ -294,6 +319,10 @@ class AuthService {
     const isValid = await argon2.verify(session.refreshTokenHash!, token);
 
     if (!isValid) {
+      // Reuse detected: stolen/old token presented — revoke the whole session.
+      await Session.findByIdAndUpdate(session._id, {
+        $set: { revokedAt: new Date() },
+      });
       throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 
@@ -322,6 +351,7 @@ class AuthService {
       {
         sub: user._id.toString(),
         type: "access",
+        sessionId: session._id.toString(),
       },
       {
         expiresIn: "15m",
@@ -330,7 +360,7 @@ class AuthService {
 
     return {
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         avatar: user.avatar,

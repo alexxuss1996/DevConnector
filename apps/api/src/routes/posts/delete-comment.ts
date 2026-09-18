@@ -14,9 +14,7 @@ const deletePostComment: FastifyPluginAsyncTypebox = async (
     async function (request, reply) {
       const { id, commentId } = request.params;
       await postService.deletePostComment(request.user.sub, id, commentId);
-      return reply.status(204).send({
-        message: "The comment was deleted",
-      });
+      return reply.status(204).send();
     },
   );
 };

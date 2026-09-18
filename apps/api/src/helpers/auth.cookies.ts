@@ -40,11 +40,18 @@ export function setAuthCookies(
  * @returns The reply with both authentication cookies cleared.
  */
 export function clearAuthCookies(reply: FastifyReply) {
+  const secure = process.env.NODE_ENV === "production";
   return reply
     .clearCookie("access_token", {
       path: "/",
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
     })
     .clearCookie("refresh_token", {
       path: "/auth",
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
     });
 }

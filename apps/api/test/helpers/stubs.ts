@@ -63,8 +63,9 @@ export function mkSessionDoc(overrides: Partial<SessionDoc> = {}): SessionDoc & 
 
 type ChainableQuery<T> = Promise<T | null> & {
   select: (s: string) => ChainableQuery<T>;
-  sort: () => ChainableQuery<T>;
-  limit: () => ChainableQuery<T>;
+  sort: (...args: any[]) => ChainableQuery<T>;
+  skip: (...args: any[]) => ChainableQuery<T>;
+  limit: (...args: any[]) => ChainableQuery<T>;
   lean: () => ChainableQuery<T>;
   exec: () => Promise<T | null>;
   populate: (...args: any[]) => ChainableQuery<T>;
@@ -75,6 +76,7 @@ export function mkQuery<T>(value: T | null): ChainableQuery<T> {
   q.select = () => q;
   q.exec = () => Promise.resolve(value);
   q.sort = () => q;
+  q.skip = () => q;
   q.lean = () => q;
   q.limit = () => q;
   q.populate = () => q;

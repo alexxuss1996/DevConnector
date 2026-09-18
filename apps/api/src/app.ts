@@ -14,7 +14,11 @@ export interface AppOptions
   extends FastifyServerOptions, Partial<AutoloadPluginOptions> {}
 // Pass --options via CLI arguments in command to enable these options.
 const options: AppOptions = {
-  logger: true,
+  ignoreTrailingSlash: true,
+  logger: {
+    level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === "production" ? "info" : "debug"),
+    redact: ["req.headers.authorization", "req.headers.cookie", "req.cookies"],
+  },
   ajv: {
     customOptions: {
       coerceTypes: false,
@@ -36,24 +40,24 @@ const app: FastifyPluginAsync<AppOptions> = async (
   // This loads all plugins defined in plugins
   // those should be support plugins that are reused
   // through your application
-  // eslint-disable-next-line no-void
-  void fastify.register(AutoLoad, {
+  await fastify.register(AutoLoad, {
     dir: join(__dirname, "plugins"),
     options: opts,
   });
 
   // This loads all plugins defined in routes
   // define your routes in one of these
-  // eslint-disable-next-line no-void
-  void fastify.register(AutoLoad, {
+  await fastify.register(AutoLoad, {
     dir: join(__dirname, "routes"),
     options: opts,
     dirNameRoutePrefix: true,
   });
   // Custom error handler
-  void fastify.setErrorHandler(errorHandler);
-  fastify.ready(async () => {
-    console.log(fastify.printRoutes());
+  fastify.setErrorHandler(errorHandler);
+  fastify.ready(() => {
+    if (process.env.NODE_ENV !== "production") {
+      fastify.log.info(fastify.printRoutes());
+    }
   });
 };
 

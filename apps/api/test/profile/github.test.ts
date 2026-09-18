@@ -299,19 +299,18 @@ describe("profileService.getGithubReposForProfile — unit", () => {
     );
   });
 
-  test("handles Authorization header when GITHUB_ACCESS_TOKEN is undefined (token undefined)", async () => {
+  test("throws GITHUB_CONFIG_ERROR when GITHUB_ACCESS_TOKEN is missing", async () => {
     const original = process.env.GITHUB_ACCESS_TOKEN;
     delete process.env.GITHUB_ACCESS_TOKEN;
 
-    let capturedAuth: string | undefined;
-    mock.method(global, "fetch", async (_url: string, opts: any) => {
-      capturedAuth = opts.headers.Authorization;
-      return { ok: true, json: async () => [] } as any;
-    });
-
-    const result = await profileService.getGithubReposForProfile("octocat");
-    assert.deepEqual(result, []);
-    assert.equal(capturedAuth, "token undefined");
+    await assert.rejects(
+      () => profileService.getGithubReposForProfile("octocat"),
+      (err: any) => {
+        assert.equal(err.statusCode, 500);
+        assert.equal(err.code, "GITHUB_CONFIG_ERROR");
+        return true;
+      },
+    );
 
     if (original !== undefined) process.env.GITHUB_ACCESS_TOKEN = original;
   });

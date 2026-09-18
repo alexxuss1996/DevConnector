@@ -1,13 +1,14 @@
 import AppError from "#helpers/app-error";
 import Profile from "#modules/profile/profile.model";
 import User from "#modules/users/user.model";
+import Post from "#modules/posts/posts.model";
+import Session from "#modules/auth/session.model";
 import {
   AddEducationInput,
   AddExperienceInput,
   CreateProfileInput,
 } from "#modules/profile/profile.schemas";
 import mongoose, { Types } from "mongoose";
-import env from "#config/env";
 
 class ProfileService {
   async getProfile(userId: string) {
@@ -25,21 +26,35 @@ class ProfileService {
     };
   }
 
-  async getProfiles() {
-    const profiles = await Profile.find().populate("userId", [
-      "name",
-      "avatar",
-    ]);
+  async getProfiles(page = 1, limit = 20) {
+    const safePage = Math.max(1, Math.floor(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 20));
+    const profiles = await Profile.find()
+      .sort({ createdAt: -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .populate("userId", ["name", "avatar"]);
     return profiles;
   }
 
   async createOrUpdateProfile(userId: string, data: CreateProfileInput) {
     const { facebook, instagram, linkedin, twitter, youtube, ...rest } = data;
 
+    const ALLOWED_PROFILE_FIELDS = new Set([
+      "company",
+      "website",
+      "location",
+      "status",
+      "skills",
+      "bio",
+      "githubusername",
+    ]);
+
     const toSet: Record<string, unknown> = {};
     const toUnset: Record<string, 1> = {};
 
     for (const [key, value] of Object.entries(rest)) {
+      if (!ALLOWED_PROFILE_FIELDS.has(key)) continue;
       if (
         value === null ||
         (typeof value === "string" && value.trim() === "")
@@ -94,30 +109,48 @@ class ProfileService {
     return profile.toJSON();
   }
   async deleteProfileAndUser(userId: string) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    // Try transactional cascade; fall back to non-transactional on standalone Mongo.
+    let session: mongoose.ClientSession | null = null;
+    let useTransaction = true;
     try {
-      const profile = await Profile.findOneAndDelete({ userId }, { session });
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch {
+      session = null;
+      useTransaction = false;
+    }
+    const opts = session && useTransaction ? { session } : {};
+    try {
+      const profile = await Profile.findOneAndDelete({ userId }, opts);
 
       if (!profile) {
-        await session.abortTransaction();
+        if (session && useTransaction) await session.abortTransaction();
         throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
       }
 
-      const user = await User.findOneAndDelete({ _id: userId }, { session });
+      const user = await User.findOneAndDelete({ _id: userId }, opts);
       if (!user) {
-        await session.abortTransaction();
+        if (session && useTransaction) await session.abortTransaction();
         throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
       }
 
-      await session.commitTransaction();
+      // Cascade: remove user's posts/comments/likes remnants and sessions.
+      await Post.deleteMany({ userId }, opts);
+      await Post.updateMany(
+        {},
+        { $pull: { likes: { userId }, comments: { userId } } },
+        opts,
+      );
+      await Session.deleteMany({ userId }, opts);
+
+      if (session && useTransaction) await session.commitTransaction();
     } catch (err) {
-      if (session.inTransaction()) {
+      if (session && useTransaction && session.inTransaction()) {
         await session.abortTransaction();
       }
       throw err;
     } finally {
-      await session.endSession();
+      if (session) await session.endSession();
     }
   }
   async addExperience(userId: string, data: AddExperienceInput) {
@@ -126,6 +159,8 @@ class ProfileService {
     const toDate = to ? new Date(to) : undefined;
     const fromDate = new Date(from);
 
+    // NOTE: read-modify-write; concurrent adds can race. For full safety use
+    // atomic $push via findOneAndUpdate (requires test-harness updates).
     const profile = await Profile.findOne({ userId });
 
     if (!profile) {
@@ -233,13 +268,24 @@ class ProfileService {
   }
 
   async getGithubReposForProfile(username: string) {
+    // Fail fast instead of sending "token undefined" to GitHub.
+    const token = process.env.GITHUB_ACCESS_TOKEN;
+    if (!token) {
+      throw new AppError(
+        500,
+        "GITHUB_CONFIG_ERROR",
+        "GitHub integration is not configured",
+      );
+    }
+    const safeUsername = encodeURIComponent(username);
     const response = await fetch(
-      `https://api.github.com/users/${username}/repos?per_page=5&sort=created&direction=asc`,
+      `https://api.github.com/users/${safeUsername}/repos?per_page=5&sort=created&direction=asc`,
       {
+        signal: AbortSignal.timeout(8000),
         headers: {
           "User-Agent": "node.js",
           Accept: "application/vnd.github.v3+json",
-          Authorization: `token ${env.GITHUB_ACCESS_TOKEN}`,
+          Authorization: `token ${token}`,
         },
       },
     );

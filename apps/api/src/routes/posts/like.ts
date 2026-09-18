@@ -13,9 +13,7 @@ const likePost: FastifyPluginAsyncTypebox = async (fastify) => {
     async function (request, reply) {
       const { id } = request.params;
       await postService.likePost(request.user.sub, id);
-      return reply.status(204).send({
-        message: "The post was liked",
-      });
+      return reply.status(204).send();
     },
   ),
     fastify.put(
@@ -27,9 +25,7 @@ const likePost: FastifyPluginAsyncTypebox = async (fastify) => {
       async function (request, reply) {
         const { id } = request.params;
         await postService.unlikePost(request.user.sub, id);
-        return reply.status(204).send({
-          message: "The post was unliked",
-        });
+        return reply.status(204).send();
       },
     ));
 };

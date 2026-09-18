@@ -35,10 +35,14 @@ export type RegisterUserInput = Static<typeof RegisterUserSchema>;
 export type LoginUserInput = Static<typeof LoginUserSchema>;
 export type CompleteOnboardingInput = Static<typeof CompleteOnboardingSchema>;
 
-// Re-exported response user shape (derived from backend; kept lightweight for frontend use)
-export type AuthUser = {
-  id: string;
-  name?: string;
-  email: string;
-  avatar?: string;
-};
+export const AuthUserSchema = Type.Object(
+  {
+    id: Type.String({ description: "User id (hex ObjectId string)" }),
+    name: Type.Optional(Type.String()),
+    email: Type.String({ format: "email" }),
+    avatar: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export type AuthUser = Static<typeof AuthUserSchema>;

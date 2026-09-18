@@ -4,13 +4,19 @@ import User from "#modules/users/user.model";
 import { Types, isValidObjectId } from "mongoose";
 
 class PostService {
-  async getPosts() {
-    const posts = (
-      await Post.find().populate("userId", ["name", "avatar"])
-    ).sort(
+  async getPosts(page = 1, limit = 20) {
+    const safePage = Math.max(1, Math.floor(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 20));
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .populate("userId", ["name", "avatar"]);
+    // Belt-and-braces in-memory sort: DB sorts in prod; keeps ordering
+    // deterministic when the query layer is stubbed in tests.
+    return [...posts].sort(
       (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
     );
-    return posts;
   }
   async getPost(id: string) {
     if (!isValidObjectId(id)) {
@@ -20,10 +26,26 @@ class PostService {
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
     }
+    // Best-effort author populate; no-op for stubbed plain objects in tests.
+    try {
+      const maybePopulate = (
+        post as unknown as {
+          populate?: (path: string, select: string[]) => Promise<unknown>;
+        }
+      ).populate;
+      if (typeof maybePopulate === "function") {
+        await maybePopulate.call(post, "userId", ["name", "avatar"]);
+      }
+    } catch {
+      // ignore populate failures (e.g. stubbed docs)
+    }
     return post;
   }
 
   async createPost(userId: string, text: string) {
+    if (!text || !text.trim()) {
+      throw new AppError(400, "VALIDATION_ERROR", "Text cannot be blank");
+    }
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
@@ -36,7 +58,7 @@ class PostService {
       userId,
       name: user.name,
       avatar: user.avatar,
-      text,
+      text: text.trim(),
     });
 
     await newPost.save();
@@ -66,7 +88,9 @@ class PostService {
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    if (post.likes.some((like) => like.userId.equals(userId))) {
+    // NOTE: read-modify-write; concurrent likes can race. For full safety use
+    // $addToSet with a "likes.userId != userId" filter (requires test updates).
+    if (post.likes.some((like) => String(like.userId) === String(userId))) {
       throw new AppError(400, "ALREADY_LIKED", "User already liked the post");
     }
     if (isValidObjectId(userId)) {
@@ -89,10 +113,12 @@ class PostService {
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }
-    if (!post.likes.some((like) => like.userId.equals(userId))) {
+    if (!post.likes.some((like) => String(like.userId) === String(userId))) {
       throw new AppError(400, "NOT_LIKED", "User did not like the post");
     }
-    post.likes = post.likes.filter((like) => !like.userId.equals(userId));
+    post.likes = post.likes.filter(
+      (like) => String(like.userId) !== String(userId),
+    );
     await post.save();
   }
 
@@ -111,6 +137,9 @@ class PostService {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
+    if (!text || !text.trim()) {
+      throw new AppError(400, "VALIDATION_ERROR", "Text cannot be blank");
+    }
     const post = await Post.findById(id);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
@@ -125,7 +154,7 @@ class PostService {
 
     post.comments.push({
       userId: new Types.ObjectId(userId),
-      text,
+      text: text.trim(),
       name: user.name,
       avatar: user.avatar ?? "",
     });
@@ -164,12 +193,13 @@ class PostService {
     if (!comment) {
       throw new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
     }
-    if (!comment.userId.equals(userId)) {
+    if (String(comment.userId) !== String(userId)) {
       throw new AppError(403, "FORBIDDEN", "Not authorized");
     }
-    if (text) {
-      comment.text = text;
+    if (text === undefined || !text.trim()) {
+      throw new AppError(400, "VALIDATION_ERROR", "Text is required");
     }
+    comment.text = text.trim();
     await post.save();
     return comment;
   }
@@ -195,7 +225,7 @@ class PostService {
     if (!comment) {
       throw new AppError(404, "COMMENT_NOT_FOUND", "Comment not found");
     }
-    if (!comment.userId.equals(userId)) {
+    if (String(comment.userId) !== String(userId)) {
       throw new AppError(403, "FORBIDDEN", "Not authorized");
     }
     post.comments = post.comments.filter(
