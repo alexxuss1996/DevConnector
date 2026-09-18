@@ -5,7 +5,7 @@ import type {
   PostIdParams,
   PostCommentIdParams,
 } from "@dev-conn/contracts";
-import { apiFetch } from "./client";
+import { ApiClient, toQuery, type PaginationParams } from "./client";
 
 export type Post = {
   _id: string;
@@ -27,51 +27,53 @@ export type Post = {
   updatedAt?: string;
 };
 
-export function getPosts(): Promise<{ posts: Post[] }> {
-  return apiFetch<{ posts: Post[] }>("/posts/");
+export class PostsApiClient extends ApiClient {
+  getPosts(params: PaginationParams = {}): Promise<{ posts: Post[] }> {
+    return this.get<{ posts: Post[] }>(`/posts/${toQuery(params)}`);
+  }
+
+  getPost(params: PostIdParams): Promise<{ post: Post }> {
+    return this.get<{ post: Post }>(`/posts/${params.id}`);
+  }
+
+  getPostComments(params: PostIdParams): Promise<{ comments: Post["comments"] }> {
+    return this.get<{ comments: Post["comments"] }>(`/posts/${params.id}/comments`);
+  }
+
+  createPost(data: CreatePostInput): Promise<Post> {
+    return this.post<Post>("/posts/", data);
+  }
+
+  deletePost(params: PostIdParams): Promise<void> {
+    return this.delete<void>(`/posts/${params.id}`);
+  }
+
+  addComment(params: PostIdParams, data: CreatePostCommentInput): Promise<Post["comments"]> {
+    return this.post<Post["comments"]>(`/posts/${params.id}/comments`, data);
+  }
+
+  updateComment(
+    params: PostCommentIdParams,
+    data: UpdatePostCommentInput,
+  ): Promise<Post["comments"][number]> {
+    return this.put<Post["comments"][number]>(
+      `/posts/${params.id}/comments/${params.commentId}`,
+      data,
+    );
+  }
+
+  deleteComment(params: PostCommentIdParams): Promise<void> {
+    return this.delete<void>(`/posts/${params.id}/comments/${params.commentId}`);
+  }
+
+  likePost(params: PostIdParams): Promise<void> {
+    return this.put<void>(`/posts/${params.id}/like`);
+  }
+
+  unlikePost(params: PostIdParams): Promise<void> {
+    return this.put<void>(`/posts/${params.id}/unlike`);
+  }
 }
 
-export function getPost(params: PostIdParams): Promise<{ post: Post }> {
-  return apiFetch<{ post: Post }>(`/posts/${params.id}`);
-}
-
-export function getPostComments(params: PostIdParams): Promise<{ comments: Post["comments"] }> {
-  return apiFetch<{ comments: Post["comments"] }>(`/posts/${params.id}/comments`);
-}
-
-export function createPost(data: CreatePostInput): Promise<Post> {
-  return apiFetch<Post>("/posts/", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export function deletePost(params: PostIdParams): Promise<void> {
-  return apiFetch<void>(`/posts/${params.id}`, { method: "DELETE" });
-}
-
-export function addComment(params: PostIdParams, data: CreatePostCommentInput): Promise<Post["comments"]> {
-  return apiFetch<Post["comments"]>(`/posts/${params.id}/comments`, {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export function updateComment(params: PostCommentIdParams, data: UpdatePostCommentInput): Promise<Post["comments"][number]> {
-  return apiFetch<Post["comments"][number]>(`/posts/${params.id}/comments/${params.commentId}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
-}
-
-export function deleteComment(params: PostCommentIdParams): Promise<void> {
-  return apiFetch<void>(`/posts/${params.id}/comments/${params.commentId}`, { method: "DELETE" });
-}
-
-export function likePost(params: PostIdParams): Promise<void> {
-  return apiFetch<void>(`/posts/${params.id}/like`, { method: "PUT" });
-}
-
-export function unlikePost(params: PostIdParams): Promise<void> {
-  return apiFetch<void>(`/posts/${params.id}/unlike`, { method: "PUT" });
-}
+/** Shared instance bound to the default API URL. */
+export const postsApi = new PostsApiClient();

@@ -7,7 +7,7 @@ import type {
   ExperienceIdParams,
   EducationIdParams,
 } from "@dev-conn/contracts";
-import { apiFetch } from "./client";
+import { ApiClient, toQuery, type PaginationParams } from "./client";
 
 // Shared response shapes derived from backend – kept in sync via contracts types for request validation
 export type Profile = CreateProfileInput & {
@@ -24,55 +24,47 @@ export type Profile = CreateProfileInput & {
   };
 };
 
-export function createOrUpdateProfile(data: CreateProfileInput): Promise<Profile> {
-  return apiFetch<Profile>("/profile/", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+export class ProfileApiClient extends ApiClient {
+  createOrUpdateProfile(data: CreateProfileInput): Promise<{ profile: Profile }> {
+    return this.post<{ profile: Profile }>("/profile/", data);
+  }
+
+  getProfiles(params: PaginationParams = {}): Promise<{ profiles: Profile[] }> {
+    return this.get<{ profiles: Profile[] }>(`/profile/${toQuery(params)}`);
+  }
+
+  getMyProfile(): Promise<{ profile: Profile }> {
+    return this.get<{ profile: Profile }>("/profile/me");
+  }
+
+  getProfileById(params: ProfileIdParams): Promise<{ profile: Profile }> {
+    return this.get<{ profile: Profile }>(`/profile/user/${params.id}`);
+  }
+
+  getGithubRepos(params: GithubUsernameParams): Promise<unknown> {
+    return this.get<unknown>(`/profile/github/${params.username}`);
+  }
+
+  addExperience(data: AddExperienceInput): Promise<{ profile: Profile }> {
+    return this.post<{ profile: Profile }>("/profile/experience", data);
+  }
+
+  deleteExperience(params: ExperienceIdParams): Promise<{ profile: Profile }> {
+    return this.delete<{ profile: Profile }>(`/profile/experience/${params.experienceId}`);
+  }
+
+  addEducation(data: AddEducationInput): Promise<{ profile: Profile }> {
+    return this.post<{ profile: Profile }>("/profile/education", data);
+  }
+
+  deleteEducation(params: EducationIdParams): Promise<{ profile: Profile }> {
+    return this.delete<{ profile: Profile }>(`/profile/education/${params.educationId}`);
+  }
+
+  deleteProfile(): Promise<void> {
+    return this.delete<void>("/profile/");
+  }
 }
 
-export function getProfiles(): Promise<{ profiles: Profile[] }> {
-  return apiFetch<{ profiles: Profile[] }>("/profile/");
-}
-
-export function getMyProfile(): Promise<{ profile: Profile }> {
-  return apiFetch<{ profile: Profile }>("/profile/me");
-}
-
-export function getProfileById(params: ProfileIdParams): Promise<{ profile: Profile }> {
-  return apiFetch<{ profile: Profile }>(`/profile/user/${params.id}`);
-}
-
-export function getGithubRepos(params: GithubUsernameParams): Promise<unknown> {
-  return apiFetch<unknown>(`/profile/github/${params.username}`);
-}
-
-export function addExperience(data: AddExperienceInput): Promise<Profile> {
-  return apiFetch<Profile>("/profile/experience", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export function deleteExperience(params: ExperienceIdParams): Promise<Profile> {
-  return apiFetch<Profile>(`/profile/experience/${params.experienceId}`, {
-    method: "DELETE",
-  });
-}
-
-export function addEducation(data: AddEducationInput): Promise<Profile> {
-  return apiFetch<Profile>("/profile/education", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export function deleteEducation(params: EducationIdParams): Promise<Profile> {
-  return apiFetch<Profile>(`/profile/education/${params.educationId}`, {
-    method: "DELETE",
-  });
-}
-
-export function deleteProfile(): Promise<void> {
-  return apiFetch<void>("/profile/", { method: "DELETE" });
-}
+/** Shared instance bound to the default API URL. */
+export const profileApi = new ProfileApiClient();

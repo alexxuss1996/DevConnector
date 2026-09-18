@@ -17,9 +17,9 @@ import type {
   PostIdParams,
   PostCommentIdParams,
 } from "@dev-conn/contracts";
-import * as authApi from "../api/auth";
-import * as profileApi from "../api/profile";
-import * as postsApi from "../api/posts";
+import { authApi } from "../api/auth";
+import { profileApi, type Profile } from "../api/profile";
+import { postsApi, type Post } from "../api/posts";
 
 // Auth queries/mutations
 export function useRegisterMutation() {
@@ -43,7 +43,7 @@ export function useLogoutMutation() {
 }
 
 // Profile queries/mutations – shared contract types drive params & body
-export function useProfiles(options?: Omit<UseQueryOptions<{ profiles: profileApi.Profile[] }>, "queryKey" | "queryFn">) {
+export function useProfiles(options?: Omit<UseQueryOptions<{ profiles: Profile[] }>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ["profiles"] as const,
     queryFn: () => profileApi.getProfiles(),
@@ -51,7 +51,7 @@ export function useProfiles(options?: Omit<UseQueryOptions<{ profiles: profileAp
   });
 }
 
-export function useMyProfile(options?: Omit<UseQueryOptions<{ profile: profileApi.Profile }>, "queryKey" | "queryFn">) {
+export function useMyProfile(options?: Omit<UseQueryOptions<{ profile: Profile }>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ["profile", "me"] as const,
     queryFn: () => profileApi.getMyProfile(),
@@ -59,7 +59,7 @@ export function useMyProfile(options?: Omit<UseQueryOptions<{ profile: profileAp
   });
 }
 
-export function useProfileById(params: ProfileIdParams, options?: Omit<UseQueryOptions<{ profile: profileApi.Profile }>, "queryKey" | "queryFn">) {
+export function useProfileById(params: ProfileIdParams, options?: Omit<UseQueryOptions<{ profile: Profile }>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ["profile", params.id] as const,
     queryFn: () => profileApi.getProfileById(params),
@@ -111,7 +111,7 @@ export function useDeleteEducationMutation() {
 }
 
 // Posts queries/mutations
-export function usePosts(options?: Omit<UseQueryOptions<{ posts: postsApi.Post[] }>, "queryKey" | "queryFn">) {
+export function usePosts(options?: Omit<UseQueryOptions<{ posts: Post[] }>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ["posts"] as const,
     queryFn: () => postsApi.getPosts(),
@@ -119,7 +119,7 @@ export function usePosts(options?: Omit<UseQueryOptions<{ posts: postsApi.Post[]
   });
 }
 
-export function usePost(params: PostIdParams, options?: Omit<UseQueryOptions<{ post: postsApi.Post }>, "queryKey" | "queryFn">) {
+export function usePost(params: PostIdParams, options?: Omit<UseQueryOptions<{ post: Post }>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ["post", params.id] as const,
     queryFn: () => postsApi.getPost(params),
@@ -127,7 +127,7 @@ export function usePost(params: PostIdParams, options?: Omit<UseQueryOptions<{ p
   });
 }
 
-export function usePostComments(params: PostIdParams, options?: Omit<UseQueryOptions<{ comments: postsApi.Post["comments"] }>, "queryKey" | "queryFn">) {
+export function usePostComments(params: PostIdParams, options?: Omit<UseQueryOptions<{ comments: Post["comments"] }>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ["post", params.id, "comments"] as const,
     queryFn: () => postsApi.getPostComments(params),
