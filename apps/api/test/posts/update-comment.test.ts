@@ -34,7 +34,10 @@ function authHeader(userId?: string) {
   return { authorization: `Bearer ${signAccessToken(app, { sub: id })}` };
 }
 
-function url(postId: string | { toString(): string }, commentId: string | { toString(): string }) {
+function url(
+  postId: string | { toString(): string },
+  commentId: string | { toString(): string },
+) {
   return `/posts/${postId.toString()}/comments/${commentId.toString()}`;
 }
 
@@ -49,7 +52,10 @@ describe("PUT /posts/:id/comments/:commentId — authentication", () => {
       payload: { text: "new" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for empty Bearer token", async () => {
@@ -63,7 +69,10 @@ describe("PUT /posts/:id/comments/:commentId — authentication", () => {
   });
 
   test("returns 401 for refresh token", async () => {
-    const refresh = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
+    const refresh = signRefreshToken(app, {
+      sub: newId().toString(),
+      sessionId: newId().toString(),
+    });
     const reply = await app.inject({
       method: "PUT",
       url: url(newId(), newId()),
@@ -88,7 +97,9 @@ describe("PUT /posts/:id/comments/:commentId — authentication", () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "updated via cookie" });
     const post: any = mkPost({ comments: [comment as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Author" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "Author" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
 
     const token = signAccessToken(app, { sub: userId.toString() });
@@ -133,9 +144,13 @@ describe("PUT /posts/:id/comments/:commentId — validation", () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "old" });
     const post: any = mkPost({ comments: [comment as any] });
-    post.save = async function () { return this; };
+    post.save = async function () {
+      return this;
+    };
     stubMethod(Post, "findById", () => mkQuery(post as any));
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Author" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "Author" }) as any),
+    );
 
     const reply = await app.inject({
       method: "PUT",
@@ -151,7 +166,9 @@ describe("PUT /posts/:id/comments/:commentId — validation", () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "valid update" });
     const post: any = mkPost({ comments: [comment as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Author" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "Author" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
 
     const reply = await app.inject({
@@ -184,8 +201,12 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "after" });
     const post: any = mkPost({ comments: [comment as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Updater" }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "Updater" }) as any),
+    );
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "PUT",
@@ -199,7 +220,8 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.equal(body.text, "after");
     assert.equal(body._id.toString(), comment._id.toString());
     assert.equal(updateStub.mock.callCount(), 1);
-    const [commentFilter, commentUpdate] = updateStub.mock.calls[0].arguments as any[];
+    const [commentFilter, commentUpdate] = updateStub.mock.calls[0]
+      .arguments as any[];
     assert.equal(commentFilter._id.toString(), post._id.toString());
     assert.equal(commentUpdate.$set["comments.$.text"], "after");
   });
@@ -208,9 +230,13 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "keep" });
     const post: any = mkPost({ comments: [comment as any] });
-    post.save = async function () { return this; };
+    post.save = async function () {
+      return this;
+    };
     stubMethod(Post, "findById", () => mkQuery(post as any));
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Keep" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "Keep" }) as any),
+    );
 
     const reply = await app.inject({
       method: "PUT",
@@ -234,7 +260,10 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
+    });
   });
 
   test("returns 404 when user not found", async () => {
@@ -248,13 +277,18 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
+    assert.deepEqual(reply.json(), {
+      code: "USER_NOT_FOUND",
+      message: "User not found",
+    });
   });
 
   test("returns 400 when user has no name", async () => {
     const post = mkPost({ comments: [mkComment() as any] });
     stubMethod(Post, "findById", () => mkQuery(post as any));
-    stubMethod(User, "findById", () => mkQuery(mkUser({ name: undefined as any }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ name: undefined as any }) as any),
+    );
     const reply = await app.inject({
       method: "PUT",
       url: url(newId(), newId()),
@@ -262,13 +296,18 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "VALIDATION_ERROR", message: "User has no name" });
+    assert.deepEqual(reply.json(), {
+      code: "VALIDATION_ERROR",
+      message: "User has no name",
+    });
   });
 
   test("returns 404 when comment not found", async () => {
     const userId = newId();
     const post = mkPost({ comments: [mkComment({ userId }) as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "n" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "n" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
     const reply = await app.inject({
@@ -278,7 +317,10 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "COMMENT_NOT_FOUND", message: "Comment not found" });
+    assert.deepEqual(reply.json(), {
+      code: "COMMENT_NOT_FOUND",
+      message: "Comment not found",
+    });
   });
 
   test("returns 403 when not author", async () => {
@@ -286,7 +328,9 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     const otherId = newId();
     const comment = mkComment({ userId: authorId, text: "orig" });
     const post: any = mkPost({ comments: [comment as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: otherId, name: "other" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: otherId, name: "other" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
 
@@ -297,14 +341,19 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hacked" },
     });
     assert.equal(reply.statusCode, 403);
-    assert.deepEqual(reply.json(), { code: "FORBIDDEN", message: "Not authorized" });
+    assert.deepEqual(reply.json(), {
+      code: "FORBIDDEN",
+      message: "Not authorized",
+    });
     // ensure not mutated
     assert.equal(comment.text, "orig");
   });
 
   test("returns 500 for DB error on update", async () => {
     stubMethod(User, "findById", () => mkQuery(mkUser({ name: "n" }) as any));
-    stubMethod(Post, "findOneAndUpdate", () => { throw new Error("boom"); });
+    stubMethod(Post, "findOneAndUpdate", () => {
+      throw new Error("boom");
+    });
     const reply = await app.inject({
       method: "PUT",
       url: url(newId(), newId()),
@@ -312,13 +361,18 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
+    });
   });
 
   test("returns 500 for DB error on User.findById", async () => {
     const post = mkPost({ comments: [mkComment() as any] });
     stubMethod(Post, "findById", () => mkQuery(post as any));
-    stubMethod(User, "findById", () => { throw new Error("boom"); });
+    stubMethod(User, "findById", () => {
+      throw new Error("boom");
+    });
     const reply = await app.inject({
       method: "PUT",
       url: url(newId(), newId()),
@@ -332,8 +386,12 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     const userId = newId();
     const comment = mkComment({ userId, text: "old" });
     const post: any = mkPost({ comments: [comment as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "n" }) as any));
-    stubMethod(Post, "findOneAndUpdate", async () => { throw new Error("update boom"); });
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "n" }) as any),
+    );
+    stubMethod(Post, "findOneAndUpdate", async () => {
+      throw new Error("update boom");
+    });
     const reply = await app.inject({
       method: "PUT",
       url: url(post._id, comment._id),
@@ -348,7 +406,9 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     const attackerId = newId().toString();
     const comment = mkComment({ userId, text: "updated" });
     const post: any = mkPost({ comments: [comment as any] });
-    const findUserStub = stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "legit" }) as any));
+    const findUserStub = stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "legit" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
 
     const reply = await app.inject({
@@ -358,7 +418,10 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "updated", userId: attackerId } as any,
     });
     assert.equal(reply.statusCode, 200);
-    assert.equal(findUserStub.mock.calls[0].arguments[0].toString(), userId.toString());
+    assert.equal(
+      findUserStub.mock.calls[0].arguments[0].toString(),
+      userId.toString(),
+    );
   });
 
   test("only updates targeted comment among many", async () => {
@@ -366,8 +429,12 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     const c1 = mkComment({ userId, text: "c1 updated" });
     const c2 = mkComment({ userId, text: "c2" });
     const post: any = mkPost({ comments: [c1 as any, c2 as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "n" }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "n" }) as any),
+    );
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "PUT",
@@ -378,7 +445,8 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.equal(reply.statusCode, 200);
     assert.equal((reply.json() as any)._id.toString(), c1._id.toString());
     // Ownership is enforced atomically via $elemMatch on the update filter
-    const [targetedFilter, targetedUpdate] = updateStub.mock.calls[0].arguments as any[];
+    const [targetedFilter, targetedUpdate] = updateStub.mock.calls[0]
+      .arguments as any[];
     assert.ok(targetedFilter.comments.$elemMatch);
     assert.equal(targetedUpdate.$set["comments.$.text"], "c1 updated");
   });
@@ -393,28 +461,17 @@ describe("postService.updatePostComment — unit", () => {
     const userId = newId();
     const c = mkComment({ userId, text: "new" });
     const post: any = mkPost({ comments: [c as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Tester" }) as any));
-    stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
-    const result = await postService.updatePostComment(userId.toString(), newId().toString(), c._id.toString(), "new");
-    assert.equal(result.text, "new");
-  });
-
-  test("throws VALIDATION_ERROR when text undefined (text required)", async () => {
-    const { postService } = await import("#modules/posts/posts.service");
-    const userId = newId();
-    const c = mkComment({ userId, text: "keep" });
-    const post: any = mkPost({ comments: [c as any] });
-    post.save = async function () { return this; };
-    stubMethod(Post, "findById", () => mkQuery(post as any));
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "Tester" }) as any));
-    await assert.rejects(
-      () => postService.updatePostComment(userId.toString(), newId().toString(), c._id.toString(), undefined),
-      (err: any) => {
-        assert.equal(err.statusCode, 400);
-        assert.equal(err.code, "VALIDATION_ERROR");
-        return true;
-      },
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "Tester" }) as any),
     );
+    stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const result = await postService.updatePostComment(
+      userId.toString(),
+      newId().toString(),
+      c._id.toString(),
+      "new",
+    );
+    assert.equal(result.text, "new");
   });
 
   test("throws POST_NOT_FOUND when post missing", async () => {
@@ -423,7 +480,13 @@ describe("postService.updatePostComment — unit", () => {
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(null));
     await assert.rejects(
-      () => postService.updatePostComment(newId().toString(), newId().toString(), newId().toString(), "t"),
+      () =>
+        postService.updatePostComment(
+          newId().toString(),
+          newId().toString(),
+          newId().toString(),
+          "t",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 404);
         assert.equal(err.code, "POST_NOT_FOUND");
@@ -438,7 +501,13 @@ describe("postService.updatePostComment — unit", () => {
     stubMethod(Post, "findById", () => mkQuery(post as any));
     stubMethod(User, "findById", () => mkQuery(null));
     await assert.rejects(
-      () => postService.updatePostComment(newId().toString(), newId().toString(), newId().toString(), "t"),
+      () =>
+        postService.updatePostComment(
+          newId().toString(),
+          newId().toString(),
+          newId().toString(),
+          "t",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 404);
         assert.equal(err.code, "USER_NOT_FOUND");
@@ -451,9 +520,17 @@ describe("postService.updatePostComment — unit", () => {
     const { postService } = await import("#modules/posts/posts.service");
     const post = mkPost({ comments: [mkComment() as any] });
     stubMethod(Post, "findById", () => mkQuery(post as any));
-    stubMethod(User, "findById", () => mkQuery(mkUser({ name: undefined as any }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ name: undefined as any }) as any),
+    );
     await assert.rejects(
-      () => postService.updatePostComment(newId().toString(), newId().toString(), newId().toString(), "t"),
+      () =>
+        postService.updatePostComment(
+          newId().toString(),
+          newId().toString(),
+          newId().toString(),
+          "t",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 400);
         assert.equal(err.code, "VALIDATION_ERROR");
@@ -466,11 +543,19 @@ describe("postService.updatePostComment — unit", () => {
     const { postService } = await import("#modules/posts/posts.service");
     const userId = newId();
     const post = mkPost({ comments: [] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "n" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "n" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
     await assert.rejects(
-      () => postService.updatePostComment(userId.toString(), newId().toString(), newId().toString(), "t"),
+      () =>
+        postService.updatePostComment(
+          userId.toString(),
+          newId().toString(),
+          newId().toString(),
+          "t",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 404);
         assert.equal(err.code, "COMMENT_NOT_FOUND");
@@ -485,11 +570,19 @@ describe("postService.updatePostComment — unit", () => {
     const otherId = newId();
     const c = mkComment({ userId: authorId });
     const post = mkPost({ comments: [c as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: otherId, name: "x" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: otherId, name: "x" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
     await assert.rejects(
-      () => postService.updatePostComment(otherId.toString(), newId().toString(), c._id.toString(), "hacked"),
+      () =>
+        postService.updatePostComment(
+          otherId.toString(),
+          newId().toString(),
+          c._id.toString(),
+          "hacked",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 403);
         assert.equal(err.code, "FORBIDDEN");

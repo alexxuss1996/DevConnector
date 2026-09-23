@@ -13,32 +13,15 @@ class PostService {
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit)
       .populate("userId", ["name", "avatar"]);
-    // Belt-and-braces in-memory sort: DB sorts in prod; keeps ordering
-    // deterministic when the query layer is stubbed in tests.
-    return [...posts].sort(
-      (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
-    );
+    return posts;
   }
   async getPost(id: string) {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const post = await Post.findById(id);
+    const post = await Post.findById(id).populate("userId", ["name", "avatar"]);
     if (!post) {
       throw new AppError(404, "POST_NOT_FOUND", "Post not found");
-    }
-    // Best-effort author populate; no-op for stubbed plain objects in tests.
-    try {
-      const maybePopulate = (
-        post as unknown as {
-          populate?: (path: string, select: string[]) => Promise<unknown>;
-        }
-      ).populate;
-      if (typeof maybePopulate === "function") {
-        await maybePopulate.call(post, "userId", ["name", "avatar"]);
-      }
-    } catch {
-      // ignore populate failures (e.g. stubbed docs)
     }
     return post;
   }
@@ -190,7 +173,7 @@ class PostService {
     userId: string,
     id: string,
     commentId: string,
-    text?: string,
+    text: string,
   ) {
     if (!isValidObjectId(id)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
@@ -198,8 +181,8 @@ class PostService {
     if (!isValidObjectId(commentId)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid ObjectId");
     }
-    const sanitizedText = text ? sanitizeText(text) : undefined;
-    if (sanitizedText === undefined || !sanitizedText.trim()) {
+    const sanitizedText = sanitizeText(text);
+    if (!sanitizedText.trim()) {
       throw new AppError(400, "VALIDATION_ERROR", "Text is required");
     }
     const user = await User.findById(userId);
@@ -219,14 +202,9 @@ class PostService {
       { new: true },
     );
     if (post) {
-      const comment = post.comments.find(
+      return post.comments.find(
         (comment) => comment._id?.toString() === commentId,
-      );
-      // Matched the filter, so the comment must be present.
-      if (!comment) {
-        throw new AppError(500, "INTERNAL_SERVER_ERROR", "Comment update failed");
-      }
-      return comment;
+      )!;
     }
     throw await this.resolveCommentWriteFailure(id, commentId);
   }
