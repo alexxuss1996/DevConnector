@@ -447,12 +447,19 @@ describe("GET /posts/ — logic", () => {
     assert.equal(body.posts.length, 2);
   });
 
-  test("returns posts sorted descending by createdAt (newest first)", async () => {
+  test("requests posts sorted descending by createdAt (newest first)", async () => {
     const older = mkPost({ text: "Older", createdAt: new Date("2023-01-01T00:00:00Z") });
     const newer = mkPost({ text: "Newer", createdAt: new Date("2024-06-01T00:00:00Z") });
     const middle = mkPost({ text: "Middle", createdAt: new Date("2023-06-15T00:00:00Z") });
-    // Return unsorted; service should sort descending
-    stubMethod(Post, "find", () => mkQuery([older, newer, middle] as any));
+    // The DB performs the sort; the stub returns already-sorted, as the DB would.
+    const q = mkQuery([newer, middle, older] as any);
+    let sortArgs: any[] | undefined;
+    const originalSort = q.sort;
+    q.sort = (...args: any[]) => {
+      sortArgs = args;
+      return originalSort(...args);
+    };
+    stubMethod(Post, "find", () => q);
 
     const reply = await app.inject({
       method: "GET",
@@ -462,7 +469,8 @@ describe("GET /posts/ — logic", () => {
 
     assert.equal(reply.statusCode, 200);
     const posts = (reply.json() as any).posts;
-    // After sorting, newest first
+    // DB sort requested newest-first, stubbed rows pass through in order
+    assert.deepEqual(sortArgs?.[0], { createdAt: -1 });
     assert.equal(posts[0].text, "Newer");
     assert.equal(posts[1].text, "Middle");
     assert.equal(posts[2].text, "Older");
@@ -704,12 +712,20 @@ describe("DELETE /posts/ — logic", () => {
 // ============================================================
 describe("postService — unit", () => {
   // Import service directly to test edge not covered by routes
-  test("getPosts sorts by createdAt descending (service unit)", async () => {
+  test("getPosts requests createdAt descending sort (service unit)", async () => {
     const { postService } = await import("#modules/posts/posts.service");
     const older = mkPost({ createdAt: new Date("2022-01-01"), text: "old" });
     const newer = mkPost({ createdAt: new Date("2023-01-01"), text: "new" });
-    stubMethod(Post, "find", () => mkQuery([older, newer] as any));
+    const q = mkQuery([newer, older] as any);
+    let sortArgs: any[] | undefined;
+    const originalSort = q.sort;
+    q.sort = (...args: any[]) => {
+      sortArgs = args;
+      return originalSort(...args);
+    };
+    stubMethod(Post, "find", () => q);
     const result = await postService.getPosts();
+    assert.deepEqual(sortArgs?.[0], { createdAt: -1 });
     assert.equal(result[0].text, "new");
     assert.equal(result[1].text, "old");
   });

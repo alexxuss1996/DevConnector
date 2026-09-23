@@ -188,7 +188,11 @@ describe("GET /posts/:id — not found", () => {
   });
 
   test("returns 500 when Post.findById rejects (DB error)", async () => {
-    stubMethod(Post, "findById", () => Promise.reject(new Error("DB boom")));
+    stubMethod(Post, "findById", () => {
+      const q = Promise.reject(new Error("DB boom")) as any;
+      q.populate = () => q;
+      return q;
+    });
 
     const reply = await app.inject({
       method: "GET",
@@ -301,7 +305,7 @@ describe("postService.getPost — unit", () => {
 
   test("throws Post not found when findById resolves to undefined (service unit)", async () => {
     const { postService } = await import("#modules/posts/posts.service");
-    stubMethod(Post, "findById", () => Promise.resolve(undefined as any));
+    stubMethod(Post, "findById", () => mkQuery(undefined as any));
 
     await assert.rejects(
       () => postService.getPost(newId().toString()),
@@ -316,7 +320,11 @@ describe("postService.getPost — unit", () => {
 
   test("propagates findById rejection (DB error) as generic error (service unit)", async () => {
     const { postService } = await import("#modules/posts/posts.service");
-    stubMethod(Post, "findById", () => Promise.reject(new Error("DB boom")));
+    stubMethod(Post, "findById", () => {
+      const q = Promise.reject(new Error("DB boom")) as any;
+      q.populate = () => q;
+      return q;
+    });
 
     await assert.rejects(
       () => postService.getPost(newId().toString()),
