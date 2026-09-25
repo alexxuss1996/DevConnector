@@ -7,7 +7,8 @@ in components.
 
 ## Quick start
 
-Use the shared singletons in components, hooks, and server actions:
+Use the shared singletons outside React components or through the React Query
+hooks. No application component currently consumes them:
 
 ```ts
 import { authApi } from "@/lib/api/auth";
@@ -146,9 +147,9 @@ const comments = await postsApi.addComment({ id: post._id }, { text: "Nice!" });
   `VALIDATION_ERROR`. Prefer the `*Params` contract types for safety.
 - **Pagination** is optional (`{ page, limit }`, limit capped at 100 server-side);
   omitting it returns the first page.
-- **`Profile` / `Post` response types** are declared in `profile.ts` / `posts.ts`
-  (the `contracts` package covers request shapes; responses stay local until a
-  shared response contract lands).
+- **`Profile` / `Post` response types** come from `@dev-conn/contracts`; shared
+  request, response, and parameter schemas are the boundary between frontend
+  and backend.
 - The legacy `apiFetch(path, init)` helper still exists in `client.ts` as a thin
   wrapper around the shared `apiClient` — use the resource clients for new code.
 
