@@ -4,28 +4,10 @@ import type {
   UpdatePostCommentInput,
   PostIdParams,
   PostCommentIdParams,
+  Post,
+  Comment,
 } from "@dev-conn/contracts";
 import { ApiClient, toQuery, type PaginationParams } from "./client";
-
-export type Post = {
-  _id: string;
-  userId: string;
-  name?: string;
-  text: string;
-  avatar?: string;
-  likes: Array<{ userId: string }>;
-  comments: Array<{
-    _id: string;
-    userId: string;
-    text: string;
-    name: string;
-    avatar?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  }>;
-  createdAt?: string;
-  updatedAt?: string;
-};
 
 export class PostsApiClient extends ApiClient {
   getPosts(params: PaginationParams = {}): Promise<{ posts: Post[] }> {
@@ -36,8 +18,8 @@ export class PostsApiClient extends ApiClient {
     return this.get<{ post: Post }>(`/posts/${params.id}`);
   }
 
-  getPostComments(params: PostIdParams): Promise<{ comments: Post["comments"] }> {
-    return this.get<{ comments: Post["comments"] }>(`/posts/${params.id}/comments`);
+  getPostComments(params: PostIdParams): Promise<{ comments: Comment[] }> {
+    return this.get<{ comments: Comment[] }>(`/posts/${params.id}/comments`);
   }
 
   createPost(data: CreatePostInput): Promise<Post> {
@@ -48,15 +30,15 @@ export class PostsApiClient extends ApiClient {
     return this.delete<void>(`/posts/${params.id}`);
   }
 
-  addComment(params: PostIdParams, data: CreatePostCommentInput): Promise<Post["comments"]> {
-    return this.post<Post["comments"]>(`/posts/${params.id}/comments`, data);
+  addComment(params: PostIdParams, data: CreatePostCommentInput): Promise<Comment[]> {
+    return this.post<Comment[]>(`/posts/${params.id}/comments`, data);
   }
 
   updateComment(
     params: PostCommentIdParams,
     data: UpdatePostCommentInput,
-  ): Promise<Post["comments"][number]> {
-    return this.put<Post["comments"][number]>(
+  ): Promise<Comment> {
+    return this.put<Comment>(
       `/posts/${params.id}/comments/${params.commentId}`,
       data,
     );

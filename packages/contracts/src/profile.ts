@@ -292,3 +292,98 @@ export type ProfileIdParams = Static<typeof ProfileIdParamsSchema>;
 export type GithubUsernameParams = Static<typeof GithubUsernameParamsSchema>;
 export type ExperienceIdParams = Static<typeof ExperienceIdParamsSchema>;
 export type EducationIdParams = Static<typeof EducationIdParamsSchema>;
+
+/** Experience subdocument as returned by the API (JSON-serialised Mongoose doc). */
+export const ExperienceSchema = Type.Object(
+  {
+    _id: Type.Optional(Type.String({ description: "ObjectId hex string" })),
+    title: NonBlankString("Job title", ["Senior Developer"]),
+    company: NonBlankString("Company name", ["Acme Corp"]),
+    location: Type.Optional(Type.String({ description: "Location", examples: ["Seattle, WA"], example: "Seattle, WA" })),
+    from: Type.String({ format: "date", description: "Start date (YYYY-MM-DD)", examples: ["2022-01-15"], example: "2022-01-15" }),
+    to: Type.Optional(Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2024-06-30"], example: "2024-06-30" })),
+    current: Type.Optional(Type.Boolean({ description: "Current job", default: false, examples: [false], example: false })),
+    description: Type.Optional(Type.String({ description: "Role description", examples: ["Built scalable APIs with Fastify and MongoDB"], example: "Built scalable APIs with Fastify and MongoDB" })),
+  },
+  { additionalProperties: false },
+);
+
+/** Education subdocument as returned by the API (JSON-serialised Mongoose doc). */
+export const EducationSchema = Type.Object(
+  {
+    _id: Type.Optional(Type.String({ description: "ObjectId hex string" })),
+    school: NonBlankString("School or university", ["MIT"]),
+    degree: NonBlankString("Degree", ["Bachelor of Science"]),
+    fieldofstudy: NonBlankString("Field of study", ["Computer Science"]),
+    from: Type.String({ format: "date", description: "Start date (YYYY-MM-DD)", examples: ["2018-09-01"], example: "2018-09-01" }),
+    to: Type.Optional(Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2022-06-15"], example: "2022-06-15" })),
+    current: Type.Optional(Type.Boolean({ description: "Currently studying", default: false, examples: [false], example: false })),
+    description: Type.Optional(Type.String({ description: "Program description", examples: ["Focused on distributed systems and databases"], example: "Focused on distributed systems and databases" })),
+  },
+  { additionalProperties: false },
+);
+
+/** Profile document as returned by the API (JSON-serialised Mongoose doc). */
+export const ProfileSchema = Type.Object(
+  {
+    _id: Type.String({ description: "ObjectId hex string" }),
+    userId: Type.String({ description: "ObjectId hex string" }),
+    company: Type.Optional(
+      Type.Union([
+        Type.String({ minLength: 1, description: "Company name" }),
+        Type.Literal(""),
+        Type.Null(),
+      ]),
+    ),
+    website: Type.Optional(
+      Type.Union([
+        Type.String({ format: "uri", description: "Personal or company website" }),
+        Type.Literal(""),
+        Type.Null(),
+      ]),
+    ),
+    location: Type.Optional(
+      Type.Union([
+        Type.String({ minLength: 1, description: "Location, e.g. Seattle, WA" }),
+        Type.Literal(""),
+        Type.Null(),
+      ]),
+    ),
+    status: Type.String({ minLength: 1, pattern: ".*\\S.*", description: "Professional status" }),
+    skills: Type.Array(
+      Type.String({ minLength: 1, pattern: ".*\\S.*", description: "A skill" }),
+      { minItems: 1 },
+    ),
+    bio: Type.Optional(
+      Type.Union([
+        Type.String({ minLength: 1, maxLength: 500, description: "Short bio" }),
+        Type.Literal(""),
+        Type.Null(),
+      ]),
+    ),
+    githubusername: Type.Optional(
+      Type.Union([
+        Type.String({ minLength: 1, description: "GitHub username" }),
+        Type.Literal(""),
+        Type.Null(),
+      ]),
+    ),
+    experience: Type.Array(ExperienceSchema),
+    education: Type.Array(EducationSchema),
+    social: Type.Object(
+      {
+        youtube: Type.Optional(Type.String()),
+        twitter: Type.Optional(Type.String()),
+        facebook: Type.Optional(Type.String()),
+        linkedin: Type.Optional(Type.String()),
+        instagram: Type.Optional(Type.String()),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export type Profile = Static<typeof ProfileSchema>;
+export type Experience = Static<typeof ExperienceSchema>;
+export type Education = Static<typeof EducationSchema>;

@@ -27,6 +27,38 @@ export const CreatePostCommentSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/** Comment subdocument as returned by the API (JSON-serialised Mongoose doc). */
+export const CommentSchema = Type.Object(
+  {
+    _id: Type.String({ description: "ObjectId hex string" }),
+    userId: Type.String({ description: "ObjectId hex string" }),
+    text: Type.String(),
+    name: Type.String(),
+    avatar: Type.Optional(Type.String()),
+    createdAt: Type.Optional(Type.String({ format: "date-time" })),
+    updatedAt: Type.Optional(Type.String({ format: "date-time" })),
+  },
+  { additionalProperties: false },
+);
+
+/** Post document as returned by the API (JSON-serialised Mongoose doc). */
+export const PostSchema = Type.Object(
+  {
+    _id: Type.String({ description: "ObjectId hex string" }),
+    userId: Type.String({ description: "ObjectId hex string" }),
+    name: Type.Optional(Type.String()),
+    text: Type.String(),
+    avatar: Type.Optional(Type.String()),
+    likes: Type.Array(
+      Type.Object({ userId: Type.String() }, { additionalProperties: false }),
+    ),
+    comments: Type.Array(CommentSchema),
+    createdAt: Type.Optional(Type.String({ format: "date-time" })),
+    updatedAt: Type.Optional(Type.String({ format: "date-time" })),
+  },
+  { additionalProperties: false },
+);
+
 export const UpdatePostSchema = Type.Object(
   {
     text: Type.Optional(
@@ -84,3 +116,5 @@ export const LikeUnlikeParamsSchema = PostIdParamsSchema;
 
 export type PostIdParams = Static<typeof PostIdParamsSchema>;
 export type PostCommentIdParams = Static<typeof PostCommentIdParamsSchema>;
+export type Post = Static<typeof PostSchema>;
+export type Comment = Static<typeof CommentSchema>;

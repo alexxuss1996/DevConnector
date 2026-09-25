@@ -8,6 +8,7 @@ import type {
   RegisterUserInput,
   LoginUserInput,
   CreateProfileInput,
+  UpdateProfileInput,
   AddExperienceInput,
   AddEducationInput,
   CreatePostInput,
@@ -16,10 +17,12 @@ import type {
   ProfileIdParams,
   PostIdParams,
   PostCommentIdParams,
+  Profile,
+  Post,
 } from "@dev-conn/contracts";
 import { authApi } from "../api/auth";
-import { profileApi, type Profile } from "../api/profile";
-import { postsApi, type Post } from "../api/posts";
+import { profileApi } from "../api/profile";
+import { postsApi } from "../api/posts";
 
 // Auth queries/mutations
 export function useRegisterMutation() {
@@ -71,6 +74,17 @@ export function useCreateProfileMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateProfileInput) => profileApi.createOrUpdateProfile(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+    },
+  });
+}
+
+export function useUpdateProfileMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateProfileInput) => profileApi.updateProfile(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["profiles"] });

@@ -1,32 +1,23 @@
 import type {
   CreateProfileInput,
+  UpdateProfileInput,
   AddExperienceInput,
   AddEducationInput,
   ProfileIdParams,
   GithubUsernameParams,
   ExperienceIdParams,
   EducationIdParams,
+  Profile,
 } from "@dev-conn/contracts";
 import { ApiClient, toQuery, type PaginationParams } from "./client";
-
-// Shared response shapes derived from backend – kept in sync via contracts types for request validation
-export type Profile = CreateProfileInput & {
-  _id: string;
-  userId: string;
-  experience: Array<AddExperienceInput & { _id: string }>;
-  education: Array<AddEducationInput & { _id: string }>;
-  social: {
-    youtube?: string;
-    twitter?: string;
-    facebook?: string;
-    linkedin?: string;
-    instagram?: string;
-  };
-};
 
 export class ProfileApiClient extends ApiClient {
   createOrUpdateProfile(data: CreateProfileInput): Promise<{ profile: Profile }> {
     return this.post<{ profile: Profile }>("/profile/", data);
+  }
+
+  updateProfile(data: UpdateProfileInput): Promise<{ profile: Profile }> {
+    return this.put<{ profile: Profile }>("/profile/", data);
   }
 
   getProfiles(params: PaginationParams = {}): Promise<{ profiles: Profile[] }> {
