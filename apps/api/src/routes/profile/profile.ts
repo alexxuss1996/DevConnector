@@ -66,6 +66,7 @@ const profile: FastifyPluginAsyncTypebox = async (fastify) => {
       schema: {
         querystring: PaginationQuerySchema,
       },
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
     },
     async function (request, _reply) {
       const { page, limit } = parsePagination(request.query);
