@@ -10,6 +10,7 @@ const getProfileById: FastifyPluginAsyncTypebox = async (
     "/user/:id",
     {
       schema: { params: ProfileIdParamsSchema },
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
     },
     async function (request, reply) {
       // `:id` accepts either the user id or the profile `_id`
