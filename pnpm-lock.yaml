@@ -206,7 +206,7 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
       vite:
-        specifier: latest
+        specifier: ^8.3.1
         version: 8.3.1(@types/node@22.15.3)(esbuild@0.28.2)(yaml@2.9.1)
       vitest:
         specifier: ^5.0.1

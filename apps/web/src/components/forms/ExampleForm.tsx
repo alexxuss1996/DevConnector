@@ -96,7 +96,11 @@ export function ExampleForm({
           render={({ field }) => (
             <RadioGroup
               value={field.value}
-              onValueChange={field.onChange}
+              onValueChange={(details) =>
+                field.onChange(
+                  (details.value ?? "") as ExampleFormValues["gender"],
+                )
+              }
               name={field.name}
             >
               <Radio value="she">She</Radio>
@@ -119,7 +123,7 @@ export function ExampleForm({
         render={({ field }) => (
           <Switch
             checked={field.value}
-            onCheckedChange={field.onChange}
+            onCheckedChange={(details) => field.onChange(details.checked)}
           >
             Email notifications
           </Switch>
@@ -131,7 +135,7 @@ export function ExampleForm({
         render={({ field }) => (
           <Checkbox
             checked={field.value === true}
-            onCheckedChange={field.onChange}
+            onCheckedChange={(details) => field.onChange(details.checked)}
           >
             I accept the terms
           </Checkbox>

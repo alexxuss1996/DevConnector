@@ -1,4 +1,5 @@
 import type { Meta } from "@storybook/nextjs-vite";
+import * as React from "react";
 import { Button } from "./button";
 import { Toaster, toaster } from "./toaster";
 
@@ -9,9 +10,14 @@ const meta: Meta = {
 
 export default meta;
 
+function DismissOnUnmount({ children }: { children: React.ReactNode }) {
+  React.useEffect(() => () => toaster.dismiss(), []);
+  return <>{children}</>;
+}
+
 export const Success = {
   render: () => (
-    <div>
+    <DismissOnUnmount>
       <Toaster />
       <Button
         onClick={() =>
@@ -20,13 +26,13 @@ export const Success = {
       >
         Show success toast
       </Button>
-    </div>
+    </DismissOnUnmount>
   ),
 };
 
 export const Error = {
   render: () => (
-    <div>
+    <DismissOnUnmount>
       <Toaster />
       <Button
         colorPalette="red"
@@ -36,6 +42,6 @@ export const Error = {
       >
         Show error toast
       </Button>
-    </div>
+    </DismissOnUnmount>
   ),
 };
