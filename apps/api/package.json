@@ -9,7 +9,10 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "test": "npm run build:ts && tsc -p test/tsconfig.json && c8 node --env-file=.env --test \"test/**/*.test.ts\"",
+    "test:unit": "npm run build:ts && tsc -p test/tsconfig.json && c8 node --env-file=.env --test \"test/auth/*.test.ts\" \"test/posts/*.test.ts\" \"test/profile/*.test.ts\" \"test/plugins/*.test.ts\" \"test/helpers/*.test.ts\"",
+    "test:integration": "sh -c 'for port in 27018 27019; do if MONGODB_PORT=$port bash test/bin/mongo-docker.sh start; then export MONGODB_URI=mongodb://127.0.0.1:$port/devconnector_test; trap \"MONGODB_PORT=$port bash test/bin/mongo-docker.sh stop\" EXIT; npm run test:integration:run; exit $?; fi; done; exit 1'",
+    "test:integration:run": "npm run build:ts && tsc -p test/tsconfig.json && node --env-file=.env.test --test \"test/integration/auth.integration.test.ts\" && node --env-file=.env.test --test \"test/integration/posts.integration.test.ts\" && node --env-file=.env.test --test \"test/integration/profile.integration.test.ts\"",
+    "test": "npm run test:unit && npm run test:integration",
     "start": "npm run clean && npm run build:ts && fastify start -l info -p 4000 dist/app.js --options",
     "build": "tsc",
     "build:ts": "tsc",

@@ -14,9 +14,13 @@ export interface AppOptions
   extends FastifyServerOptions, Partial<AutoloadPluginOptions> {}
 // Pass --options via CLI arguments in command to enable these options.
 const options: AppOptions = {
-  ignoreTrailingSlash: true,
+  routerOptions: {
+    ignoreTrailingSlash: true,
+  },
   logger: {
-    level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === "production" ? "info" : "debug"),
+    level:
+      process.env.LOG_LEVEL ??
+      (process.env.NODE_ENV === "production" ? "info" : "debug"),
     redact: ["req.headers.authorization", "req.headers.cookie", "req.cookies"],
   },
   ajv: {

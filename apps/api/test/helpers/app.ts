@@ -52,8 +52,13 @@ export async function buildApp({
 }: { withRoutes?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false,
-    ignoreTrailingSlash: true,
-    ajv: { customOptions: { coerceTypes: false, allErrors: true, strict: false }, plugins: [AjvErrors, addFormats] },
+    routerOptions: {
+      ignoreTrailingSlash: true,
+    },
+    ajv: {
+      customOptions: { coerceTypes: false, allErrors: true, strict: false },
+      plugins: [AjvErrors, addFormats],
+    },
   });
 
   await app.register(cookie);
@@ -129,9 +134,7 @@ export function signAccessToken(
   payload: Partial<AuthPayload> & Record<string, unknown> = {},
 ): string {
   const sub = (payload.sub ?? newId().toString()).toString();
-  const sessionId = (
-    payload.sessionId ?? newId().toString()
-  ).toString();
+  const sessionId = (payload.sessionId ?? newId().toString()).toString();
   recordSessionToken(sessionId, sub);
   ensureSessionStub();
   const { sub: _s, sessionId: _sid, ...rest } = payload;
