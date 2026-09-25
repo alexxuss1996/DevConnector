@@ -2,18 +2,18 @@
 
 ## Overview
 
-The frontend communicates with the backend via a layered API client in `apps/web/lib/api/`. All request/response types are driven by the shared contracts package (`@dev-conn/contracts`), which is a TypeBox schema library consumed by both the Fastify backend (for validation) and the React frontend (for types).
+The frontend communicates with the backend via a layered API client in `apps/web/src/lib/api/`. All request/response types are driven by the shared contracts package (`@dev-conn/contracts`), which is a TypeBox schema library consumed by both the Fastify backend (for validation) and the React frontend (for types).
 
 ## Architecture
 
 ```
 packages/contracts/src/     → TypeBox schemas + extracted TS types (single source of truth)
 apps/api/src/routes/        → Fastify route handlers, validate with contract schemas
-apps/web/lib/api/           → Frontend HTTP clients (ApiClient + resource clients)
-apps/web/lib/queries/       → React Query hooks wrapping the API clients
+apps/web/src/lib/api/      → Frontend HTTP clients (ApiClient + resource clients)
+apps/web/src/lib/queries/  → React Query hooks wrapping the API clients
 ```
 
-## HTTP Client (`lib/api/client.ts`)
+## HTTP Client (`src/lib/api/client.ts`)
 
 **`ApiClient`** — base class wrapping `fetch` with cookie-based session auth:
 
@@ -48,7 +48,7 @@ try {
 
 Each resource has a dedicated client class extending `ApiClient`, with a shared singleton instance.
 
-### Auth (`lib/api/auth.ts`)
+### Auth (`src/lib/api/auth.ts`)
 
 | Method | HTTP | Path | Body | Returns |
 |---|---|---|---|---|
@@ -66,7 +66,7 @@ const user = await authApi.login({ email: "x@y.com", password: "pass" });
 // Cookies (access_token, refresh_token) set automatically by backend.
 ```
 
-### Posts (`lib/api/posts.ts`)
+### Posts (`src/lib/api/posts.ts`)
 
 | Method | HTTP | Path | Body/Params | Returns |
 |---|---|---|---|---|
@@ -91,7 +91,7 @@ const { post } = await postsApi.getPost({ id: "6712..." });
 await postsApi.createPost({ text: "Hello world" });
 ```
 
-### Profile (`lib/api/profile.ts`)
+### Profile (`src/lib/api/profile.ts`)
 
 | Method | HTTP | Path | Body/Params | Returns |
 |---|---|---|---|---|
@@ -116,7 +116,7 @@ const { profile } = await profileApi.getMyProfile();
 await profileApi.addExperience({ title: "Dev", company: "Acme", from: "2022-01-01" });
 ```
 
-## React Query Hooks (`lib/queries/index.ts`)
+## React Query Hooks (`src/lib/queries/index.ts`)
 
 All hooks wrap the resource API clients with TanStack React Query. They handle query keys, caching, and cache invalidation on mutations.
 
@@ -220,8 +220,8 @@ The contracts package is the shared type/schema boundary. It uses **TypeBox** to
 2. Export both the schema const and the extracted type (`export type FooInput = Static<typeof FooSchema>`).
 3. Import the schema in the backend route handler and pass it as `schema: { body: FooSchema }` (or `params`, `querystring`).
 4. Import the type in the frontend API client and use it as the method signature.
-5. Add a React Query hook in `lib/queries/index.ts` if the endpoint is read-oriented or needs cache invalidation.
+5. Add a React Query hook in `src/lib/queries/index.ts` if the endpoint is read-oriented or needs cache invalidation.
 
 ---
 
-*Last verified: the frontend API surface matches the backend routes; all 24 endpoints have a corresponding frontend method. See `apps/web/lib/api/README.md` for the full client reference.*
+*Current state: the frontend API client exposes 25 methods. See `apps/web/src/lib/api/README.md` for the full client reference.*
