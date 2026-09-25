@@ -5,6 +5,7 @@ import { sanitizePlainText } from "#helpers/sanitize";
 import argon2 from "argon2";
 import gravatarUrl from "gravatar-url";
 import { FastifyInstance } from "fastify";
+import { randomUUID } from "node:crypto";
 
 export interface RegisterInput {
   name: string;
@@ -446,6 +447,7 @@ class AuthService {
       },
       {
         expiresIn: "30d",
+        jti: randomUUID(),
       },
     );
 
