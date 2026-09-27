@@ -4,22 +4,26 @@ Current state of the `web` app and the conventions to preserve.
 
 ## Current state
 
-- Next.js 16.3.5 App Router with React 19.3 and strict TypeScript.
-- The home page is still the Turborepo starter.
+- Next.js 16.3.6 App Router with React 19.3 and strict TypeScript.
+- The home page is a minimal placeholder; product UI has not been built yet.
 - Chakra UI, TanStack React Query, `next-themes`, and the Nuqs Next.js adapter are mounted in the root provider.
-- CSS Modules style the starter page; `src/app/globals.css` is currently empty.
+- Storybook 9 is configured with stories in `src/stories/` covering every UI component plus a rich ExampleForm.
+- Vitest is set up for unit tests; Playwright is available for e2e.
 - Typed API clients, shared contracts, and React Query hooks exist but are not yet consumed by application components.
-- There is no frontend test script and no shared `@dev-conn/ui` package.
+- There is no shared `@dev-conn/ui` package.
 
 ## Layout
 
 ```text
 apps/web/src/
 ├── app/                    App Router pages, layout, and global styles
-├── components/ui/          Provider, color mode, and toaster components
-└── lib/
-    ├── api/                HTTP base client and resource clients
-    └── queries/            React Query hooks
+├── components/
+│   ├── forms/              ExampleForm (rich validated form)
+│   └── ui/                 Chakra UI wrappers (43 components)
+├── lib/
+│   ├── api/                HTTP base client and resource clients
+│   └── queries/            React Query hooks
+└── stories/                Storybook stories for all UI components
 
 packages/contracts/src/     TypeBox request, response, and parameter schemas
 ```
@@ -38,10 +42,13 @@ import { useMyProfile } from "@/lib/queries";
 | API requests | `@/lib/api` | Implemented; no application consumers yet |
 | Cached component data | `@/lib/queries` | Implemented; no application consumers yet |
 | UI primitives | Chakra UI | Provider mounted; not used by product pages yet |
-| Page and component styles | CSS Modules | Used by the starter page |
+| Page and component styles | CSS Modules | Available; no product pages yet |
 | Global styles | `src/app/globals.css` | Empty placeholder |
 | URL state | `nuqs` | Adapter mounted; no product-page usage yet |
-| Forms | React Hook Form and TypeBox resolvers | Installed; no form component yet |
+| Forms | React Hook Form and TypeBox resolvers | ExampleForm implemented |
+| Visual testing | Storybook 9 | Stories for all UI components + ExampleForm |
+| Unit tests | Vitest | API clients and query hooks tested |
+| E2E tests | Playwright | Configured; no specs yet |
 | Icons | `react-icons` | Installed; use this instead of adding another icon package |
 
 Do not add a second library for an existing capability. Keep the current starter page separate from DevConnector product UI until product components replace it.
@@ -131,7 +138,7 @@ Do not expose raw backend messages unless they are known to be safe. Prefer a st
 
 Use TypeBox schemas from `@dev-conn/contracts` as the source of truth for API input and field validation. Client validation improves feedback, but the server remains authoritative. Do not duplicate contract rules unless a form has a genuinely different requirement.
 
-React Hook Form and the TypeBox resolver are installed but not yet used:
+React Hook Form and the TypeBox resolver are used by `src/components/forms/ExampleForm.tsx`:
 
 ```tsx
 "use client";
