@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   MenuCheckboxItem,
   MenuContent,
@@ -11,7 +11,7 @@ import {
   MenuRoot,
   MenuSeparator,
   MenuTrigger,
-} from "../components/ui/menu";
+} from "@/components/ui/menu";
 
 const meta: Meta<typeof MenuRoot> = {
   title: "UI/Menu",

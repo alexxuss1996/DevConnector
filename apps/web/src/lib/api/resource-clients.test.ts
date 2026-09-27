@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AuthApiClient } from "./auth";
-import { PostsApiClient } from "./posts";
-import { ProfileApiClient } from "./profile";
+import { AuthApiClient } from "@/lib/api/auth";
+import { PostsApiClient } from "@/lib/api/posts";
+import { ProfileApiClient } from "@/lib/api/profile";
 
 const baseUrl = "http://api.test";
 

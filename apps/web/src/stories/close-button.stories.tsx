@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { CloseButton } from "../components/ui/close-button";
+import { CloseButton } from "@/components/ui/close-button";
 
 const meta: Meta<typeof CloseButton> = {
   title: "UI/CloseButton",

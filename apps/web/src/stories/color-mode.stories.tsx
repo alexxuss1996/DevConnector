@@ -6,7 +6,7 @@ import {
   DarkMode,
   LightMode,
   useColorMode,
-} from "../components/ui/color-mode";
+} from "@/components/ui/color-mode";
 
 const meta: Meta = {
   title: "UI/ColorMode",

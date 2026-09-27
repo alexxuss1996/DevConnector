@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   ActionBarCloseTrigger,
   ActionBarContent,
   ActionBarRoot,
   ActionBarSelectionTrigger,
   ActionBarSeparator,
-} from "../components/ui/action-bar";
+} from "@/components/ui/action-bar";
 
 const meta: Meta<typeof ActionBarRoot> = {
   title: "UI/ActionBar",

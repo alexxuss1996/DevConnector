@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   StepsCompletedContent,
   StepsContent,
@@ -8,7 +8,7 @@ import {
   StepsNextTrigger,
   StepsPrevTrigger,
   StepsRoot,
-} from "../components/ui/steps";
+} from "@/components/ui/steps";
 
 const meta: Meta<typeof StepsRoot> = {
   title: "UI/Steps",

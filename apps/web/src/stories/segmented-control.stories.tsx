@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { SegmentedControl } from "../components/ui/segmented-control";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 const meta: Meta<typeof SegmentedControl> = {
   title: "UI/SegmentedControl",

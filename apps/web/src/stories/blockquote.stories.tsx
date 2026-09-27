@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Blockquote, BlockquoteIcon } from "../components/ui/blockquote";
+import { Blockquote, BlockquoteIcon } from "@/components/ui/blockquote";
 
 const meta: Meta<typeof Blockquote> = {
   title: "UI/Blockquote",

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Field } from "../components/ui/field";
-import { TagsInputControl, TagsInputRoot } from "../components/ui/tags-input";
+import { Field } from "@/components/ui/field";
+import { TagsInputControl, TagsInputRoot } from "@/components/ui/tags-input";
 
 const meta: Meta<typeof TagsInputRoot> = {
   title: "UI/TagsInput",

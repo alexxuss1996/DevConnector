@@ -4,7 +4,7 @@ import {
   BreadcrumbEllipsis,
   BreadcrumbLink,
   BreadcrumbRoot,
-} from "../components/ui/breadcrumb";
+} from "@/components/ui/breadcrumb";
 
 const meta: Meta<typeof BreadcrumbRoot> = {
   title: "UI/Breadcrumb",

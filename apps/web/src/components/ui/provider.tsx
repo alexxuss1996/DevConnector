@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { useState } from "react";
 
-import { ColorModeProvider, type ColorModeProviderProps } from "./color-mode";
+import { ColorModeProvider, type ColorModeProviderProps } from "@/components/ui/color-mode";
 
 export function Provider(props: ColorModeProviderProps) {
   const [queryClient] = useState(

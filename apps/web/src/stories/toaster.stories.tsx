@@ -1,7 +1,7 @@
 import type { Meta } from "@storybook/nextjs-vite";
 import * as React from "react";
-import { Button } from "../components/ui/button";
-import { Toaster, toaster } from "../components/ui/toaster";
+import { Button } from "@/components/ui/button";
+import { Toaster, toaster } from "@/components/ui/toaster";
 
 const meta: Meta = {
   title: "UI/Toaster",

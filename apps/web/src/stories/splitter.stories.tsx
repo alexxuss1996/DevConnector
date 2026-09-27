@@ -3,7 +3,7 @@ import {
   Splitter,
   SplitterPanel,
   SplitterResizeTrigger,
-} from "../components/ui/splitter";
+} from "@/components/ui/splitter";
 
 const meta: Meta<typeof Splitter> = {
   title: "UI/Splitter",

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Rating } from "../components/ui/rating";
+import { Rating } from "@/components/ui/rating";
 
 const meta: Meta<typeof Rating> = {
   title: "UI/Rating",

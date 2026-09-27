@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Button } from "../components/ui/button";
-import { Tooltip } from "../components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const meta: Meta<typeof Tooltip> = {
   title: "UI/Tooltip",

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { LuBold } from "react-icons/lu";
-import { Toggle } from "../components/ui/toggle";
+import { Toggle } from "@/components/ui/toggle";
 
 const meta: Meta<typeof Toggle> = {
   title: "UI/Toggle",

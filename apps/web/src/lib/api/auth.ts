@@ -3,7 +3,7 @@ import type {
   LoginUserInput,
   AuthUser,
 } from "@dev-conn/contracts";
-import { ApiClient } from "./client";
+import { ApiClient } from "@/lib/api/client";
 
 export class AuthApiClient extends ApiClient {
   register(data: RegisterUserInput): Promise<AuthUser> {

@@ -18,7 +18,7 @@ import {
   useAddCommentMutation,
   useCreateProfileMutation,
   useLogoutMutation,
-} from "./index";
+} from "@/lib/queries/index";
 
 function runOnSuccess(...args: unknown[]) {
   mocks.mutationOptions?.onSuccess?.(...args);

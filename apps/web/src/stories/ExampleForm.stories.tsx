@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { ExampleForm } from "../components/forms/ExampleForm";
+import { ExampleForm } from "@/components/forms/ExampleForm";
 
 const meta: Meta<typeof ExampleForm> = {
   title: "Forms/ExampleForm",

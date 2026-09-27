@@ -1,7 +1,7 @@
 "use client"
 
 import { TagsInput as ChakraTagsInput } from "@chakra-ui/react"
-import { CloseButton } from "./close-button"
+import { CloseButton } from "@/components/ui/close-button"
 import * as React from "react"
 
 interface TagsInputControlProps extends ChakraTagsInput.ControlProps {

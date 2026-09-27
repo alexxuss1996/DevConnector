@@ -9,7 +9,7 @@ import type {
   EducationIdParams,
   Profile,
 } from "@dev-conn/contracts";
-import { ApiClient, toQuery, type PaginationParams } from "./client";
+import { ApiClient, toQuery, type PaginationParams } from "@/lib/api/client";
 
 export class ProfileApiClient extends ApiClient {
   createOrUpdateProfile(data: CreateProfileInput): Promise<{ profile: Profile }> {

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Prose } from "../components/ui/prose";
+import { Prose } from "@/components/ui/prose";
 
 const meta: Meta<typeof Prose> = {
   title: "UI/Prose",

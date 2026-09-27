@@ -5,7 +5,7 @@ import {
   ClipboardLabel,
   ClipboardLink,
   ClipboardRoot,
-} from "../components/ui/clipboard";
+} from "@/components/ui/clipboard";
 
 const meta: Meta<typeof ClipboardRoot> = {
   title: "UI/Clipboard",

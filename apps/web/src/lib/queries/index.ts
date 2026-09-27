@@ -20,9 +20,9 @@ import type {
   Profile,
   Post,
 } from "@dev-conn/contracts";
-import { authApi } from "../api/auth";
-import { profileApi } from "../api/profile";
-import { postsApi } from "../api/posts";
+import { authApi } from "@/lib/api/auth";
+import { profileApi } from "@/lib/api/profile";
+import { postsApi } from "@/lib/api/posts";
 
 // Auth queries/mutations
 export function useRegisterMutation() {

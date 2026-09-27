@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   PopoverBody,
   PopoverCloseTrigger,
@@ -7,7 +7,7 @@ import {
   PopoverRoot,
   PopoverTitle,
   PopoverTrigger,
-} from "../components/ui/popover";
+} from "@/components/ui/popover";
 
 const meta: Meta<typeof PopoverRoot> = {
   title: "UI/Popover",

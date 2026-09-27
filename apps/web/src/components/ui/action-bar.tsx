@@ -1,5 +1,5 @@
 import { ActionBar, Portal } from "@chakra-ui/react"
-import { CloseButton } from "./close-button"
+import { CloseButton } from "@/components/ui/close-button"
 import * as React from "react"
 
 interface ActionBarContentProps extends ActionBar.ContentProps {

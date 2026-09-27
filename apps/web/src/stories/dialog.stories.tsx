@@ -1,5 +1,5 @@
 import type { Meta } from "@storybook/nextjs-vite";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   DialogActionTrigger,
   DialogBody,
@@ -10,7 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
   DialogTrigger,
-} from "../components/ui/dialog";
+} from "@/components/ui/dialog";
 
 const meta: Meta = { title: "UI/Dialog", tags: ["autodocs"] };
 

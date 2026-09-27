@@ -1,7 +1,7 @@
 import { Input } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { LuSearch, LuUser } from "react-icons/lu";
-import { InputGroup } from "../components/ui/input-group";
+import { InputGroup } from "@/components/ui/input-group";
 
 const meta: Meta<typeof InputGroup> = {
   title: "UI/InputGroup",

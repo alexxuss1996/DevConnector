@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Field } from "../components/ui/field";
-import { NativeSelectField, NativeSelectRoot } from "../components/ui/native-select";
+import { Field } from "@/components/ui/field";
+import { NativeSelectField, NativeSelectRoot } from "@/components/ui/native-select";
 
 const meta: Meta<typeof NativeSelectRoot> = {
   title: "UI/NativeSelect",

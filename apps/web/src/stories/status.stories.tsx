@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Status } from "../components/ui/status";
+import { Status } from "@/components/ui/status";
 
 const meta: Meta<typeof Status> = {
   title: "UI/Status",

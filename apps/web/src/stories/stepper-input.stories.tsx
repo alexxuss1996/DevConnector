@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { StepperInput } from "../components/ui/stepper-input";
+import { StepperInput } from "@/components/ui/stepper-input";
 
 const meta: Meta<typeof StepperInput> = {
   title: "UI/StepperInput",

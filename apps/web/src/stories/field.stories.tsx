@@ -1,6 +1,6 @@
 import { Input } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Field } from "../components/ui/field";
+import { Field } from "@/components/ui/field";
 
 const meta: Meta<typeof Field> = {
   title: "UI/Field",

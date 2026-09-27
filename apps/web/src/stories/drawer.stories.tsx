@@ -1,5 +1,5 @@
 import type { Meta } from "@storybook/nextjs-vite";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   DrawerBody,
   DrawerCloseTrigger,
@@ -9,7 +9,7 @@ import {
   DrawerRoot,
   DrawerTitle,
   DrawerTrigger,
-} from "../components/ui/drawer";
+} from "@/components/ui/drawer";
 
 const meta: Meta = { title: "UI/Drawer", tags: ["autodocs"] };
 

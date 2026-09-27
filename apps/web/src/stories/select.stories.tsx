@@ -7,7 +7,7 @@ import {
   SelectRoot,
   SelectTrigger,
   SelectValueText,
-} from "../components/ui/select";
+} from "@/components/ui/select";
 
 const meta: Meta<typeof SelectRoot> = {
   title: "UI/Select",

@@ -3,7 +3,7 @@ import {
   ProgressCircleRing,
   ProgressCircleRoot,
   ProgressCircleValueText,
-} from "../components/ui/progress-circle";
+} from "@/components/ui/progress-circle";
 
 const meta: Meta<typeof ProgressCircleRoot> = {
   title: "UI/ProgressCircle",

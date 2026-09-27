@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Field } from "../components/ui/field";
-import { PinInput } from "../components/ui/pin-input";
+import { Field } from "@/components/ui/field";
+import { PinInput } from "@/components/ui/pin-input";
 
 const meta: Meta<typeof PinInput> = {
   title: "UI/PinInput",

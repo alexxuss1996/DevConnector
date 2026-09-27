@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Field } from "../components/ui/field";
+import { Field } from "@/components/ui/field";
 import {
   NumberInputField,
   NumberInputLabel,
   NumberInputRoot,
   NumberInputScrubber,
-} from "../components/ui/number-input";
+} from "@/components/ui/number-input";
 
 const meta: Meta<typeof NumberInputRoot> = {
   title: "UI/NumberInput",

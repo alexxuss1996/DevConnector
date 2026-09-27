@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   HoverCardContent,
   HoverCardRoot,
   HoverCardTrigger,
-} from "../components/ui/hover-card";
+} from "@/components/ui/hover-card";
 
 const meta: Meta<typeof HoverCardRoot> = {
   title: "UI/HoverCard",

@@ -5,7 +5,7 @@ import {
   PaginationPageText,
   PaginationPrevTrigger,
   PaginationRoot,
-} from "../components/ui/pagination";
+} from "@/components/ui/pagination";
 
 const meta: Meta<typeof PaginationRoot> = {
   title: "UI/Pagination",

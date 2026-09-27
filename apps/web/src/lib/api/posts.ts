@@ -7,7 +7,7 @@ import type {
   Post,
   Comment,
 } from "@dev-conn/contracts";
-import { ApiClient, toQuery, type PaginationParams } from "./client";
+import { ApiClient, toQuery, type PaginationParams } from "@/lib/api/client";
 
 export class PostsApiClient extends ApiClient {
   getPosts(params: PaginationParams = {}): Promise<{ posts: Post[] }> {

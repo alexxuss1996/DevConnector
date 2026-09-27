@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { LuSearch } from "react-icons/lu";
-import { Button } from "../components/ui/button";
-import { EmptyState } from "../components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const meta: Meta<typeof EmptyState> = {
   title: "UI/EmptyState",
