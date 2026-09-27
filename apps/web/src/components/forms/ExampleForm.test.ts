@@ -1,5 +1,6 @@
+import { Value } from "typebox/value";
 import { describe, expect, test } from "vitest";
-import { exampleFormSchema } from "./exampleFormSchema";
+import { exampleFormSchema } from "@/components/forms/exampleFormSchema";
 
 const valid = {
   name: "Alex",
@@ -15,16 +16,27 @@ const valid = {
   tags: ["react"],
 };
 
+function errorPaths(value: unknown): string[] {
+  const paths: string[] = [];
+  for (const e of Value.Errors(exampleFormSchema, value)) {
+    const params = e.params as { requiredProperties?: string[] } | undefined;
+    if (e.instancePath === "" && params?.requiredProperties) {
+      for (const key of params.requiredProperties) paths.push(`/${key}`);
+    } else {
+      paths.push(e.instancePath);
+    }
+  }
+  return paths;
+}
+
 describe("exampleFormSchema", () => {
   test("accepts valid values", () => {
-    expect(exampleFormSchema.safeParse(valid).success).toBe(true);
+    expect(Value.Check(exampleFormSchema, valid)).toBe(true);
   });
 
   test("rejects empty submit with errors for every required field", () => {
-    const result = exampleFormSchema.safeParse({});
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    const keys = Object.keys(result.error.flatten().fieldErrors);
+    expect(Value.Check(exampleFormSchema, {})).toBe(false);
+    const paths = errorPaths({});
     for (const key of [
       "name",
       "email",
@@ -36,35 +48,24 @@ describe("exampleFormSchema", () => {
       "terms",
       "tags",
     ]) {
-      expect(keys).toContain(key);
+      expect(paths).toContain(`/${key}`);
     }
   });
 
   test("rejects bad email, short password, underage", () => {
-    const result = exampleFormSchema.safeParse({
-      ...valid,
-      email: "nope",
-      password: "short",
-      age: 10,
-    });
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    const fields = result.error.flatten().fieldErrors;
-    expect(fields.email).toBeDefined();
-    expect(fields.password).toBeDefined();
-    expect(fields.age).toBeDefined();
+    const value = { ...valid, email: "nope", password: "short", age: 10 };
+    expect(Value.Check(exampleFormSchema, value)).toBe(false);
+    const paths = errorPaths(value);
+    expect(paths).toContain("/email");
+    expect(paths).toContain("/password");
+    expect(paths).toContain("/age");
   });
 
   test("rejects missing terms acceptance and empty tags", () => {
-    const result = exampleFormSchema.safeParse({
-      ...valid,
-      terms: false,
-      tags: [],
-    });
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    const fields = result.error.flatten().fieldErrors;
-    expect(fields.terms).toBeDefined();
-    expect(fields.tags).toBeDefined();
+    const value = { ...valid, terms: false, tags: [] };
+    expect(Value.Check(exampleFormSchema, value)).toBe(false);
+    const paths = errorPaths(value);
+    expect(paths).toContain("/terms");
+    expect(paths).toContain("/tags");
   });
 });
