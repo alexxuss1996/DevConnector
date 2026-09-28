@@ -13,13 +13,15 @@ import {
   stubMethod,
   restoreAllStubs,
 } from "../helpers/stubs.ts";
-import { buildApp, signRefreshToken } from "../helpers/app.ts";
+import { signRefreshToken } from "../helpers/app.ts";
+import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { createApp } from "#app";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;
 
 before(async () => {
-  app = await buildApp();
+  app = await createApp({ logger: false, overrides: { oauth: oauthStub, db: noDb } });
 });
 
 after(async () => {

@@ -2,6 +2,7 @@ import "#config/env";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
+import fp from "fastify-plugin";
 import Fastify, {
   FastifyInstance,
   FastifyPluginAsync,
@@ -68,10 +69,7 @@ const options: AppOptions = {
   },
 };
 
-const app: FastifyPluginAsync<AppOptions> = async (
-  fastify,
-  opts,
-): Promise<void> => {
+const app = fp<AppOptions>(async (fastify, opts): Promise<void> => {
   const { oauth = oauthPlugin, db = mongoosePlugin, rateLimitKey } =
     opts.overrides ?? {};
 
@@ -92,6 +90,13 @@ const app: FastifyPluginAsync<AppOptions> = async (
   );
   await fastify.register(swaggerPlugin);
 
+  // Before the routes, not after: avvio creates each registered plugin's
+  // encapsulated context when the register call is made, and the context
+  // inherits the error handler present at that moment. Setting it afterwards
+  // leaves every route with Fastify's default handler.
+  fastify.setErrorHandler(errorHandler);
+  registerRequestIdHook(fastify);
+
   // Routes stay autoloaded: production and tests call this same line, so a
   // route file added to src/routes is live in both with no edit to either.
   await fastify.register(AutoLoad, {
@@ -100,14 +105,12 @@ const app: FastifyPluginAsync<AppOptions> = async (
     dirNameRoutePrefix: true,
   });
 
-  fastify.setErrorHandler(errorHandler);
-  registerRequestIdHook(fastify);
   fastify.ready(() => {
     if (process.env.NODE_ENV !== "production") {
       fastify.log.info(fastify.printRoutes());
     }
   });
-};
+});
 
 /**
  * Boots the same wiring the CLI boots, with substitutions. `overrides` is

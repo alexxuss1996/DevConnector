@@ -2,13 +2,25 @@ import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import Profile from "#modules/profiles/profiles.model";
 import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
-import { buildApp } from "../helpers/app.ts";
+import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { createApp } from "#app";
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;
 
 before(async () => {
-  app = await buildApp({ withRoutes: true });
+  app = await createApp({
+    logger: false,
+    overrides: {
+      oauth: oauthStub,
+      db: noDb,
+      // Real per-IP keying, so a suite that fires many requests at one
+      // address trips the production budget. Key per request instead; the
+      // limits themselves stay real.
+      rateLimitKey: () => randomUUID(),
+    },
+  });
 });
 
 after(async () => {

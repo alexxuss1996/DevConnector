@@ -6,7 +6,10 @@ import Post from "#modules/posts/posts.model";
 import Session from "#modules/auth/session.model";
 import { profileService } from "#modules/profiles/profiles.service";
 import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
-import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
+import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
+import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { createApp } from "#app";
+import { randomUUID } from "node:crypto";
 import mongoose, { Types } from "mongoose";
 import type { FastifyInstance } from "fastify";
 
@@ -32,7 +35,17 @@ function stubMongooseSession() {
 let app: FastifyInstance;
 
 before(async () => {
-  app = await buildApp({ withRoutes: true });
+  app = await createApp({
+    logger: false,
+    overrides: {
+      oauth: oauthStub,
+      db: noDb,
+      // Real per-IP keying, so a suite that fires many requests at one
+      // address trips the production budget. Key per request instead; the
+      // limits themselves stay real.
+      rateLimitKey: () => randomUUID(),
+    },
+  });
 });
 
 after(async () => {
