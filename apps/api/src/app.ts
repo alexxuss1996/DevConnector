@@ -41,6 +41,14 @@ export interface PluginOverrides {
   oauth?: FastifyPluginAsync<FastifyPluginOptions>;
   db?: FastifyPluginAsync<FastifyPluginOptions>;
   rateLimitKey?: (request: FastifyRequest) => string;
+  /**
+   * Registered inside the app, before it readies. A test can use this to add
+   * its own routes — the `authenticate` decorator needs one to guard, and
+   * `createApp` readies the instance, so a route added afterwards is
+   * rejected. `app` is fp()-wrapped, so the routes land on the same instance
+   * the caller gets back.
+   */
+  extraRoutes?: (app: FastifyInstance) => void;
 }
 
 export interface AppOptions extends FastifyServerOptions {
@@ -70,7 +78,7 @@ const options: AppOptions = {
 };
 
 const app = fp<AppOptions>(async (fastify, opts): Promise<void> => {
-  const { oauth = oauthPlugin, db = mongoosePlugin, rateLimitKey } =
+  const { oauth = oauthPlugin, db = mongoosePlugin, rateLimitKey, extraRoutes } =
     opts.overrides ?? {};
 
   // Order is load-bearing and matches what autoload's alphabetical sort
@@ -104,6 +112,8 @@ const app = fp<AppOptions>(async (fastify, opts): Promise<void> => {
     options: opts,
     dirNameRoutePrefix: true,
   });
+
+  extraRoutes?.(fastify);
 
   fastify.ready(() => {
     if (process.env.NODE_ENV !== "production") {

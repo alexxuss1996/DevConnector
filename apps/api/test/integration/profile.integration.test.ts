@@ -1,25 +1,31 @@
 import { describe, test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { buildIntegrationApp, cleanDb, testEmail, testName } from "../helpers/integration.ts";
+import { appendDbSuffix, cleanDb, testEmail, testName, toLocalMongoUri } from "../helpers/integration.ts";
+import { oauthStub } from "../helpers/plugin-overrides.ts";
+import { createApp } from "#app";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 
 let app: FastifyInstance;
-let mongoUri: string;
-let jwtSecret: string;
-let frontendUrl: string;
 
 before(async () => {
   const runId = randomUUID().slice(0, 8);
-  mongoUri = process.env.MONGODB_URI ?? `mongodb://localhost:27018/devconnector_test`;
-  jwtSecret = `test-jwt-secret-${randomUUID().slice(0, 16)}`;
-  frontendUrl = "http://localhost:3000";
+  const baseUri = process.env.MONGODB_URI ?? "mongodb://localhost:27018/devconnector_test";
+  // Per-run database and secret, so parallel runs do not collide. Both are
+  // read by src/config/env and src/plugins/mongoose at registration time,
+  // which happens inside createApp below — after these assignments.
+  process.env.MONGODB_URI = appendDbSuffix(toLocalMongoUri(baseUri), runId);
+  process.env.JWT_SECRET = `test-jwt-secret-${randomUUID().slice(0, 16)}`;
+  process.env.FRONTEND_URL = "http://localhost:3000";
 
-  app = await buildIntegrationApp({
-    mongoUri,
-    jwtSecret,
-    frontendUrl,
-    dbNameSuffix: runId,
+  app = await createApp({
+    logger: false,
+    overrides: {
+      oauth: oauthStub,
+      // `db` is deliberately absent: integration tests want the real mongoose
+      // plugin and a real connection.
+      rateLimitKey: () => randomUUID(),
+    },
   });
 });
 

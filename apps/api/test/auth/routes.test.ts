@@ -29,16 +29,19 @@ before(async () => {
       // address trips the production budget. Key per request instead; the
       // limits themselves stay real.
       rateLimitKey: () => randomUUID(),
+      // The `authenticate` decorator needs a route to guard. The old harness
+      // invented /protected for this and the real wiring has no such route,
+      // so register one guarded by the real decorator. It has to go through
+      // the app, before it readies — a route added to the returned instance
+      // afterwards is rejected.
+      extraRoutes: (instance) => {
+        instance
+          .get("/protected", { onRequest: [instance.authenticate] }, async () => ({
+            ok: true,
+          }));
+      },
     },
   });
-
-  // The `authenticate` decorator needs a route to guard. The old harness
-  // invented /protected for this; the real wiring has no such route, so
-  // register one here, guarded by the real decorator, and assert the
-  // decorator's behaviour rather than any handler's.
-  app.get("/protected", { onRequest: [app.authenticate] }, async () => ({
-    ok: true,
-  }));
 });
 
 after(async () => {
