@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance } from "fastify";
+import mongoose from "mongoose";
 import { oauthStub, oauthStubNamespace, noDb } from "./plugin-overrides.ts";
 
 describe("oauthStub", () => {
@@ -49,7 +50,11 @@ describe("noDb", () => {
     const server = Fastify({ logger: false });
     await server.register(noDb);
     await server.ready();
-    assert.equal(server.printRoutes().length >= 0, true);
+
+    // The point of the stub: a unit test must not reach for a database. If
+    // the real plugins/mongoose had been passed instead, readyState would be
+    // 1 (connected) or 2 (connecting) and the suite would hang on connect.
+    assert.equal(mongoose.connection.readyState, 0);
     await server.close();
   });
 });
