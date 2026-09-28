@@ -61,18 +61,80 @@ describe("the real wiring", () => {
     assert.notEqual(res.statusCode, 404);
   });
 
+  // Proves the plugin is passed to a register() call, not merely imported:
+  // an import with a forgotten register() compiles and the plugin never
+  // loads, which is the same silence the compiler cannot catch.
   test("every plugin file in src/plugins is registered in app.ts", () => {
     const appSource = readFileSync(srcFile("app.ts"), "utf8");
     const files = readdirSync(srcFile("plugins/")).filter((f) =>
       f.endsWith(".ts"),
     );
     assert.ok(files.length > 0, "no plugin files found");
+
+    // Map the local identifier each plugin is imported as to the file it
+    // came from — `rate-limit` is imported as `rateLimitPlugin`. The db and
+    // oauth plugins are registered through the `overrides` destructure rather
+    // than under their import name, so accept either.
+    const registered = new Set(
+      [...appSource.matchAll(/register\(\s*(\w+)/g)].map((m) => m[1]),
+    );
+    const viaOverride = new Set(
+      [...appSource.matchAll(/=\s*(\w+Plugin)\b/g)].map((m) => m[1]),
+    );
+    const importedFrom = new Map(
+      [...appSource.matchAll(/^\s*import\s+(\w+)\s+from\s+"#plugins\/([\w-]+)"/gm)]
+        .map((m) => [m[2], m[1]]),
+    );
+
     for (const file of files) {
+      const name = file.replace(/\.ts$/, "");
+      const identifier = importedFrom.get(name);
       assert.ok(
-        appSource.includes(`#plugins/${file.replace(/\.ts$/, "")}`),
-        `src/plugins/${file} is not imported by src/app.ts — add it to the registration list`,
+        identifier,
+        `src/plugins/${file} is not imported by src/app.ts — add it to the import list`,
+      );
+      assert.ok(
+        registered.has(identifier) || viaOverride.has(identifier),
+        `src/app.ts imports ${identifier} from #plugins/${name} but never passes it to register() — the plugin would never load`,
       );
     }
+  });
+  // Without rateLimitKey the real per-IP keying applies, so the production
+  // budget on /auth/login (5/minute) trips. Every other suite overrides the
+  // key and therefore never reaches this path — the rate limiter's
+  // errorResponseBuilder meeting the app's own error handler, which is what
+  // production does, is only observable here.
+  test("a tripped route budget returns the API's 429 shape", async () => {
+    const strict = await createApp({
+      logger: false,
+      overrides: { oauth: oauthStub, db: noDb },
+    });
+    let last = await strict.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {},
+    });
+    for (let i = 0; i < 6; i++) {
+      last = await strict.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {},
+      });
+    }
+
+    assert.equal(last.statusCode, 429);
+    const body = last.json();
+    assert.equal(body.code, "RATE_LIMIT_EXCEEDED");
+    assert.equal(typeof body.retryAfter, "string");
+    assert.equal(body.requestId, last.headers["x-request-id"]);
+    // The limiter's own headers must survive the app's error handler. It
+    // sends addHeadersOnExceeding, which is retry-after only — the
+    // x-ratelimit-* headers are not set on a rejected request.
+    assert.ok(
+      Number(last.headers["retry-after"]) > 0,
+      `expected a retry-after header, got ${last.headers["retry-after"]}`,
+    );
+    await strict.close();
   });
 });
 
