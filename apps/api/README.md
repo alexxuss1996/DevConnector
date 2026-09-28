@@ -28,8 +28,7 @@ pnpm --filter api dev        # or pnpm dev from repo root via turbo
 
 ## Interactive documentation
 
-Registered in `src/plugins/swagger.ts` (loaded via `@fastify/autoload` before `src/routes/`). Both UIs serve the same spec generated dynamically from route schemas (`@fastify/swagger` `openapi: 3.0.3`, `info.title: "DevConnector API"`).
-
+Registered in `src/plugins/swagger.ts` and registered explicitly in `src/app.ts`, after the other plugins and before the routes. Both UIs serve the same spec generated dynamically from route schemas (`@fastify/swagger` `openapi: 3.0.3`, `info.title: "DevConnector API"`).
 * `GET /docs` — Swagger UI (`@fastify/swagger-ui@^6`, `routePrefix: "/docs"`, `uiConfig.docExpansion: "list"`)
 
 Security schemes exposed in OpenAPI:
@@ -63,13 +62,36 @@ To hide a route from docs: `schema: { hide: true }`. To hide untagged routes glo
 
 ```
 src/
-  app.ts                # Fastify options (ajv + ajv-errors + ajv-formats) + AutoLoad for plugins/ & routes/ (dirNameRoutePrefix: true)
+  app.ts                # explicit plugin registration + createApp() factory; routes via AutoLoad (dirNameRoutePrefix: true)
   plugins/              # swagger.ts, auth.ts, jwt.ts, cookie.ts, rate-limit.ts, mongoose.ts, oath.ts
   routes/               # auth/{register,login,refresh,logout,google}, profiles/{profiles,me,...}, posts/{...}
   modules/{auth,profiles,posts,users}/  # *.service.ts, *.model.ts (Mongoose)
   helpers/              # error-handler.ts, auth.ts, auth.cookies.ts
   config/env.ts        # EnvSchema (TypeBox)
 ```
+
+## Test wiring
+
+Tests boot the real application through `createApp()` from `#app` — the same
+wiring `fastify start` loads. There is no separate test harness.
+
+```ts
+const app = await createApp({
+  logger: false,
+  overrides: {
+    oauth: oauthStub,                // stands in for the OIDC discovery fetch
+    db: noDb,                        // unit tests stub Mongoose models instead
+    rateLimitKey: () => randomUUID() // per-request bucket, budgets unchanged
+  }
+});
+```
+
+Integration tests omit `db` to get a real connection. Plugins are registered
+explicitly so that deleting one is a build failure; the coverage test in
+`test/app.test.ts` fails if a plugin file is added but not registered.
+
+`extraRoutes` adds test-only routes. It runs inside the app before it readies,
+which is why it is an override and not a call on the returned instance.
 
 ## Env
 
