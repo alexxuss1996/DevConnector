@@ -1,7 +1,6 @@
 import fp from "fastify-plugin";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import scalar from "@scalar/fastify-api-reference";
 
 export default fp(async (fastify) => {
   // Swagger (OpenAPI) - must be before routes
@@ -25,7 +24,7 @@ export default fp(async (fastify) => {
       ],
       tags: [
         { name: "Auth", description: "Authentication & session" },
-        { name: "Profile", description: "User profiles, experience, education" },
+        { name: "Profiles", description: "User profiles, experience, education" },
         { name: "Posts", description: "Posts, likes, comments" },
         { name: "System", description: "Health / root" },
       ],
@@ -65,21 +64,5 @@ export default fp(async (fastify) => {
       tryItOutEnabled: true,
     },
     staticCSP: true,
-  });
-
-  // Scalar (modern alternative) at /reference
-  await fastify.register(scalar, {
-    routePrefix: "/reference",
-    configuration: {
-      theme: "purple",
-      metaData: {
-        title: "DevConnector API",
-        description: "DevConnector API Reference - modern interactive docs",
-      },
-      // defaults to using the spec from @fastify/swagger
-      layout: "modern",
-      showSidebar: true,
-      hideDownloadButton: false,
-    },
   });
 });

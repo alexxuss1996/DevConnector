@@ -8,7 +8,7 @@ export default fp(async (fastify) => {
     global: true,
     max: 100,
     timeWindow: "1 minute",
-    allowList: ["/", "/docs", "/reference"],
+    allowList: ["/", "/docs"],
     enableDraftSpec: true,
     addHeaders: {
       "x-ratelimit-limit": true,

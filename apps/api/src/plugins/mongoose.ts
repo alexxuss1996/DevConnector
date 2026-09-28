@@ -5,19 +5,12 @@ import mongoose from "mongoose";
 export default fp(async (fastify) => {
   const uri = env.MONGODB_URI;
 
-  if (!uri) {
-    throw new Error("MONGODB_URI is not set");
-  }
-
   // If already connected to the same URI, skip reconnecting
   if (
     mongoose.connection.readyState === 1 &&
     (mongoose.connection as any)._connectionString === uri
   ) {
     fastify.log.info("MongoDB already connected");
-    if (!fastify.hasDecorator("db")) {
-      fastify.decorate("db", mongoose.connection);
-    }
     return;
   }
 
@@ -34,10 +27,6 @@ export default fp(async (fastify) => {
   });
 
   fastify.log.info("Connected to MongoDB");
-
-  if (!fastify.hasDecorator("db")) {
-    fastify.decorate("db", mongoose.connection);
-  }
 
   fastify.addHook("onClose", async () => {
     if (mongoose.connection.readyState !== 0) {
