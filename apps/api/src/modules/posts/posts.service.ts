@@ -5,13 +5,12 @@ import { Types, isValidObjectId } from "mongoose";
 import { sanitizeText } from "#helpers/sanitize";
 
 class PostService {
+  /** `page`/`limit` must come from `parsePagination`, the single clamp. */
   async getPosts(page = 1, limit = 20) {
-    const safePage = Math.max(1, Math.floor(page) || 1);
-    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 20));
     const posts = await Post.find()
       .sort({ createdAt: -1 })
-      .skip((safePage - 1) * safeLimit)
-      .limit(safeLimit)
+      .skip((page - 1) * limit)
+      .limit(limit)
       .populate("userId", ["name", "avatar"]);
     return posts;
   }
