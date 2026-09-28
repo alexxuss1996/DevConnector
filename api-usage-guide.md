@@ -95,17 +95,25 @@ await postsApi.createPost({ text: "Hello world" });
 
 | Method | HTTP | Path | Body/Params | Returns |
 |---|---|---|---|---|
-| `createOrUpdateProfile(data)` | POST | `/profile/` | `CreateProfileInput` | `{ profile: Profile }` |
-| `updateProfile(data)` | PUT | `/profile/` | `UpdateProfileInput` | `{ profile: Profile }` |
-| `getProfiles(params)` | GET | `/profile/?page=N&limit=N` | `PaginationParams` | `{ profiles: Profile[] }` |
-| `getMyProfile()` | GET | `/profile/me` | — | `{ profile: Profile }` |
-| `getProfileById(params)` | GET | `/profile/user/:id` | `ProfileIdParams` | `{ profile: Profile }` |
-| `getGithubRepos(params)` | GET | `/profile/github/:username` | `GithubUsernameParams` | `unknown` (GitHub API response) |
-| `addExperience(data)` | POST | `/profile/experience` | `AddExperienceInput` | `{ profile: Profile }` |
-| `deleteExperience(params)` | DELETE | `/profile/experience/:experienceId` | `ExperienceIdParams` | `{ profile: Profile }` |
-| `addEducation(data)` | POST | `/profile/education` | `AddEducationInput` | `{ profile: Profile }` |
-| `deleteEducation(params)` | DELETE | `/profile/education/:educationId` | `EducationIdParams` | `{ profile: Profile }` |
-| `deleteProfile()` | DELETE | `/profile/` | — | `void` (204) |
+| `createProfile(data)` | POST | `/profiles/` | `CreateProfileInput` | `{ profile: PublicProfile }` — 201, or 409 `PROFILE_ALREADY_EXISTS` |
+| `updateProfile(data)` | PATCH | `/profiles/` | `UpdateProfileInput` | `{ profile: PublicProfile }` |
+| `getProfiles(params)` | GET | `/profiles/?page=N&limit=N` | `PaginationParams` | `{ profiles: PublicProfileSummary[]; total: number; page: number; limit: number }` |
+| `getMyProfile()` | GET | `/profiles/me` | — | `{ profile: PublicProfile }` |
+| `getProfileById(params)` | GET | `/profiles/user/:id` | `ProfileIdParams` | `{ profile: PublicProfile }` |
+| `getGithubRepos(params)` | GET | `/profiles/github/:username` | `GithubUsernameParams` | `unknown` (GitHub API response) |
+| `addExperience(data)` | POST | `/profiles/experience` | `AddExperienceInput` | `{ profile: PublicProfile }` |
+| `deleteExperience(params)` | DELETE | `/profiles/experience/:experienceId` | `ExperienceIdParams` | `{ profile: PublicProfile }` |
+| `addEducation(data)` | POST | `/profiles/education` | `AddEducationInput` | `{ profile: PublicProfile }` |
+| `deleteEducation(params)` | DELETE | `/profiles/education/:educationId` | `EducationIdParams` | `{ profile: PublicProfile }` |
+| `deleteProfile()` | DELETE | `/profiles/` | — | `void` (204) |
+
+`getProfiles` returns a summary projection (`_id`, `userId`, `status`, `company`,
+`location`, `skills`) plus the unpaginated `total`, so paging does not have to
+infer more pages from a full page of results. Public reads send
+`Cache-Control: public, max-age=60, stale-while-revalidate=300`.
+
+Error bodies include a `requestId`, and every response echoes it as the
+`x-request-id` header.
 
 **`profileApi`** — shared instance.
 
@@ -139,7 +147,7 @@ await login.mutateAsync({ email: "x@y.com", password: "pass" });
 
 | Hook | Type | Query Key | On Success |
 |---|---|---|---|
-| `useProfiles(options?)` | `UseQuery` | `["profiles"]` | — |
+| `useProfiles(params?, options?)` | `UseQuery` | `["profiles", params]` | — |
 | `useMyProfile(options?)` | `UseQuery` | `["profile", "me"]` | — |
 | `useProfileById(params, options?)` | `UseQuery` | `["profile", params.id]` | — |
 | `useCreateProfileMutation()` | `UseMutation` | — | invalidate `["profile"]`, `["profiles"]` |
@@ -193,7 +201,6 @@ The contracts package is the shared type/schema boundary. It uses **TypeBox** to
 **Auth** (`contracts/src/auth.ts`):
 - `RegisterUserSchema` → `RegisterUserInput` — `{ name, email, password }`
 - `LoginUserSchema` → `LoginUserInput` — `{ email, password }`
-- `CompleteOnboardingSchema` → `CompleteOnboardingInput` — `{ name }`
 - `LinkGoogleSchema` → `LinkGoogleInput` — `{ accessToken }`
 - `AuthUserSchema` → `AuthUser` — `{ id, name?, email, avatar? }`
 

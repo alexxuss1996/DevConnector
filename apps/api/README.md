@@ -12,8 +12,7 @@ pnpm --filter api dev        # or pnpm dev from repo root via turbo
 
 * API: http://localhost:4000
 * Interactive docs (Swagger UI): http://localhost:4000/docs
-* Modern docs (Scalar): http://localhost:4000/reference
-* OpenAPI JSON: http://localhost:4000/docs/json (Swagger), http://localhost:4000/reference/openapi.json (Scalar)
+* OpenAPI JSON: http://localhost:4000/docs/json
 * OpenAPI YAML: http://localhost:4000/docs/yaml
 
 `npm start` / `pnpm start` runs production build on port `4000` (`fastify start -p 4000 dist/app.js`).
@@ -32,7 +31,6 @@ pnpm --filter api dev        # or pnpm dev from repo root via turbo
 Registered in `src/plugins/swagger.ts` (loaded via `@fastify/autoload` before `src/routes/`). Both UIs serve the same spec generated dynamically from route schemas (`@fastify/swagger` `openapi: 3.0.3`, `info.title: "DevConnector API"`).
 
 * `GET /docs` — Swagger UI (`@fastify/swagger-ui@^6`, `routePrefix: "/docs"`, `uiConfig.docExpansion: "list"`)
-* `GET /reference` — Scalar (`@scalar/fastify-api-reference@^1`, `routePrefix: "/reference"`, `theme: "purple"`, `layout: "modern"`)
 
 Security schemes exposed in OpenAPI:
 * `bearerAuth` — `Authorization: Bearer <accessToken>` (from `POST /auth/login` / `/auth/register`)
@@ -57,7 +55,7 @@ fastify.post("/", {
 }, handler)
 ```
 
-For clean examples avoid bare `pattern: ".*\\S.*"` without `example`/`examples` — the UI faker will generate gibberish to satisfy the regex. See `src/modules/profile/profile.schemas.ts` for pattern + `example: "Developer"`, top-level `example: { status: "Developer", skills: ["JavaScript","Node.js","React"], ... }`.
+For clean examples avoid bare `pattern: ".*\\S.*"` without `example`/`examples` — the UI faker will generate gibberish to satisfy the regex. See `src/modules/profiles/profiles.schemas.ts` for pattern + `example: "Developer"`, top-level `example: { status: "Developer", skills: ["JavaScript","Node.js","React"], ... }`.
 
 To hide a route from docs: `schema: { hide: true }`. To hide untagged routes globally set `hideUntagged: true` in `src/plugins/swagger.ts`.
 
@@ -66,9 +64,9 @@ To hide a route from docs: `schema: { hide: true }`. To hide untagged routes glo
 ```
 src/
   app.ts                # Fastify options (ajv + ajv-errors + ajv-formats) + AutoLoad for plugins/ & routes/ (dirNameRoutePrefix: true)
-  plugins/              # swagger.ts, auth.ts, jwt.ts, cookie.ts, sensible.ts, rate-limit.ts, mongoose.ts, oath.ts
-  routes/               # auth/{register,login,refresh,logout,google}, profile/{profile,me,...}, posts/{...}
-  modules/{auth,profile,posts,users}/  # *.schemas.ts (TypeBox), *.service.ts, *.model.ts (Mongoose)
+  plugins/              # swagger.ts, auth.ts, jwt.ts, cookie.ts, rate-limit.ts, mongoose.ts, oath.ts
+  routes/               # auth/{register,login,refresh,logout,google}, profiles/{profiles,me,...}, posts/{...}
+  modules/{auth,profiles,posts,users}/  # *.service.ts, *.model.ts (Mongoose)
   helpers/              # error-handler.ts, auth.ts, auth.cookies.ts
   config/env.ts        # EnvSchema (TypeBox)
 ```
@@ -79,5 +77,5 @@ Required (`src/config/env.ts`): `JWT_SECRET`, `MONGODB_URI`, `FRONTEND_URL`, `GI
 
 ## Learn more
 
-* [Fastify](https://fastify.dev/docs/latest/) — [Fastify Swagger](https://github.com/fastify/fastify-swagger), [fastify-swagger-ui](https://github.com/fastify/fastify-swagger-ui), [Scalar Fastify](https://github.com/scalar/scalar/blob/main/documentation/integrations/fastify.md)
+* [Fastify](https://fastify.dev/docs/latest/) — [Fastify Swagger](https://github.com/fastify/fastify-swagger), [fastify-swagger-ui](https://github.com/fastify/fastify-swagger-ui)
 * [TypeBox](https://github.com/sinclairzx81/typebox)
