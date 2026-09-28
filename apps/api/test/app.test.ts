@@ -1,22 +1,10 @@
 import { describe, test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import Fastify, { type FastifyInstance } from "fastify";
-import fp from "fastify-plugin";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { app, options, createApp } from "#app";
-
-const oauthStub = fp(async (fastify) => {
-  // `as any` matches test/helpers/app.ts:156 — the route-facing type is a
-  // module augmentation over the whole OAuth2Namespace, and a stub will never
-  // carry its other members.
-  fastify.decorate("googleOAuth2", {
-    getAccessTokenFromAuthorizationCodeFlow: async () => ({
-      token: { access_token: "stub", token_type: "Bearer" },
-    }),
-  } as any);
-});
-const noDb = fp(async () => {});
+import { oauthStub, noDb } from "./helpers/plugin-overrides.ts";
 
 const srcFile = (relative: string) =>
   fileURLToPath(new URL(`../src/${relative}`, import.meta.url));
