@@ -106,6 +106,7 @@ type ChainableQuery<T> = Promise<T | null> & {
   lean: () => ChainableQuery<T>;
   exec: () => Promise<T | null>;
   populate: (...args: any[]) => ChainableQuery<T>;
+  countDocuments: (...args: any[]) => ChainableQuery<number>;
 };
 
 export function mkQuery<T>(value: T | null): ChainableQuery<T> {
@@ -117,6 +118,16 @@ export function mkQuery<T>(value: T | null): ChainableQuery<T> {
   q.lean = () => q;
   q.limit = () => q;
   q.populate = () => q;
+  // Total is opt-in via mkCount.
+  q.countDocuments = (() => q) as ChainableQuery<T>["countDocuments"];
+  return q;
+}
+
+/** Stand-in for `Model.countDocuments()`, which resolves a number. */
+export function mkCount(total: number) {
+  const q = Promise.resolve(total) as unknown as ChainableQuery<number>;
+  q.countDocuments = () => q;
+  q.exec = () => Promise.resolve(total);
   return q;
 }
 
@@ -136,6 +147,8 @@ export interface ProfileDoc {
   createdAt?: Date;
   updatedAt?: Date;
   toJSON: () => Record<string, unknown>;
+  /** Mongoose populates in place; the stub is a no-op chain. */
+  populate: (...args: any[]) => ProfileDoc;
 }
 
 export function mkProfile(overrides: Partial<ProfileDoc> = {}): ProfileDoc {
@@ -147,8 +160,11 @@ export function mkProfile(overrides: Partial<ProfileDoc> = {}): ProfileDoc {
     social: {},
     experience: [],
     education: [],
+    populate() {
+      return this;
+    },
     toJSON() {
-      const { toJSON, ...rest } = this as any;
+      const { toJSON, populate, ...rest } = this as any;
       return { ...rest };
     },
     ...overrides,
@@ -156,7 +172,7 @@ export function mkProfile(overrides: Partial<ProfileDoc> = {}): ProfileDoc {
   // Ensure toJSON is always present even if overridden
   if (!doc.toJSON) {
     doc.toJSON = function () {
-      const { toJSON, ...rest } = this as any;
+      const { toJSON, populate, ...rest } = this as any;
       return { ...rest };
     };
   }
@@ -274,4 +290,26 @@ export function restoreAllStubs(): void {
     }
   }
   clearSessionTokens();
+}
+
+/**
+ * Shapes what `Profile.create` was handed into the `{ $set }` view the tests
+ * used to read off `findOneAndUpdate`, so create-path assertions stay about
+ * *what got written* rather than which Mongoose call did the writing.
+ */
+export function createdDoc(createMock: {
+  mock: { calls: Array<{ arguments: unknown[] }> };
+}): Record<string, unknown> {
+  const doc = (createMock.mock.calls[0]?.arguments?.[0] ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const { userId: _userId, social, ...rest } = doc;
+  const set: Record<string, unknown> = { ...rest };
+  for (const [key, value] of Object.entries(
+    (social ?? {}) as Record<string, unknown>,
+  )) {
+    set[`social.${key}`] = value;
+  }
+  return set;
 }

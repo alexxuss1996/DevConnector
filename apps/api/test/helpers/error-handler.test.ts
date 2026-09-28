@@ -5,7 +5,10 @@ import AppError from "#helpers/app-error";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 function fakeRequest(logError = mock.fn()): FastifyRequest {
-  return { log: { error: logError } } as unknown as FastifyRequest;
+  return {
+    id: "req-test",
+    log: { error: logError },
+  } as unknown as FastifyRequest;
 }
 
 function fakeReply() {
@@ -37,6 +40,7 @@ describe("errorHandler", () => {
     assert.deepEqual(captured.body, {
       code: "EMAIL_IN_USE",
       message: "Email already registered",
+      requestId: "req-test",
     });
   });
 
@@ -77,6 +81,7 @@ describe("errorHandler", () => {
     assert.deepEqual(captured.body, {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
+      requestId: "req-test",
     });
     assert.equal(logError.mock.callCount(), 1);
   });

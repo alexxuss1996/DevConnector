@@ -1,6 +1,6 @@
 import { describe, test, before, after, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { profileService, clearGithubReposCache } from "#modules/profile/profile.service";
+import { profileService, clearGithubReposCache } from "#modules/profiles/profiles.service";
 import { newId } from "../helpers/stubs.ts";
 import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import type { FastifyInstance } from "fastify";
@@ -52,19 +52,19 @@ function mockFetchNotFound(body: any = { message: "Not Found" }) {
 }
 
 // ============================================================
-// GET /profile/github/:username — authentication
+// GET /profiles/github/:username — authentication
 // ============================================================
-describe("GET /profile/github/:username — authentication", () => {
+describe("GET /profiles/github/:username — authentication", () => {
   test("returns 401 without token", async () => {
-    const reply = await app.inject({ method: "GET", url: "/profile/github/octocat" });
+    const reply = await app.inject({ method: "GET", url: "/profiles/github/octocat" });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId });
   });
 
   test("returns 401 for empty Bearer token", async () => {
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: { authorization: "Bearer " },
     });
     assert.equal(reply.statusCode, 401);
@@ -74,18 +74,18 @@ describe("GET /profile/github/:username — authentication", () => {
     const refresh = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: { authorization: `Bearer ${refresh}` },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId });
   });
 
   test("returns 401 for tampered access token", async () => {
     const token = signAccessToken(app, { sub: newId().toString() });
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: { authorization: `Bearer ${token}x` },
     });
     assert.equal(reply.statusCode, 401);
@@ -99,7 +99,7 @@ describe("GET /profile/github/:username — authentication", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       cookies: { access_token: token },
     });
     assert.equal(reply.statusCode, 200);
@@ -112,7 +112,7 @@ describe("GET /profile/github/:username — authentication", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 200);
@@ -121,9 +121,9 @@ describe("GET /profile/github/:username — authentication", () => {
 });
 
 // ============================================================
-// GET /profile/github/:username — logic & fetch integration
+// GET /profiles/github/:username — logic & fetch integration
 // ============================================================
-describe("GET /profile/github/:username — logic", () => {
+describe("GET /profiles/github/:username — logic", () => {
   test("returns 200 with repos array on success", async () => {
     const mockRepos = [
       { id: 1, name: "repo1", html_url: "https://github.com/octocat/repo1" },
@@ -133,7 +133,7 @@ describe("GET /profile/github/:username — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: authHeader(),
     });
 
@@ -150,7 +150,7 @@ describe("GET /profile/github/:username — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/testuser123",
+      url: "/profiles/github/testuser123",
       headers: authHeader(),
     });
 
@@ -171,7 +171,7 @@ describe("GET /profile/github/:username — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: authHeader(),
     });
 
@@ -191,7 +191,7 @@ describe("GET /profile/github/:username — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/nonexistentuser12345",
+      url: "/profiles/github/nonexistentuser12345",
       headers: authHeader(),
     });
 
@@ -206,7 +206,7 @@ describe("GET /profile/github/:username — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/emptyuser",
+      url: "/profiles/github/emptyuser",
       headers: authHeader(),
     });
 
@@ -221,12 +221,12 @@ describe("GET /profile/github/:username — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
   });
 
   test("returns 500 when fetch json throws", async () => {
@@ -238,7 +238,7 @@ describe("GET /profile/github/:username — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/github/octocat",
+      url: "/profiles/github/octocat",
       headers: authHeader(),
     });
 

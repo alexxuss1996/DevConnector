@@ -1,5 +1,9 @@
-import { AddExperienceSchema } from "@dev-conn/contracts";
-import { profileService } from "#modules/profile/profile.service";
+import {
+  AddExperienceSchema,
+  ErrorResponseSchema,
+  ProfileResponseSchema,
+} from "@dev-conn/contracts";
+import { profileService } from "#modules/profiles/profiles.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
 const addExperience: FastifyPluginAsyncTypebox = async (
@@ -10,7 +14,17 @@ const addExperience: FastifyPluginAsyncTypebox = async (
     "/experience",
     {
       onRequest: [fastify.authenticate],
-      schema: { body: AddExperienceSchema },
+      schema: {
+        tags: ["Profiles"],
+        summary: "Add a job to your experience",
+        body: AddExperienceSchema,
+        response: {
+          201: ProfileResponseSchema,
+          400: ErrorResponseSchema,
+          401: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+        },
+      },
     },
     async function (request, reply) {
       const result = await profileService.addExperience(

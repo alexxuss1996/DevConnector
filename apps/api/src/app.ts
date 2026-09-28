@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
 import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
 import { errorHandler } from "#helpers/error-handler";
+import { baseOptions, registerRequestIdHook } from "#helpers/request-id";
 import AjvErrors from "ajv-errors";
 import addFormats from "ajv-formats";
 
@@ -17,6 +18,7 @@ const options: AppOptions = {
   routerOptions: {
     ignoreTrailingSlash: true,
   },
+  ...baseOptions,
   logger: {
     level:
       process.env.LOG_LEVEL ??
@@ -58,6 +60,8 @@ const app: FastifyPluginAsync<AppOptions> = async (
   });
   // Custom error handler
   fastify.setErrorHandler(errorHandler);
+
+  registerRequestIdHook(fastify);
   fastify.ready(() => {
     if (process.env.NODE_ENV !== "production") {
       fastify.log.info(fastify.printRoutes());

@@ -92,11 +92,11 @@ or to `FRONTEND_URL?error=google_auth_failed` on failure.
 
 ### `ProfileApiClient` (`profile.ts`, singleton `profileApi`)
 
-Every profile endpoint returns the `{ profile }` envelope (lists return
-`{ profiles }`):
+Every profile endpoint returns the `{ profile }` envelope; the directory list
+returns summaries plus the unpaginated total:
 
 ```ts
-const { profile } = await profileApi.createOrUpdateProfile({
+const { profile } = await profileApi.createProfile({
   status: "Developer",
   skills: ["TypeScript"],
 });
@@ -106,13 +106,14 @@ await profileApi.deleteProfile(); // deletes profile + user, resolves void
 
 | Method | Returns |
 | ------ | ------- |
-| `createOrUpdateProfile(data)` | `{ profile: Profile }` |
-| `getProfiles({ page, limit }?)` | `{ profiles: Profile[] }` |
-| `getMyProfile()` | `{ profile: Profile }` |
-| `getProfileById({ id })` | `{ profile: Profile }` |
+| `createProfile(data)` | `{ profile: PublicProfile }` (201; 409 if one exists) |
+| `updateProfile(data)` | `{ profile: PublicProfile }` (PATCH) |
+| `getProfiles({ page, limit }?)` | `{ profiles: PublicProfileSummary[]; total: number; page: number; limit: number }` |
+| `getMyProfile()` | `{ profile: PublicProfile }` |
+| `getProfileById({ id })` | `{ profile: PublicProfile }` |
 | `getGithubRepos({ username })` | `unknown` (raw GitHub payload) |
-| `addExperience(data)` / `addEducation(data)` | `{ profile: Profile }` |
-| `deleteExperience({ experienceId })` / `deleteEducation({ educationId })` | `{ profile: Profile }` |
+| `addExperience(data)` / `addEducation(data)` | `{ profile: PublicProfile }` |
+| `deleteExperience({ experienceId })` / `deleteEducation({ educationId })` | `{ profile: PublicProfile }` |
 | `deleteProfile()` | `void` |
 
 ### `PostsApiClient` (`posts.ts`, singleton `postsApi`)

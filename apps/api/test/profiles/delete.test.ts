@@ -1,7 +1,7 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import Profile from "#modules/profile/profile.model";
-import { profileService } from "#modules/profile/profile.service";
+import Profile from "#modules/profiles/profiles.model";
+import { profileService } from "#modules/profiles/profiles.service";
 import { newId, mkProfile, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
 import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { Types } from "mongoose";
@@ -28,23 +28,23 @@ function authHeader(userId?: string) {
 }
 
 // ============================================================
-// DELETE /profile/experience/:experienceId
+// DELETE /profiles/experience/:experienceId
 // ============================================================
 
-describe("DELETE /profile/experience/:experienceId — authentication", () => {
+describe("DELETE /profiles/experience/:experienceId — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${newId().toString()}`,
+      url: `/profiles/experience/${newId().toString()}`,
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId });
   });
 
   test("returns 401 for an empty Bearer token", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${newId().toString()}`,
+      url: `/profiles/experience/${newId().toString()}`,
       headers: { authorization: "Bearer " },
     });
     assert.equal(reply.statusCode, 401);
@@ -57,7 +57,7 @@ describe("DELETE /profile/experience/:experienceId — authentication", () => {
     });
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${newId().toString()}`,
+      url: `/profiles/experience/${newId().toString()}`,
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
@@ -67,7 +67,7 @@ describe("DELETE /profile/experience/:experienceId — authentication", () => {
     const token = signAccessToken(app, { sub: newId().toString() });
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${newId().toString()}`,
+      url: `/profiles/experience/${newId().toString()}`,
       headers: { authorization: `Bearer ${token}x` },
     });
     assert.equal(reply.statusCode, 401);
@@ -85,18 +85,18 @@ describe("DELETE /profile/experience/:experienceId — authentication", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       cookies: { access_token: accessToken },
     });
     assert.equal(reply.statusCode, 200);
   });
 });
 
-describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", () => {
+describe("DELETE /profiles/experience/:experienceId — validation (ObjectId)", () => {
   test("returns 400 for non-hex string", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/experience/not-an-objectid",
+      url: "/profiles/experience/not-an-objectid",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
@@ -106,7 +106,7 @@ describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", (
   test("returns 400 for too short ObjectId (23 chars)", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/experience/507f1f77bcf86cd79943901", // 23 hex
+      url: "/profiles/experience/507f1f77bcf86cd79943901", // 23 hex
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
@@ -116,7 +116,7 @@ describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", (
   test("returns 400 for too long ObjectId (25 chars)", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/experience/507f1f77bcf86cd7994390111", // 25 hex
+      url: "/profiles/experience/507f1f77bcf86cd7994390111", // 25 hex
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
@@ -126,7 +126,7 @@ describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", (
   test("returns 400 for 24 chars with non-hex (zzzz)", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/experience/zzzzzzzzzzzzzzzzzzzzzzzz",
+      url: "/profiles/experience/zzzzzzzzzzzzzzzzzzzzzzzz",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
@@ -134,10 +134,10 @@ describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", (
   });
 
   test("returns 400 for empty string id is 404 (route not matched) or 400 — fastify returns 404 for missing param", async () => {
-    // hitting /profile/experience/ without id -> Fastify 404 route not found, not our validation
+    // hitting /profiles/experience/ without id -> Fastify 404 route not found, not our validation
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/experience/",
+      url: "/profiles/experience/",
       headers: authHeader(),
     });
     // No route matches -> 404; ensure it's not 200
@@ -154,7 +154,7 @@ describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", (
 
     const replyLower = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expIdLower}`,
+      url: `/profiles/experience/${expIdLower}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
     assert.equal(replyLower.statusCode, 200);
@@ -165,7 +165,7 @@ describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", (
     stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mockProfile2 as any));
     const replyUpper = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expIdUpper}`,
+      url: `/profiles/experience/${expIdUpper}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
     assert.equal(replyUpper.statusCode, 200);
@@ -174,7 +174,7 @@ describe("DELETE /profile/experience/:experienceId — validation (ObjectId)", (
   });
 });
 
-describe("DELETE /profile/experience/:experienceId — logic", () => {
+describe("DELETE /profiles/experience/:experienceId — logic", () => {
   test("returns 200 and profile when experience is deleted", async () => {
     const userId = newId();
     const expId = newId();
@@ -186,7 +186,7 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
 
@@ -215,7 +215,7 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 
     await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
 
@@ -233,7 +233,7 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
 
@@ -249,7 +249,7 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
 
@@ -266,7 +266,7 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 
     await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
 
@@ -283,12 +283,12 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${newId().toString()}`,
+      url: `/profiles/experience/${newId().toString()}`,
       headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
   });
 
   test("uses userId from JWT sub, not from URL or body", async () => {
@@ -302,7 +302,7 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { userId: attackerId } as any,
     });
@@ -315,14 +315,14 @@ describe("DELETE /profile/experience/:experienceId — logic", () => {
 });
 
 // ============================================================
-// DELETE /profile/education/:educationId
+// DELETE /profiles/education/:educationId
 // ============================================================
 
-describe("DELETE /profile/education/:educationId — authentication", () => {
+describe("DELETE /profiles/education/:educationId — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/education/${newId().toString()}`,
+      url: `/profiles/education/${newId().toString()}`,
     });
     assert.equal(reply.statusCode, 401);
   });
@@ -334,7 +334,7 @@ describe("DELETE /profile/education/:educationId — authentication", () => {
     });
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/education/${newId().toString()}`,
+      url: `/profiles/education/${newId().toString()}`,
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
@@ -349,18 +349,18 @@ describe("DELETE /profile/education/:educationId — authentication", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/education/${eduId.toString()}`,
+      url: `/profiles/education/${eduId.toString()}`,
       cookies: { access_token: accessToken },
     });
     assert.equal(reply.statusCode, 200);
   });
 });
 
-describe("DELETE /profile/education/:educationId — validation (ObjectId)", () => {
+describe("DELETE /profiles/education/:educationId — validation (ObjectId)", () => {
   test("returns 400 for non-hex string", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/education/not-an-objectid",
+      url: "/profiles/education/not-an-objectid",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
@@ -370,7 +370,7 @@ describe("DELETE /profile/education/:educationId — validation (ObjectId)", () 
   test("returns 400 for too short", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/education/507f1f77bcf86cd79943901",
+      url: "/profiles/education/507f1f77bcf86cd79943901",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
@@ -379,7 +379,7 @@ describe("DELETE /profile/education/:educationId — validation (ObjectId)", () 
   test("returns 400 for too long", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/education/507f1f77bcf86cd7994390111",
+      url: "/profiles/education/507f1f77bcf86cd7994390111",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
@@ -388,14 +388,14 @@ describe("DELETE /profile/education/:educationId — validation (ObjectId)", () 
   test("returns 400 for non-hex 24 chars", async () => {
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/education/gggggggggggggggggggggggg",
+      url: "/profiles/education/gggggggggggggggggggggggg",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 400);
   });
 });
 
-describe("DELETE /profile/education/:educationId — logic", () => {
+describe("DELETE /profiles/education/:educationId — logic", () => {
   test("returns 200 and profile when education is deleted", async () => {
     const userId = newId();
     const eduId = newId();
@@ -406,7 +406,7 @@ describe("DELETE /profile/education/:educationId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/education/${eduId.toString()}`,
+      url: `/profiles/education/${eduId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
 
@@ -427,7 +427,7 @@ describe("DELETE /profile/education/:educationId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/education/${newId().toString()}`,
+      url: `/profiles/education/${newId().toString()}`,
       headers: authHeader(),
     });
 
@@ -441,7 +441,7 @@ describe("DELETE /profile/education/:educationId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/education/${newId().toString()}`,
+      url: `/profiles/education/${newId().toString()}`,
       headers: authHeader(),
     });
 
@@ -457,12 +457,12 @@ describe("DELETE /profile/education/:educationId — logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: `/profile/education/${newId().toString()}`,
+      url: `/profiles/education/${newId().toString()}`,
       headers: authHeader(),
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
   });
 });
 
@@ -477,7 +477,7 @@ describe("DELETE routes — DRY and ObjectId invariants", () => {
     const f1 = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mock as any));
     await app.inject({
       method: "DELETE",
-      url: `/profile/experience/${expId.toString()}`,
+      url: `/profiles/experience/${expId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
     assert.ok(f1.mock.calls[0].arguments[0]["experience._id"] instanceof Types.ObjectId);
@@ -487,7 +487,7 @@ describe("DELETE routes — DRY and ObjectId invariants", () => {
     const f2 = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mock as any));
     await app.inject({
       method: "DELETE",
-      url: `/profile/education/${eduId.toString()}`,
+      url: `/profiles/education/${eduId.toString()}`,
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
     assert.ok(f2.mock.calls[0].arguments[0]["education._id"] instanceof Types.ObjectId);

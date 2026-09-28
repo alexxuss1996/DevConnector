@@ -1,6 +1,6 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import Profile from "#modules/profile/profile.model";
+import Profile from "#modules/profiles/profiles.model";
 import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
 import { buildApp } from "../helpers/app.ts";
 import type { FastifyInstance } from "fastify";
@@ -21,9 +21,9 @@ afterEach(() => {
 });
 
 // ============================================================
-// GET /profile/user/:id — public route (no auth required)
+// GET /profiles/user/:id — public route (no auth required)
 // ============================================================
-describe("GET /profile/user/:id", () => {
+describe("GET /profiles/user/:id", () => {
   test("returns 200 with wrapped profile when found", async () => {
     const userId = newId();
     const mockProfile = mkProfile({ userId });
@@ -32,7 +32,7 @@ describe("GET /profile/user/:id", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: `/profile/user/${userId.toString()}`,
+      url: `/profiles/user/${userId.toString()}`,
     });
 
     assert.equal(reply.statusCode, 200);
@@ -44,17 +44,17 @@ describe("GET /profile/user/:id", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: `/profile/user/${newId().toString()}`,
+      url: `/profiles/user/${newId().toString()}`,
     });
 
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "PROFILE_NOT_FOUND", message: "Profile not found" });
+    assert.deepEqual(reply.json(), { code: "PROFILE_NOT_FOUND", message: "Profile not found", requestId: reply.json().requestId });
   });
 
   test("returns 400 VALIDATION_ERROR for malformed id", async () => {
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/user/not-an-objectid",
+      url: "/profiles/user/not-an-objectid",
     });
 
     assert.equal(reply.statusCode, 400);
@@ -68,10 +68,10 @@ describe("GET /profile/user/:id", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: `/profile/user/${newId().toString()}`,
+      url: `/profiles/user/${newId().toString()}`,
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
   });
 });

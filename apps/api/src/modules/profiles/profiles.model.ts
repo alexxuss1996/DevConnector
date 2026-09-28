@@ -151,6 +151,13 @@ const profileSchema = new Schema<IProfile>(
   },
 );
 
+// The public directory sorts by newest and pages with skip/limit; without this
+// every list request is a collection scan plus an in-memory sort.
+profileSchema.index({ createdAt: -1 });
+
 const Profile = mongoose.model<IProfile>("Profile", profileSchema);
+
+/** A loaded profile document, with the Mongoose helpers the service relies on. */
+export type ProfileDocument = mongoose.Document & IProfile & { _id: Types.ObjectId };
 
 export default Profile;

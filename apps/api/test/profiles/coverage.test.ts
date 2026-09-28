@@ -1,10 +1,10 @@
 import { describe, test, before, after, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import Profile from "#modules/profile/profile.model";
+import Profile from "#modules/profiles/profiles.model";
 import User from "#modules/users/user.model";
 import Post from "#modules/posts/posts.model";
 import Session from "#modules/auth/session.model";
-import { profileService } from "#modules/profile/profile.service";
+import { profileService } from "#modules/profiles/profiles.service";
 import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
 import { buildApp, signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import mongoose, { Types } from "mongoose";
@@ -73,7 +73,10 @@ describe("createOrUpdateProfile — uncovered branches", () => {
     const spy = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null as any));
 
     const result = await profileService.createOrUpdateProfile(userId, {} as any);
-    assert.deepEqual(result, existing.toJSON());
+    // Empty updates short-circuit to the existing profile, normalised for the
+    // public response contract.
+    assert.equal(result._id, String(existing._id));
+    assert.equal(result.userId._id, userId);
     assert.equal(spy.mock.callCount(), 0);
   });
 
@@ -134,9 +137,9 @@ describe("createOrUpdateProfile — uncovered branches", () => {
 
 
 // ============================================================
-// GET /profile/ — uncovered 21-24
+// GET /profiles/ — uncovered 21-24
 // ============================================================
-describe("GET /profile/ — uncovered", () => {
+describe("GET /profiles/ — uncovered", () => {
   test("returns 200 with profiles array (public, no auth required)", async () => {
     const p1 = mkProfile({ status: "Dev", skills: ["JS"] });
     const p2 = mkProfile({ status: "Manager", skills: ["Leadership"] });
@@ -144,37 +147,52 @@ describe("GET /profile/ — uncovered", () => {
     // Our service does Profile.find().populate(...)
     // mkQuery for array needs to support populate chain; mkQuery already does
     stubMethod(Profile, "find", () => mkQuery([p1, p2] as any));
+    stubMethod(Profile, "countDocuments", () => mkQuery(2) as any);
 
-    const reply = await app.inject({ method: "GET", url: "/profile/" });
+    const reply = await app.inject({ method: "GET", url: "/profiles/" });
     assert.equal(reply.statusCode, 200);
     const body = reply.json() as any;
     assert.ok(Array.isArray(body.profiles));
     assert.equal(body.profiles.length, 2);
+    assert.equal(body.total, 2);
+    assert.equal(body.page, 1);
+    assert.equal(body.limit, 20);
+    // List entries use the summary projection, not the full profile. Only the
+    // populated fields are emitted; no experience/education/bio leak through.
+    assert.deepEqual(Object.keys(body.profiles[0]).sort(), [
+      "_id",
+      "skills",
+      "status",
+      "userId",
+    ]);
   });
 
   test("returns 200 with empty array when no profiles", async () => {
     stubMethod(Profile, "find", () => mkQuery([] as any));
-    const reply = await app.inject({ method: "GET", url: "/profile/" });
+    stubMethod(Profile, "countDocuments", () => mkQuery(0) as any);
+    const reply = await app.inject({ method: "GET", url: "/profiles/" });
     assert.equal(reply.statusCode, 200);
-    assert.deepEqual((reply.json() as any).profiles, []);
+    const body = reply.json() as any;
+    assert.deepEqual(body.profiles, []);
+    assert.equal(body.total, 0);
   });
 
   test("returns 500 on DB error", async () => {
     stubMethod(Profile, "find", () => {
       throw new Error("DB boom");
     });
-    const reply = await app.inject({ method: "GET", url: "/profile/" });
+    const reply = await app.inject({ method: "GET", url: "/profiles/" });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
   });
 });
 
 // ============================================================
-// DELETE /profile/ — uncovered 32-35 (and service 96-106)
+// DELETE /profiles/ — uncovered 32-35 (and service 96-106)
 // ============================================================
-describe("DELETE /profile/ — authentication and logic", () => {
+describe("DELETE /profiles/ — authentication and logic", () => {
   test("returns 401 without token", async () => {
-    const reply = await app.inject({ method: "DELETE", url: "/profile/" });
+    const reply = await app.inject({ method: "DELETE", url: "/profiles/" });
     assert.equal(reply.statusCode, 401);
   });
 
@@ -182,7 +200,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
     const refresh = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${refresh}` },
     });
     assert.equal(reply.statusCode, 401);
@@ -202,7 +220,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/",
+      url: "/profiles/",
       cookies: { access_token: token },
     });
     assert.equal(reply.statusCode, 204);
@@ -213,7 +231,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
     stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(null));
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
@@ -228,7 +246,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
@@ -248,7 +266,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
 
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
     });
     assert.equal(reply.statusCode, 204);
@@ -274,7 +292,7 @@ describe("DELETE /profile/ — authentication and logic", () => {
     });
     const reply = await app.inject({
       method: "DELETE",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 500);
@@ -282,13 +300,13 @@ describe("DELETE /profile/ — authentication and logic", () => {
 });
 
 // ============================================================
-// POST /profile/experience — addExperience (108-136)
+// POST /profiles/experience — addExperience (108-136)
 // ============================================================
-describe("POST /profile/experience — authentication", () => {
+describe("POST /profiles/experience — authentication", () => {
   test("returns 401 without token", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
     assert.equal(reply.statusCode, 401);
@@ -302,7 +320,7 @@ describe("POST /profile/experience — authentication", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       cookies: { access_token: token },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
@@ -310,11 +328,11 @@ describe("POST /profile/experience — authentication", () => {
   });
 });
 
-describe("POST /profile/experience — validation", () => {
+describe("POST /profiles/experience — validation", () => {
   test("returns 400 when title missing", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: authHeader(),
       payload: { company: "Acme", from: "2023-01-01" } as any,
     });
@@ -325,7 +343,7 @@ describe("POST /profile/experience — validation", () => {
   test("returns 400 when company missing", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: authHeader(),
       payload: { title: "Dev", from: "2023-01-01" } as any,
     });
@@ -335,7 +353,7 @@ describe("POST /profile/experience — validation", () => {
   test("returns 400 when from is not date", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: authHeader(),
       payload: { title: "Dev", company: "Acme", from: "not-a-date" },
     });
@@ -345,7 +363,7 @@ describe("POST /profile/experience — validation", () => {
   test("returns 400 when to is not date", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: authHeader(),
       payload: { title: "Dev", company: "Acme", from: "2023-01-01", to: "bad-date" },
     });
@@ -353,12 +371,12 @@ describe("POST /profile/experience — validation", () => {
   });
 });
 
-describe("POST /profile/experience — logic (108-136)", () => {
+describe("POST /profiles/experience — logic (108-136)", () => {
   test("returns 404 when profile not found", async () => {
     stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null));
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: authHeader(),
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
@@ -383,7 +401,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload,
     });
@@ -409,7 +427,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
@@ -427,7 +445,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01", current: true },
     });
@@ -445,7 +463,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
@@ -459,7 +477,7 @@ describe("POST /profile/experience — logic (108-136)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/experience",
+      url: "/profiles/experience",
       headers: authHeader(),
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
@@ -468,24 +486,24 @@ describe("POST /profile/experience — logic (108-136)", () => {
 });
 
 // ============================================================
-// POST /profile/education — addEducation (139-167)
+// POST /profiles/education — addEducation (139-167)
 // ============================================================
-describe("POST /profile/education — authentication", () => {
+describe("POST /profiles/education — authentication", () => {
   test("returns 401 without token", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });
     assert.equal(reply.statusCode, 401);
   });
 });
 
-describe("POST /profile/education — validation", () => {
+describe("POST /profiles/education — validation", () => {
   test("returns 400 when school missing", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: authHeader(),
       payload: { degree: "BS", fieldofstudy: "CS", from: "2020-01-01" } as any,
     });
@@ -495,7 +513,7 @@ describe("POST /profile/education — validation", () => {
   test("returns 400 when degree missing", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: authHeader(),
       payload: { school: "MIT", fieldofstudy: "CS", from: "2020-01-01" } as any,
     });
@@ -505,7 +523,7 @@ describe("POST /profile/education — validation", () => {
   test("returns 400 when fieldofstudy missing", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: authHeader(),
       payload: { school: "MIT", degree: "BS", from: "2020-01-01" } as any,
     });
@@ -515,7 +533,7 @@ describe("POST /profile/education — validation", () => {
   test("returns 400 when from is not date", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: authHeader(),
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "bad" },
     });
@@ -523,12 +541,12 @@ describe("POST /profile/education — validation", () => {
   });
 });
 
-describe("POST /profile/education — logic (139-167)", () => {
+describe("POST /profiles/education — logic (139-167)", () => {
   test("returns 404 when profile not found", async () => {
     stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null));
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: authHeader(),
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });
@@ -552,7 +570,7 @@ describe("POST /profile/education — logic (139-167)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload,
     });
@@ -574,7 +592,7 @@ describe("POST /profile/education — logic (139-167)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });
@@ -590,7 +608,7 @@ describe("POST /profile/education — logic (139-167)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01", current: true },
     });
@@ -606,7 +624,7 @@ describe("POST /profile/education — logic (139-167)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });
@@ -620,7 +638,7 @@ describe("POST /profile/education — logic (139-167)", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/education",
+      url: "/profiles/education",
       headers: authHeader(),
       payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
     });

@@ -1,10 +1,11 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import Profile from "#modules/profile/profile.model";
+import Profile from "#modules/profiles/profiles.model";
 import {
   newId,
   mkProfile,
   mkQuery,
+  createdDoc,
   stubMethod,
   restoreAllStubs,
 } from "../helpers/stubs.ts";
@@ -35,24 +36,25 @@ function validProfilePayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("POST /profile — authentication", () => {
+describe("POST /profiles — create-only — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
   test("returns 401 for an empty Bearer token", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: "Bearer " },
       payload: validProfilePayload(),
     });
@@ -60,6 +62,7 @@ describe("POST /profile — authentication", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -70,7 +73,7 @@ describe("POST /profile — authentication", () => {
     });
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${refreshToken}` },
       payload: validProfilePayload(),
     });
@@ -78,6 +81,7 @@ describe("POST /profile — authentication", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -85,7 +89,7 @@ describe("POST /profile — authentication", () => {
     const token = signAccessToken(app, { sub: newId().toString() });
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${token}x` },
       payload: validProfilePayload(),
     });
@@ -93,6 +97,7 @@ describe("POST /profile — authentication", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -103,18 +108,20 @@ describe("POST /profile — authentication", () => {
     stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(mockDoc as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       cookies: { access_token: accessToken },
       payload: validProfilePayload(),
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
   });
 });
 
-describe("POST /profile — validation", () => {
+describe("POST /profiles — create-only — validation", () => {
   function authHeader() {
     return {
       authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}`,
@@ -124,7 +131,7 @@ describe("POST /profile — validation", () => {
   test("returns 400 when status is missing", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
       payload: { skills: ["JS"] },
     });
@@ -148,7 +155,7 @@ describe("POST /profile — validation", () => {
   test("returns 400 when skills is missing", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
       payload: { status: "Developer" },
     });
@@ -159,7 +166,7 @@ describe("POST /profile — validation", () => {
   test("returns 400 when skills is empty array", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
       payload: { status: "Developer", skills: [] },
     });
@@ -170,7 +177,7 @@ describe("POST /profile — validation", () => {
   test("returns 400 when website is not a uri", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
       payload: validProfilePayload({ website: "not-a-uri" }),
     });
@@ -201,7 +208,7 @@ describe("POST /profile — validation", () => {
     ]) {
       const reply = await app.inject({
         method: "POST",
-        url: "/profile/",
+        url: "/profiles/",
         headers: authHeader(),
         payload: validProfilePayload({ [field]: "not-a-uri" }),
       });
@@ -213,7 +220,7 @@ describe("POST /profile — validation", () => {
   test("returns 400 when bio exceeds 500 chars", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: authHeader(),
       payload: validProfilePayload({ bio: "a".repeat(501) }),
     });
@@ -227,21 +234,23 @@ describe("POST /profile — validation", () => {
     stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(mockDoc as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: {
         authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
       },
       payload: { status: "Developer", skills: ["JS"] },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     assert.equal((reply.json() as any).profile.status, "Developer");
   });
 });
 
-describe("POST /profile — createOrUpdate logic", () => {
+describe("POST /profiles — create-only — createOrUpdate logic", () => {
   test("creates profile and returns 200 with the persisted document", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
@@ -262,18 +271,20 @@ describe("POST /profile — createOrUpdate logic", () => {
         linkedin: (payload as any).linkedin as string,
       },
     });
-    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+    stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     const body = reply.json() as any;
     assert.ok(body.profile);
     assert.equal(body.profile.company, "Acme");
@@ -281,13 +292,8 @@ describe("POST /profile — createOrUpdate logic", () => {
     assert.equal(body.profile.status, "Developer");
     assert.deepEqual(body.profile.skills, ["JavaScript", "Node.js"]);
     // Verify service was called with correct filter and $set using dot-notation for social
-    assert.equal(findOneAndUpdate.mock.callCount(), 1);
-    const [filter, update, options] = findOneAndUpdate.mock.calls[0]
-      .arguments as any[];
-    assert.deepEqual(filter, { userId: userId.toString() });
-    assert.equal(options.upsert, true);
-    assert.equal(options.returnDocument, "after");
-    assert.equal(options.setDefaultsOnInsert, true);
+    assert.equal(create.mock.callCount(), 1);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set.status, "Developer");
     assert.equal(update.$set.company, "Acme");
     assert.equal(update.$set["social.twitter"], "https://twitter.com/jane");
@@ -312,16 +318,19 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set["social.facebook"], "https://facebook.com/jane");
     assert.equal(update.$set.social, undefined);
     // other social keys should not be set
@@ -337,16 +346,19 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.ok(
       !Object.keys(update.$set).some((k: string) => k.startsWith("social.")),
     );
@@ -362,15 +374,18 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set.company, undefined);
     assert.equal(update.$set.website, undefined);
     assert.equal(update.$set.location, undefined);
@@ -398,16 +413,19 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set["social.youtube"], "https://youtube.com/c/jane");
     assert.equal(update.$set["social.twitter"], "https://twitter.com/jane");
     assert.equal(update.$set["social.facebook"], "https://facebook.com/jane");
@@ -426,16 +444,19 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set.website, "http://example.com");
   });
 
@@ -447,19 +468,22 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set.website, undefined);
-    assert.equal(update.$unset.website, 1);
-  });
+    // Nothing to unset on an insert: rejected fields are simply absent.
+    assert.equal("website" in update.$set, false);  });
 
   test("unsets a github username that sanitizes to nothing", async () => {
     const userId = newId();
@@ -468,19 +492,22 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload: validProfilePayload({ githubusername: "<script>x</script>" }),
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set.githubusername, undefined);
-    assert.equal(update.$unset.githubusername, 1);
-  });
+    // Nothing to unset on an insert: rejected fields are simply absent.
+    assert.equal("githubusername" in update.$set, false);  });
 
   test("stores plain-text fields with ampersands intact", async () => {
     const userId = newId();
@@ -493,16 +520,19 @@ describe("POST /profile — createOrUpdate logic", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload,
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set.company, "R&D");
     assert.equal(update.$set.bio, "Likes JS & TS");
   });
@@ -512,22 +542,24 @@ describe("POST /profile — createOrUpdate logic", () => {
     const otherId = newId().toString();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
     const persisted = mkProfile({ userId });
-    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+    stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload: { ...validProfilePayload(), userId: otherId } as any,
     });
 
-    // TypeBox strips unknown props, but filter must still be JWT sub
-    assert.equal(reply.statusCode, 200);
-    const [filter] = findOneAndUpdate.mock.calls[0].arguments as any[];
-    assert.equal(filter.userId, userId.toString());
-    assert.notEqual(filter.userId, otherId);
+    // TypeBox strips unknown props, but the owner must still be the JWT sub.
+    assert.equal(reply.statusCode, 201);
+    const [doc] = create.mock.calls[0].arguments as any[];
+    assert.equal(String(doc.userId), userId.toString());
+    assert.notEqual(String(doc.userId), otherId);
   });
 
   test("returns 500 for unexpected service error", async () => {
@@ -538,7 +570,7 @@ describe("POST /profile — createOrUpdate logic", () => {
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: {
         authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
       },
@@ -549,11 +581,12 @@ describe("POST /profile — createOrUpdate logic", () => {
     assert.deepEqual(reply.json(), {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
+      requestId: reply.json().requestId,
     });
   });
 });
 
-describe("POST /profile — wipe via null", () => {
+describe("POST /profiles — create-only — wipe via null", () => {
   test("wipes a top-level optional field when null is sent", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
@@ -561,18 +594,21 @@ describe("POST /profile — wipe via null", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload: validProfilePayload({ company: null }),
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
-    assert.equal(update.$unset.company, 1);
-    assert.equal(update.$set?.company, undefined);
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
+    // Nothing to unset on an insert: rejected fields are simply absent.
+    assert.equal("company" in update.$set, false);    assert.equal(update.$set?.company, undefined);
   });
 
   test("wipes multiple top-level fields and social fields together", async () => {
@@ -582,10 +618,12 @@ describe("POST /profile — wipe via null", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload: validProfilePayload({
         company: null,
@@ -595,12 +633,14 @@ describe("POST /profile — wipe via null", () => {
       }),
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
-    assert.equal(update.$unset.company, 1);
-    assert.equal(update.$unset.website, 1);
-    assert.equal(update.$unset["social.twitter"], 1);
-    assert.equal(update.$unset["social.linkedin"], 1);
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
+    // Nothing to unset on an insert: rejected fields are simply absent.
+    assert.equal("company" in update.$set, false);    // Nothing to unset on an insert: the field is simply absent.
+    assert.equal("website" in update.$set, false);
+    assert.equal("social.twitter" in update.$set, false);
+    assert.equal("social.linkedin" in update.$set, false);
     assert.equal(update.$set?.company, undefined);
   });
 
@@ -611,19 +651,21 @@ describe("POST /profile — wipe via null", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload: validProfilePayload({ twitter: null }),
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
-    assert.equal(update.$unset["social.twitter"], 1);
-    assert.equal(update.$set?.["social.twitter"], undefined);
-    assert.equal(update.$unset["social.linkedin"], undefined);
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
+    assert.equal("social.twitter" in update.$set, false);
+    assert.equal("social.linkedin" in update.$set, false);
   });
 
   test("mixes $set and $unset in same request", async () => {
@@ -633,10 +675,12 @@ describe("POST /profile — wipe via null", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${accessToken}` },
       payload: validProfilePayload({
         company: "NewCo",
@@ -645,12 +689,13 @@ describe("POST /profile — wipe via null", () => {
       }),
     });
 
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
     assert.equal(update.$set.company, "NewCo");
     assert.equal(update.$set["social.facebook"], "https://facebook.com/new");
-    assert.equal(update.$unset.website, 1);
-  });
+    // Nothing to unset on an insert: rejected fields are simply absent.
+    assert.equal("website" in update.$set, false);  });
 
   test("wipes optional fields when empty string is sent (form-friendly)", async () => {
     const userId = newId();
@@ -669,9 +714,11 @@ describe("POST /profile — wipe via null", () => {
       const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
         Promise.resolve(persisted as any),
       );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
       const reply = await app.inject({
         method: "POST",
-        url: "/profile/",
+        url: "/profiles/",
         headers: {
           authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
         },
@@ -679,11 +726,17 @@ describe("POST /profile — wipe via null", () => {
       });
       assert.equal(
         reply.statusCode,
-        200,
-        `should 200 for ${JSON.stringify(payload)}`,
+        201,
+        `should 201 for ${JSON.stringify(payload)}`,
       );
-      const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
-      assert.equal(update.$unset[unsetKey], 1, `should unset ${unsetKey}`);
+      assert.equal(findOneAndUpdate.mock.callCount(), 0);
+      const update = { $set: createdDoc(create) };
+      // An insert has nothing to unset: a blank value is simply not written.
+      assert.equal(
+        unsetKey in update.$set,
+        false,
+        `should not write ${unsetKey}`,
+      );
       restoreAllStubs();
     }
   });
@@ -694,18 +747,21 @@ describe("POST /profile — wipe via null", () => {
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
     );
+    stubMethod(Profile, "exists", () => Promise.resolve(null));
+    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: {
         authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
       },
       payload: validProfilePayload({ company: "   " }),
     });
-    assert.equal(reply.statusCode, 200);
-    const [, update] = findOneAndUpdate.mock.calls[0].arguments as any[];
-    assert.equal(update.$unset.company, 1);
-  });
+    assert.equal(reply.statusCode, 201);
+    assert.equal(findOneAndUpdate.mock.callCount(), 0);
+    const update = { $set: createdDoc(create) };
+    // Nothing to unset on an insert: rejected fields are simply absent.
+    assert.equal("company" in update.$set, false);  });
 
   test("returns 400 for empty required fields", async () => {
     const userId = newId();
@@ -717,7 +773,7 @@ describe("POST /profile — wipe via null", () => {
     for (const payload of cases) {
       const reply = await app.inject({
         method: "POST",
-        url: "/profile/",
+        url: "/profiles/",
         headers: {
           authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
         },
@@ -740,7 +796,7 @@ describe("POST /profile — wipe via null", () => {
     ]) {
       const reply = await app.inject({
         method: "POST",
-        url: "/profile/",
+        url: "/profiles/",
         headers: {
           authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
         },
@@ -752,13 +808,14 @@ describe("POST /profile — wipe via null", () => {
   });
 });
 
-describe("GET /profile/me — authentication", () => {
+describe("GET /profiles/me — authentication", () => {
   test("returns 401 without a token", async () => {
-    const reply = await app.inject({ method: "GET", url: "/profile/me" });
+    const reply = await app.inject({ method: "GET", url: "/profiles/me" });
     assert.equal(reply.statusCode, 401);
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -769,13 +826,14 @@ describe("GET /profile/me — authentication", () => {
     });
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -791,7 +849,7 @@ describe("GET /profile/me — authentication", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       cookies: { access_token: accessToken },
     });
     assert.equal(reply.statusCode, 200);
@@ -799,7 +857,7 @@ describe("GET /profile/me — authentication", () => {
   });
 });
 
-describe("GET /profile/me — logic", () => {
+describe("GET /profiles/me — logic", () => {
   test("returns 200 with the profile when found", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
@@ -815,7 +873,7 @@ describe("GET /profile/me — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       headers: { authorization: `Bearer ${accessToken}` },
     });
 
@@ -833,7 +891,7 @@ describe("GET /profile/me — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       headers: {
         authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
       },
@@ -854,7 +912,7 @@ describe("GET /profile/me — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       headers: {
         authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
       },
@@ -864,7 +922,9 @@ describe("GET /profile/me — logic", () => {
     // Verify findOne was called with correct filter and populate args
     assert.equal(findOneStub.mock.callCount(), 1);
     const [filter] = findOneStub.mock.calls[0].arguments as any[];
-    assert.deepEqual(filter, { userId: userId.toString() });
+    // One query matches either the user id or the profile _id.
+    const id = userId.toString();
+    assert.deepEqual(filter, { $or: [{ userId: id }, { _id: id }] });
     // mkQuery.populate is a no-op but we can ensure it was at least a query;
     // the service calls .populate("userId", ["name","avatar"])
   });
@@ -876,7 +936,7 @@ describe("GET /profile/me — logic", () => {
 
     const reply = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       headers: {
         authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}`,
       },
@@ -886,6 +946,7 @@ describe("GET /profile/me — logic", () => {
     assert.deepEqual(reply.json(), {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
+      requestId: reply.json().requestId,
     });
   });
 });

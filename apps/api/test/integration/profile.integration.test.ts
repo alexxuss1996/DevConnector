@@ -58,7 +58,7 @@ describe("integration — profile", () => {
     // Create profile
     const createReply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers,
       payload: {
         status: "Developer",
@@ -67,7 +67,7 @@ describe("integration — profile", () => {
         website: "https://example.com",
       },
     });
-    assert.equal(createReply.statusCode, 200);
+    assert.equal(createReply.statusCode, 201);
     const profile = createReply.json().profile as {
       _id: string;
       status: string;
@@ -79,10 +79,10 @@ describe("integration — profile", () => {
     assert.deepEqual(profile.skills, ["JavaScript", "TypeScript"]);
     assert.equal(profile.company, "Acme Corp");
 
-    // Read own profile via /profile/me
+    // Read own profile via /profiles/me
     const meReply = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       headers,
     });
     assert.equal(meReply.statusCode, 200);
@@ -91,15 +91,15 @@ describe("integration — profile", () => {
     // Read by user id (public)
     const byIdReply = await app.inject({
       method: "GET",
-      url: `/profile/user/${userId}`,
+      url: `/profiles/user/${userId}`,
     });
     assert.equal(byIdReply.statusCode, 200);
     assert.equal((byIdReply.json().profile as any).status, "Developer");
 
     // Update profile
     const updateReply = await app.inject({
-      method: "PUT",
-      url: "/profile/",
+      method: "PATCH",
+      url: "/profiles/",
       headers,
       payload: { company: "Globex Inc", bio: "Full-stack dev" },
     });
@@ -113,7 +113,7 @@ describe("integration — profile", () => {
   test("cannot create profile without authentication", async () => {
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       payload: { status: "Dev", skills: ["JS"] },
     });
     assert.equal(reply.statusCode, 401);
@@ -123,7 +123,7 @@ describe("integration — profile", () => {
     const { headers } = await setupBasicUser(testEmail("invalid-profile"));
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers,
       payload: { skills: ["JS"] }, // missing status
     });
@@ -138,21 +138,21 @@ describe("integration — profile", () => {
     // Create profiles
     await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: userA.headers,
       payload: { status: "Designer", skills: ["Figma"] },
     });
     await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: userB.headers,
       payload: { status: "PM", skills: ["Jira"] },
     });
 
     // User B tries to overwrite User A's profile
     const reply = await app.inject({
-      method: "PUT",
-      url: "/profile/",
+      method: "PATCH",
+      url: "/profiles/",
       headers: userB.headers,
       payload: { status: "Hacked", skills: ["Phishing"] },
     });
@@ -164,7 +164,7 @@ describe("integration — profile", () => {
     // Verify A's profile is unchanged
     const aProfile = await app.inject({
       method: "GET",
-      url: "/profile/me",
+      url: "/profiles/me",
       headers: userA.headers,
     });
     assert.equal((aProfile.json().profile as any).status, "Designer");
@@ -175,7 +175,7 @@ describe("integration — profile", () => {
     // Valid https URL
     const valid = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers,
       payload: {
         status: "Dev",
@@ -183,13 +183,13 @@ describe("integration — profile", () => {
         twitter: "https://twitter.com/jane",
       },
     });
-    assert.equal(valid.statusCode, 200);
+    assert.equal(valid.statusCode, 201);
     assert.equal((valid.json().profile as any).social.twitter, "https://twitter.com/jane");
 
     // Invalid (non-URI)
     const invalid = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers,
       payload: {
         status: "Dev",
@@ -207,7 +207,7 @@ describe("integration — profile", () => {
       const { headers } = await setupBasicUser(email);
       await app.inject({
         method: "POST",
-        url: "/profile/",
+        url: "/profiles/",
         headers,
         payload: {
           status: `Role ${i}`,
@@ -218,7 +218,7 @@ describe("integration — profile", () => {
 
     const listReply = await app.inject({
       method: "GET",
-      url: "/profile/?limit=50",
+      url: "/profiles/?limit=50",
     });
     assert.equal(listReply.statusCode, 200);
     const profiles = listReply.json().profiles as Array<{ status: string }>;
@@ -229,7 +229,7 @@ describe("integration — profile", () => {
     const { headers } = await setupBasicUser(testEmail("github"));
     const reply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers,
       payload: {
         status: "Dev",
@@ -237,7 +237,7 @@ describe("integration — profile", () => {
         githubusername: "octocat",
       },
     });
-    assert.equal(reply.statusCode, 200);
+    assert.equal(reply.statusCode, 201);
     assert.equal((reply.json().profile as any).githubusername, "octocat");
   });
 });

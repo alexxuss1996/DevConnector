@@ -7,53 +7,61 @@ import type {
   GithubUsernameParams,
   ExperienceIdParams,
   EducationIdParams,
-  Profile,
+  PublicProfile,
+  PublicProfileSummary,
 } from "@dev-conn/contracts";
 import { ApiClient, toQuery, type PaginationParams } from "@/lib/api/client";
 
 export class ProfileApiClient extends ApiClient {
-  createOrUpdateProfile(data: CreateProfileInput): Promise<{ profile: Profile }> {
-    return this.post<{ profile: Profile }>("/profile/", data);
+  createProfile(data: CreateProfileInput): Promise<{ profile: PublicProfile }> {
+    return this.post<{ profile: PublicProfile }>("/profiles/", data);
   }
 
-  updateProfile(data: UpdateProfileInput): Promise<{ profile: Profile }> {
-    return this.put<{ profile: Profile }>("/profile/", data);
+  updateProfile(data: UpdateProfileInput): Promise<{ profile: PublicProfile }> {
+    return this.patch<{ profile: PublicProfile }>("/profiles/", data);
   }
 
-  getProfiles(params: PaginationParams = {}): Promise<{ profiles: Profile[] }> {
-    return this.get<{ profiles: Profile[] }>(`/profile/${toQuery(params)}`);
+  getProfiles(
+    params: PaginationParams = {},
+  ): Promise<{ profiles: PublicProfileSummary[]; total: number; page: number; limit: number }> {
+    return this.get<{
+      profiles: PublicProfileSummary[];
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/profiles/${toQuery(params)}`);
   }
 
-  getMyProfile(): Promise<{ profile: Profile }> {
-    return this.get<{ profile: Profile }>("/profile/me");
+  getMyProfile(): Promise<{ profile: PublicProfile }> {
+    return this.get<{ profile: PublicProfile }>("/profiles/me");
   }
 
-  getProfileById(params: ProfileIdParams): Promise<{ profile: Profile }> {
-    return this.get<{ profile: Profile }>(`/profile/user/${params.id}`);
+  getProfileById(params: ProfileIdParams): Promise<{ profile: PublicProfile }> {
+    return this.get<{ profile: PublicProfile }>(`/profiles/user/${params.id}`);
   }
 
   getGithubRepos(params: GithubUsernameParams): Promise<unknown> {
-    return this.get<unknown>(`/profile/github/${params.username}`);
+    return this.get<unknown>(`/profiles/github/${params.username}`);
   }
 
-  addExperience(data: AddExperienceInput): Promise<{ profile: Profile }> {
-    return this.post<{ profile: Profile }>("/profile/experience", data);
+  addExperience(data: AddExperienceInput): Promise<{ profile: PublicProfile }> {
+    return this.post<{ profile: PublicProfile }>("/profiles/experience", data);
   }
 
-  deleteExperience(params: ExperienceIdParams): Promise<{ profile: Profile }> {
-    return this.delete<{ profile: Profile }>(`/profile/experience/${params.experienceId}`);
+  deleteExperience(params: ExperienceIdParams): Promise<{ profile: PublicProfile }> {
+    return this.delete<{ profile: PublicProfile }>(`/profiles/experience/${params.experienceId}`);
   }
 
-  addEducation(data: AddEducationInput): Promise<{ profile: Profile }> {
-    return this.post<{ profile: Profile }>("/profile/education", data);
+  addEducation(data: AddEducationInput): Promise<{ profile: PublicProfile }> {
+    return this.post<{ profile: PublicProfile }>("/profiles/education", data);
   }
 
-  deleteEducation(params: EducationIdParams): Promise<{ profile: Profile }> {
-    return this.delete<{ profile: Profile }>(`/profile/education/${params.educationId}`);
+  deleteEducation(params: EducationIdParams): Promise<{ profile: PublicProfile }> {
+    return this.delete<{ profile: PublicProfile }>(`/profiles/education/${params.educationId}`);
   }
 
   deleteProfile(): Promise<void> {
-    return this.delete<void>("/profile/");
+    return this.delete<void>("/profiles/");
   }
 }
 

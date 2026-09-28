@@ -323,51 +323,52 @@ export const EducationSchema = Type.Object(
   { additionalProperties: false },
 );
 
-/** Profile document as returned by the API (JSON-serialised Mongoose doc). */
-export const ProfileSchema = Type.Object(
+/**
+ * The profile owner as returned by the profile GET endpoints, which populate
+ * `userId` with the user's `_id`, `name` and `avatar` instead of the bare id
+ * stored on the document. This is why the response schemas below model
+ * `userId` as an object rather than an ObjectId string.
+ */
+export const ProfileOwnerSchema = Type.Object(
   {
     _id: Type.String({ description: "ObjectId hex string" }),
-    userId: Type.String({ description: "ObjectId hex string" }),
-    company: Type.Optional(
-      Type.Union([
-        Type.String({ minLength: 1, description: "Company name" }),
-        Type.Literal(""),
-        Type.Null(),
-      ]),
+    name: Type.Optional(Type.String()),
+    avatar: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export type ProfileOwner = Static<typeof ProfileOwnerSchema>;
+
+/** Optional profile text fields, stored unset when the value is blank. */
+const OptionalText = (description: string, examples: string[]) =>
+  Type.Optional(
+    Type.Union(
+      [Type.String({ description, examples }), Type.Literal(""), Type.Null()],
+      { default: undefined },
     ),
-    website: Type.Optional(
-      Type.Union([
-        Type.String({ format: "uri", description: "Personal or company website" }),
-        Type.Literal(""),
-        Type.Null(),
-      ]),
-    ),
-    location: Type.Optional(
-      Type.Union([
-        Type.String({ minLength: 1, description: "Location, e.g. Seattle, WA" }),
-        Type.Literal(""),
-        Type.Null(),
-      ]),
-    ),
+  );
+
+/**
+ * A profile as returned by the single-profile reads (`GET /profiles/user/:id`,
+ * `GET /profiles/me`) and every profile write. Declared with
+ * `additionalProperties: false` so the Fastify response serializer strips
+ * anything not listed here.
+ */
+export const PublicProfileSchema = Type.Object(
+  {
+    _id: Type.String({ description: "ObjectId hex string" }),
+    userId: ProfileOwnerSchema,
+    company: OptionalText("Company name", ["Acme Corp"]),
+    website: OptionalText("Personal or company website", ["https://example.com"]),
+    location: OptionalText("Location, e.g. Seattle, WA", ["Seattle, WA"]),
     status: Type.String({ minLength: 1, pattern: ".*\\S.*", description: "Professional status" }),
     skills: Type.Array(
       Type.String({ minLength: 1, pattern: ".*\\S.*", description: "A skill" }),
       { minItems: 1 },
     ),
-    bio: Type.Optional(
-      Type.Union([
-        Type.String({ minLength: 1, maxLength: 500, description: "Short bio" }),
-        Type.Literal(""),
-        Type.Null(),
-      ]),
-    ),
-    githubusername: Type.Optional(
-      Type.Union([
-        Type.String({ minLength: 1, description: "GitHub username" }),
-        Type.Literal(""),
-        Type.Null(),
-      ]),
-    ),
+    bio: OptionalText("Short bio", ["Full-stack developer"]),
+    githubusername: OptionalText("GitHub username", ["octocat"]),
     experience: Type.Array(ExperienceSchema),
     education: Type.Array(EducationSchema),
     social: Type.Object(
@@ -380,10 +381,107 @@ export const ProfileSchema = Type.Object(
       },
       { additionalProperties: false },
     ),
+    createdAt: Type.Optional(Type.String({ format: "date-time", description: "ISO timestamp" })),
+    updatedAt: Type.Optional(Type.String({ format: "date-time", description: "ISO timestamp" })),
   },
   { additionalProperties: false },
 );
 
-export type Profile = Static<typeof ProfileSchema>;
+/**
+ * The subset a directory listing needs. `GET /profiles/` projects down to
+ * this, so the heavy subdocuments (`experience`, `education`) and the private
+ * `social` block are never sent for a list page.
+ */
+export const PublicProfileSummarySchema = Type.Object(
+  {
+    _id: Type.String({ description: "ObjectId hex string" }),
+    userId: ProfileOwnerSchema,
+    status: Type.String({ minLength: 1, pattern: ".*\\S.*", description: "Professional status" }),
+    company: OptionalText("Company name", ["Acme Corp"]),
+    location: OptionalText("Location, e.g. Seattle, WA", ["Seattle, WA"]),
+    skills: Type.Array(
+      Type.String({ minLength: 1, pattern: ".*\\S.*", description: "A skill" }),
+      { minItems: 1 },
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export const ProfileResponseSchema = Type.Object(
+  { profile: PublicProfileSchema },
+  { additionalProperties: false },
+);
+
+export const ProfileListResponseSchema = Type.Object(
+  {
+    profiles: Type.Array(PublicProfileSummarySchema),
+    total: Type.Integer({ minimum: 0, description: "Total profiles matching the query" }),
+    page: Type.Integer({ minimum: 1 }),
+    limit: Type.Integer({ minimum: 1, maximum: 100 }),
+  },
+  { additionalProperties: false },
+);
+
+export type PublicProfile = Static<typeof PublicProfileSchema>;
+export type PublicProfileSummary = Static<typeof PublicProfileSummarySchema>;
+export type ProfileResponse = Static<typeof ProfileResponseSchema>;
+export type ProfileListResponse = Static<typeof ProfileListResponseSchema>;
 export type Experience = Static<typeof ExperienceSchema>;
 export type Education = Static<typeof EducationSchema>;
+
+/**
+ * Error body shared by every endpoint. `additionalProperties: true` on purpose:
+ * validation failures add `issues` and `fieldErrors`, and a strict schema here
+ * would silently strip them.
+ */
+export const ErrorResponseSchema = Type.Object(
+  {
+    code: Type.String({ description: "Stable machine-readable error code" }),
+    message: Type.String(),
+    requestId: Type.Optional(Type.String({ description: "Echoes X-Request-Id" })),
+  },
+  { additionalProperties: true },
+);
+
+export type ErrorResponse = Static<typeof ErrorResponseSchema>;
+
+/**
+ * Pagination query string. The API receives querystring values as strings and
+ * AJV runs with `coerceTypes: false`, so each field accepts a string or an
+ * integer and the handler normalises it.
+ */
+export const PaginationQuerySchema = Type.Object(
+  {
+    page: Type.Optional(
+      Type.Union([Type.Integer({ minimum: 1 }), Type.String({ minLength: 1 })], {
+        default: 1,
+        description: "1-based page number",
+      }),
+    ),
+    limit: Type.Optional(
+      Type.Union([Type.Integer({ minimum: 1, maximum: 100 }), Type.String({ minLength: 1 })], {
+        default: 20,
+        description: "Page size, 1-100",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export interface PaginationQuery {
+  page?: number | string;
+  limit?: number | string;
+}
+
+/** Normalises a pagination query to safe integers, clamped to `limit` 1-100. */
+export function parsePagination(query: PaginationQuery = {}): { page: number; limit: number } {
+  const toInt = (value: unknown, fallback: number) => {
+    const n = typeof value === "string" ? Number(value) : (value as number);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) return fallback;
+    return n;
+  };
+  const page = Math.max(1, toInt(query.page, 1));
+  const limit = Math.min(100, Math.max(1, toInt(query.limit, 20)));
+  return { page, limit };
+}
+

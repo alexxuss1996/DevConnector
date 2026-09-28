@@ -1,5 +1,9 @@
-import { AddEducationSchema } from "@dev-conn/contracts";
-import { profileService } from "#modules/profile/profile.service";
+import {
+  AddEducationSchema,
+  ErrorResponseSchema,
+  ProfileResponseSchema,
+} from "@dev-conn/contracts";
+import { profileService } from "#modules/profiles/profiles.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
 const addEducation: FastifyPluginAsyncTypebox = async (
@@ -10,7 +14,17 @@ const addEducation: FastifyPluginAsyncTypebox = async (
     "/education",
     {
       onRequest: [fastify.authenticate],
-      schema: { body: AddEducationSchema },
+      schema: {
+        tags: ["Profiles"],
+        summary: "Add a school to your education",
+        body: AddEducationSchema,
+        response: {
+          201: ProfileResponseSchema,
+          400: ErrorResponseSchema,
+          401: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+        },
+      },
     },
     async function (request, reply) {
       const result = await profileService.addEducation(

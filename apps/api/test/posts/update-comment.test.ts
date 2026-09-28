@@ -55,6 +55,7 @@ describe("PUT /posts/:id/comments/:commentId — authentication", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -263,6 +264,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.deepEqual(reply.json(), {
       code: "POST_NOT_FOUND",
       message: "Post not found",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -280,6 +282,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.deepEqual(reply.json(), {
       code: "USER_NOT_FOUND",
       message: "User not found",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -299,6 +302,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.deepEqual(reply.json(), {
       code: "VALIDATION_ERROR",
       message: "User has no name",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -320,6 +324,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.deepEqual(reply.json(), {
       code: "COMMENT_NOT_FOUND",
       message: "Comment not found",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -344,6 +349,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.deepEqual(reply.json(), {
       code: "FORBIDDEN",
       message: "Not authorized",
+      requestId: reply.json().requestId,
     });
     // ensure not mutated
     assert.equal(comment.text, "orig");
@@ -364,6 +370,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
     assert.deepEqual(reply.json(), {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
+      requestId: reply.json().requestId,
     });
   });
 

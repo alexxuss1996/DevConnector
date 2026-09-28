@@ -104,7 +104,7 @@ describe("POST /auth/register", () => {
     const body = reply.json();
     assert.equal(body.code, "REGISTRATION_FAILED");
     assert.equal(body.message, "Email already in use");
-    assert.deepEqual(Object.keys(body).sort(), ["code", "message"]);
+    assert.deepEqual(Object.keys(body).sort(), ["code", "message", "requestId"]);
   });
 });
 
@@ -169,6 +169,7 @@ describe("POST /auth/login", () => {
     assert.deepEqual(reply.json(), {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -223,6 +224,7 @@ describe("POST /auth/refresh", () => {
     const reply = await app.inject({ method: "POST", url: "/auth/refresh" });
 
     assert.equal(reply.statusCode, 401);
+    // Sent directly by the route, not via errorHandler, so no body requestId.
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
@@ -292,7 +294,8 @@ describe("GET /protected (authenticate decorator)", () => {
     const reply = await app.inject({ method: "GET", url: "/protected" });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 200 for a valid access token", async () => {
@@ -334,7 +337,8 @@ describe("GET /protected (authenticate decorator)", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for a tampered access token", async () => {
@@ -347,7 +351,8 @@ describe("GET /protected (authenticate decorator)", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 });
 
@@ -451,6 +456,7 @@ describe("POST /auth/register — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "REGISTRATION_FAILED",
       message: "Email already in use",
+      requestId: reply.json().requestId,
     });
 
     assert.equal(create.mock.callCount(), 0);
@@ -514,6 +520,7 @@ describe("POST /auth/login — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
 
     assert.equal(setCookieNames(reply).length, 0);
@@ -578,6 +585,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -611,6 +619,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -644,6 +653,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -677,6 +687,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -718,6 +729,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -751,6 +763,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -876,6 +889,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(secondReply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: secondReply.json().requestId,
     });
 
     // The rotated token must still be valid.
@@ -907,6 +921,7 @@ describe("POST /auth/refresh — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
+      requestId: reply.json().requestId,
     });
   });
 });
@@ -1013,6 +1028,7 @@ describe("GET /protected — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -1033,6 +1049,7 @@ describe("GET /protected — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -1049,6 +1066,7 @@ describe("GET /protected — additional cases", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 });

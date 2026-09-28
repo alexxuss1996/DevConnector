@@ -42,7 +42,8 @@ describe("PUT /posts/:id/like — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({ method: "PUT", url: `/posts/${newId()}/like` });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for empty Bearer token", async () => {
@@ -148,7 +149,8 @@ describe("PUT /posts/:id/like — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 404 when user not found", async () => {
@@ -160,7 +162,8 @@ describe("PUT /posts/:id/like — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
+    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 400 when already liked", async () => {
@@ -175,7 +178,8 @@ describe("PUT /posts/:id/like — logic", () => {
       headers: authHeader(userId.toString()),
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "ALREADY_LIKED", message: "User already liked the post" });
+    assert.deepEqual(reply.json(), { code: "ALREADY_LIKED", message: "User already liked the post", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 for DB error on update", async () => {
@@ -285,7 +289,8 @@ describe("PUT /posts/:id/unlike — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 404 when user not found", async () => {
@@ -296,7 +301,8 @@ describe("PUT /posts/:id/unlike — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
+    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 400 when not liked", async () => {
@@ -310,7 +316,8 @@ describe("PUT /posts/:id/unlike — logic", () => {
       headers: authHeader(userId.toString()),
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "NOT_LIKED", message: "User did not like the post" });
+    assert.deepEqual(reply.json(), { code: "NOT_LIKED", message: "User did not like the post", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 for DB error", async () => {
@@ -332,7 +339,8 @@ describe("GET /posts/:id/comments — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments` });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 200 with comments with auth", async () => {
@@ -365,7 +373,8 @@ describe("GET /posts/:id/comments — authentication", () => {
     stubMethod(Post, "findById", () => mkQuery(null));
     const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments`, headers: authHeader() });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 200 with empty array when no comments", async () => {
@@ -537,7 +546,8 @@ describe("POST /posts/:id/comments — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 404 when user not found", async () => {
@@ -549,7 +559,8 @@ describe("POST /posts/:id/comments — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
+    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 400 when user has no name", async () => {
@@ -562,7 +573,8 @@ describe("POST /posts/:id/comments — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "VALIDATION_ERROR", message: "User has no name" });
+    assert.deepEqual(reply.json(), { code: "VALIDATION_ERROR", message: "User has no name", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 for update error", async () => {
@@ -659,7 +671,8 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 404 when user not found", async () => {
@@ -670,7 +683,8 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
+    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 404 when comment not found (bad commentId)", async () => {
@@ -685,7 +699,8 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(userId.toString()),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "COMMENT_NOT_FOUND", message: "Comment not found" });
+    assert.deepEqual(reply.json(), { code: "COMMENT_NOT_FOUND", message: "Comment not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 403 when user did not author comment", async () => {
@@ -703,7 +718,8 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(otherUserId.toString()),
     });
     assert.equal(reply.statusCode, 403);
-    assert.deepEqual(reply.json(), { code: "FORBIDDEN", message: "Not authorized" });
+    assert.deepEqual(reply.json(), { code: "FORBIDDEN", message: "Not authorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 for DB error", async () => {

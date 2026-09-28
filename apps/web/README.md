@@ -5,7 +5,7 @@ Current state of the `web` app and the conventions to preserve.
 ## Current state
 
 - Next.js 16.3.6 App Router with React 19.3 and strict TypeScript.
-- The home page is a minimal placeholder; product UI has not been built yet.
+- The home page is a minimal placeholder; the public profile directory and detail pages are built on it.
 - Chakra UI, TanStack React Query, `next-themes`, and the Nuqs Next.js adapter are mounted in the root provider.
 - Storybook 9 is configured with stories in `src/stories/` covering every UI component plus a rich ExampleForm.
 - Vitest is set up for unit tests; Playwright is available for e2e.
@@ -39,12 +39,12 @@ import { useMyProfile } from "@/lib/queries";
 | Need | Use | Current state |
 | --- | --- | --- |
 | Shared request and response types | `@dev-conn/contracts` | Exported and used by the API and query layers |
-| API requests | `@/lib/api` | Implemented; no application consumers yet |
-| Cached component data | `@/lib/queries` | Implemented; no application consumers yet |
-| UI primitives | Chakra UI | Provider mounted; not used by product pages yet |
-| Page and component styles | CSS Modules | Available; no product pages yet |
+| API requests | `@/lib/api` | Implemented; consumed by the public profile pages |
+| Cached component data | `@/lib/queries` | Implemented; consumed by the public profile pages |
+| UI primitives | Chakra UI | Provider mounted; used by the public profile pages |
+| Page and component styles | CSS Modules | `src/components/profiles/profiles.module.css` |
 | Global styles | `src/app/globals.css` | Empty placeholder |
-| URL state | `nuqs` | Adapter mounted; no product-page usage yet |
+| URL state | `nuqs` | Adapter mounted; directory page state comes from `searchParams` |
 | Forms | React Hook Form and TypeBox resolvers | ExampleForm implemented |
 | Visual testing | Storybook 9 | Stories for all UI components + ExampleForm |
 | Unit tests | Vitest | API clients and query hooks tested |
@@ -171,7 +171,7 @@ export function LoginForm() {
 
 ## URL state, notifications, and accessibility
 
-Use `nuqs` for shareable filters, sorting, and pagination. Keep temporary UI state such as open menus and drafts in React state. A Chakra-based toaster exists locally; use it for transient feedback rather than as the only place to report an error.
+Use `nuqs` for shareable filters and sorting. Pagination that only needs the current value is read from `searchParams` in the page and passed down. Keep temporary UI state such as open menus and drafts in React state. A Chakra-based toaster exists locally; use it for transient feedback rather than as the only place to report an error.
 
 - Use `next/image` for images and meaningful `alt` text.
 - Use `next/link` for internal navigation and buttons for actions.

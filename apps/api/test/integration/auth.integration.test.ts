@@ -117,11 +117,11 @@ describe("integration — auth flow", () => {
     // 4. Use the new access token against a protected route.
     const protectedReply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: { authorization: `Bearer ${newAccessToken}` },
       payload: { status: "Developer", skills: ["JS"] },
     });
-    assert.equal(protectedReply.statusCode, 200);
+    assert.equal(protectedReply.statusCode, 201);
 
     // 5. Logout
     const logoutReply = await app.inject({
@@ -278,20 +278,20 @@ describe("integration — auth flow", () => {
     // Valid origin: should pass.
     const goodReply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       headers: {
         origin: frontendUrl,
         authorization: `Bearer ${accessToken}`,
       },
       payload: { status: "Developer", skills: ["JS"] },
     });
-    assert.equal(goodReply.statusCode, 200);
+    assert.equal(goodReply.statusCode, 201);
 
     // Wrong origin: should be rejected (403) — but only when auth is via cookie.
     // Bearer auth bypasses the CSRF hook entirely, so use the cookie instead.
     const badReply = await app.inject({
       method: "POST",
-      url: "/profile/",
+      url: "/profiles/",
       cookies: { access_token: accessToken },
       headers: { origin: "https://evil.example.com" },
       payload: { status: "Developer", skills: ["JS"] },

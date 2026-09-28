@@ -17,9 +17,11 @@ import type {
   ProfileIdParams,
   PostIdParams,
   PostCommentIdParams,
-  Profile,
+  PublicProfile,
+  PublicProfileSummary,
   Post,
 } from "@dev-conn/contracts";
+import type { PaginationParams } from "@/lib/api/client";
 import { authApi } from "@/lib/api/auth";
 import { profileApi } from "@/lib/api/profile";
 import { postsApi } from "@/lib/api/posts";
@@ -46,15 +48,26 @@ export function useLogoutMutation() {
 }
 
 // Profile queries/mutations – shared contract types drive params & body
-export function useProfiles(options?: Omit<UseQueryOptions<{ profiles: Profile[] }>, "queryKey" | "queryFn">) {
+export function useProfiles(
+  params: PaginationParams = {},
+  options?: Omit<
+    UseQueryOptions<{
+      profiles: PublicProfileSummary[];
+      total: number;
+      page: number;
+      limit: number;
+    }>,
+    "queryKey" | "queryFn"
+  >,
+) {
   return useQuery({
-    queryKey: ["profiles"] as const,
-    queryFn: () => profileApi.getProfiles(),
+    queryKey: ["profiles", params] as const,
+    queryFn: () => profileApi.getProfiles(params),
     ...options,
   });
 }
 
-export function useMyProfile(options?: Omit<UseQueryOptions<{ profile: Profile }>, "queryKey" | "queryFn">) {
+export function useMyProfile(options?: Omit<UseQueryOptions<{ profile: PublicProfile }>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ["profile", "me"] as const,
     queryFn: () => profileApi.getMyProfile(),
@@ -62,7 +75,10 @@ export function useMyProfile(options?: Omit<UseQueryOptions<{ profile: Profile }
   });
 }
 
-export function useProfileById(params: ProfileIdParams, options?: Omit<UseQueryOptions<{ profile: Profile }>, "queryKey" | "queryFn">) {
+export function useProfileById(
+  params: ProfileIdParams,
+  options?: Omit<UseQueryOptions<{ profile: PublicProfile }>, "queryKey" | "queryFn">,
+) {
   return useQuery({
     queryKey: ["profile", params.id] as const,
     queryFn: () => profileApi.getProfileById(params),
@@ -73,7 +89,7 @@ export function useProfileById(params: ProfileIdParams, options?: Omit<UseQueryO
 export function useCreateProfileMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateProfileInput) => profileApi.createOrUpdateProfile(data),
+    mutationFn: (data: CreateProfileInput) => profileApi.createProfile(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["profiles"] });

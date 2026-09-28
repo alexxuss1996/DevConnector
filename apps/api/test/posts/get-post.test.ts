@@ -62,6 +62,7 @@ describe("GET /posts/:id — success", () => {
     assert.deepEqual(reply.json(), {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
+      requestId: reply.json().requestId,
     });
   });
 
@@ -167,7 +168,8 @@ describe("GET /posts/:id — not found", () => {
     });
 
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 when Post.findById throws generic Error", async () => {
@@ -184,7 +186,8 @@ describe("GET /posts/:id — not found", () => {
     // Generic errors not from AppError are treated as 500 by errorHandler
     // (service now throws AppError for known not-found; generic throw is unexpected)
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 when Post.findById rejects (DB error)", async () => {
@@ -201,7 +204,8 @@ describe("GET /posts/:id — not found", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 when findById throws unexpected error", async () => {
@@ -216,7 +220,8 @@ describe("GET /posts/:id — not found", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 404 when findById resolves to undefined (falsy)", async () => {

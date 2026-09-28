@@ -1,4 +1,4 @@
-import { type Static, Type } from "typebox";
+import { Static, Type } from "typebox";
 
 export const exampleFormSchema = Type.Object({
   name: Type.String({
@@ -24,7 +24,11 @@ export const exampleFormSchema = Type.Object({
     }),
   ),
   role: Type.Union(
-    [Type.Literal("frontend"), Type.Literal("backend"), Type.Literal("fullstack")],
+    [
+      Type.Literal("frontend"),
+      Type.Literal("backend"),
+      Type.Literal("fullstack"),
+    ],
     { errorMessage: "Pick a role." },
   ),
   gender: Type.Union(

@@ -18,10 +18,10 @@ describe("ApiClient", () => {
 
     const result = await new ApiClient("http://api.test").request<{
       profile: { _id: string };
-    }>("/profile/me");
+    }>("/profiles/me");
 
     expect(result.profile._id).toBe("profile-id");
-    expect(fetchMock).toHaveBeenCalledWith("http://api.test/profile/me", {
+    expect(fetchMock).toHaveBeenCalledWith("http://api.test/profiles/me", {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
     });
@@ -51,6 +51,28 @@ describe("ApiClient", () => {
         status: 401,
         code: "INVALID_CREDENTIALS",
         message: "Invalid login",
+      }),
+    );
+  });
+  it("keeps the HTTP status when the error body is not JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("<html><body>Not Found</body></html>", {
+          status: 404,
+          headers: { "Content-Type": "text/html" },
+        }),
+      ),
+    );
+
+    await expect(
+      new ApiClient("http://api.test").request("/profiles/"),
+    ).rejects.toEqual(
+      expect.objectContaining<ApiError>({
+        name: "ApiError",
+        status: 404,
+        code: "REQUEST_FAILED",
+        message: "Request failed: 404",
       }),
     );
   });

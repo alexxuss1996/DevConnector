@@ -14,18 +14,19 @@ export const errorHandler = (
   request: FastifyRequest,
   reply: FastifyReply,
 ) => {
+  // Every error body carries the request id so a client-reported failure can
+  // be matched to a server log line.
+  const fail = (status: number, body: Record<string, unknown>) =>
+    reply.status(status).send({ ...body, requestId: request.id });
+
   if (error instanceof AppError) {
     if (error.statusCode >= 500) {
       request.log.error(error);
-      // Preserve the typed status/code (e.g. 502 GITHUB_UPSTREAM_ERROR) so
-      // callers can distinguish upstream failures; only generic Errors
-      // become INTERNAL_SERVER_ERROR below.
-      return reply.status(error.statusCode).send({
-        code: error.code,
-        message: error.message,
-      });
     }
-    return reply.status(error.statusCode).send({
+    // Preserve the typed status/code (e.g. 502 GITHUB_UPSTREAM_ERROR) so
+    // callers can distinguish upstream failures; only generic Errors
+    // become INTERNAL_SERVER_ERROR below.
+    return fail(error.statusCode, {
       code: error.code,
       message: error.message,
     });
@@ -44,7 +45,7 @@ export const errorHandler = (
       if (!fieldErrors[key]) fieldErrors[key] = [];
       fieldErrors[key].push(issue.message);
     }
-    return reply.status(400).send({
+    return fail(400, {
       code: "VALIDATION_ERROR",
       message: "Request validation failed",
       issues: issues.map(({ path, code, message }) => ({
@@ -64,9 +65,7 @@ export const errorHandler = (
   ) {
     const statusCode = (error as FastifyError).statusCode as number;
     if (statusCode === 404) {
-      return reply
-        .status(404)
-        .send({ code: "NOT_FOUND", message: "Not found" });
+      return fail(404, { code: "NOT_FOUND", message: "Not found" });
     }
     if (statusCode === 429) {
       // Normalize but preserve rate-limit details; headers set by the
@@ -75,7 +74,7 @@ export const errorHandler = (
         code?: string;
         retryAfter?: unknown;
       };
-      return reply.status(429).send({
+      return fail(429, {
         code: err.code ?? "RATE_LIMIT_EXCEEDED",
         message: error.message ?? "Too many requests",
         ...(typeof err.retryAfter !== "undefined"
@@ -85,7 +84,7 @@ export const errorHandler = (
     }
     if (statusCode < 500) {
       const err = error as FastifyError & { code?: string };
-      return reply.status(statusCode).send({
+      return fail(statusCode, {
         code: err.code ?? "BAD_REQUEST",
         message: error.message ?? "Bad request",
       });
@@ -94,7 +93,7 @@ export const errorHandler = (
 
   request.log.error(error);
 
-  return reply.status(500).send({
+  return fail(500, {
     code: "INTERNAL_SERVER_ERROR",
     message: "Internal server error",
   });

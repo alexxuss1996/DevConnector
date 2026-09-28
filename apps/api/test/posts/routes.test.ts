@@ -44,7 +44,8 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello world" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for an empty Bearer token", async () => {
@@ -55,7 +56,8 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for a refresh token (must be access)", async () => {
@@ -70,7 +72,8 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for a tampered access token", async () => {
@@ -82,7 +85,8 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("accepts access token from cookie", async () => {
@@ -291,7 +295,8 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found" });
+    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 400 when user has no name", async () => {
@@ -305,7 +310,8 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "VALIDATION_ERROR", message: "User has no name" });
+    assert.deepEqual(reply.json(), { code: "VALIDATION_ERROR", message: "User has no name", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 for unexpected DB error on User.findById", async () => {
@@ -319,7 +325,8 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 for save error", async () => {
@@ -335,7 +342,8 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    });
   });
 
   test("creates post with correct avatar from user", async () => {
@@ -367,7 +375,8 @@ describe("GET /posts/ — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({ method: "GET", url: "/posts/" });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for an empty Bearer token", async () => {
@@ -390,7 +399,8 @@ describe("GET /posts/ — authentication", () => {
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for a tampered access token", async () => {
@@ -522,7 +532,8 @@ describe("GET /posts/ — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 when populate throws", async () => {
@@ -547,7 +558,8 @@ describe("DELETE /posts/ — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({ method: "DELETE", url: `/posts/${newId()}` });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
+    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 401 for an empty Bearer token", async () => {
@@ -646,7 +658,8 @@ describe("DELETE /posts/ — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 for unexpected DB error", async () => {
@@ -659,7 +672,8 @@ describe("DELETE /posts/ — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error" });
+    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    });
   });
 
   test("returns 500 when findOneAndDelete rejects", async () => {
@@ -700,7 +714,7 @@ describe("DELETE /posts/ — logic", () => {
       headers: { authorization: `Bearer ${signAccessToken(app, { sub: userIdB.toString() })}` },
     });
     assert.equal(replyB.statusCode, 404);
-    assert.deepEqual(replyB.json(), { code: "POST_NOT_FOUND", message: "Post not found" });
+    assert.deepEqual(replyB.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: replyB.json().requestId });
     assert.equal(findB.mock.callCount(), 1);
     assert.equal(findB.mock.calls[0].arguments[0].userId, userIdB.toString());
     assert.ok(findB.mock.calls[0].arguments[0]._id);

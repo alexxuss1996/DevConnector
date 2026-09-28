@@ -6,6 +6,11 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
+    /**
+     * The API's correlation id for this request. Surface it so a user
+     * reporting a failure can quote something the server can find in its logs.
+     */
+    public readonly requestId?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -15,6 +20,21 @@ export class ApiError extends Error {
 interface ErrorBody {
   code?: string;
   message?: string;
+  requestId?: string;
+}
+
+/**
+ * Parses a JSON body, or `undefined` when it isn't JSON. Without this a proxy
+ * or gateway HTML error page throws a `SyntaxError` and the HTTP status — the
+ * only useful part of the failure — is lost.
+ */
+function parseJson<T>(text: string): (T & ErrorBody) | undefined {
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as T & ErrorBody;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Base HTTP client for the DevConnector API (cookie session auth). */
@@ -36,7 +56,7 @@ export class ApiClient {
     }
 
     const text = await res.text();
-    const data = text ? (JSON.parse(text) as T & ErrorBody) : (undefined as T);
+    const data = parseJson<T>(text);
 
     if (!res.ok) {
       const body = (data ?? {}) as ErrorBody;
@@ -44,6 +64,8 @@ export class ApiClient {
         res.status,
         body.code ?? "REQUEST_FAILED",
         body.message ?? `Request failed: ${res.status}`,
+        // Fall back to the echoed header for errors sent outside errorHandler.
+        body.requestId ?? res.headers.get("x-request-id") ?? undefined,
       );
     }
 
@@ -66,6 +88,14 @@ export class ApiClient {
     return this.request<T>(path, {
       ...init,
       method: "PUT",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  protected patch<T>(path: string, body?: unknown, init: RequestInit = {}): Promise<T> {
+    return this.request<T>(path, {
+      ...init,
+      method: "PATCH",
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   }

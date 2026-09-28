@@ -47,15 +47,65 @@ describe("resource clients", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "http://api.test/profile/?page=2&limit=10",
+      "http://api.test/profiles/?page=2&limit=10",
       expect.objectContaining({ method: "GET" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "http://api.test/profile/experience/experience-id",
+      "http://api.test/profiles/experience/experience-id",
       expect.objectContaining({ method: "DELETE" }),
     );
   });
+
+  it("reads a single public profile by owner id", async () => {
+    const fetchMock = mockOkResponse();
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ProfileApiClient(baseUrl);
+
+    await client.getProfileById({ id: "65f0f0f0f0f0f0f0f0f0f0f" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://api.test/profiles/user/65f0f0f0f0f0f0f0f0f0f0f",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("creates with POST and updates with PATCH", async () => {
+    const fetchMock = mockOkResponse();
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ProfileApiClient(baseUrl);
+
+    await client.createProfile({ status: "Developer", skills: ["JS"] });
+    await client.updateProfile({ status: "Senior" });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://api.test/profiles/",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ status: "Developer", skills: ["JS"] }) }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://api.test/profiles/",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ status: "Senior" }) }),
+    );
+  });
+
+  it("surfaces the list envelope the API returns", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      new Response(
+        JSON.stringify({ profiles: [{ _id: "p1" }], total: 1, page: 1, limit: 12 }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ProfileApiClient(baseUrl);
+
+    const result = await client.getProfiles({ page: 1, limit: 12 });
+
+    expect(result.total).toBe(1);
+    expect(result.profiles).toHaveLength(1);
+  });
+
 
   it("sends post and comment mutations with IDs", async () => {
     const fetchMock = mockOkResponse();

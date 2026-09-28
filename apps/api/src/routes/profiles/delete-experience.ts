@@ -1,6 +1,10 @@
-import { profileService } from "#modules/profile/profile.service";
+import { profileService } from "#modules/profiles/profiles.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
-import { ExperienceIdParamsSchema } from "@dev-conn/contracts";
+import {
+  ExperienceIdParamsSchema,
+  ErrorResponseSchema,
+  ProfileResponseSchema,
+} from "@dev-conn/contracts";
 
 const deleteExperience: FastifyPluginAsyncTypebox = async (
   fastify,
@@ -10,7 +14,17 @@ const deleteExperience: FastifyPluginAsyncTypebox = async (
     "/experience/:experienceId",
     {
       onRequest: [fastify.authenticate],
-      schema: { params: ExperienceIdParamsSchema },
+      schema: {
+        tags: ["Profiles"],
+        summary: "Remove a job from your experience",
+        params: ExperienceIdParamsSchema,
+        response: {
+          200: ProfileResponseSchema,
+          400: ErrorResponseSchema,
+          401: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+        },
+      },
     },
     async function (request, reply) {
       const result = await profileService.deleteExperience(
