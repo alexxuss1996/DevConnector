@@ -1,33 +1,13 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import jwt from "@fastify/jwt";
 import cookie from "@fastify/cookie";
-import sensible from "@fastify/sensible";
-import type { OAuth2Namespace } from "@fastify/oauth2";
 import authPlugin from "#plugins/auth";
-import registerRoute from "#routes/auth/register";
-import loginRoute from "#routes/auth/login";
-import refreshRoute from "#routes/auth/refresh";
-import logoutRoute from "#routes/auth/logout";
-import googleRoute from "#routes/auth/google";
-import linkGoogleRoute from "#routes/auth/link-google";
-import profileRoute from "#routes/profile/profile";
-import meRoute from "#routes/profile/me";
-import getByIdRoute from "#routes/profile/get-by-id";
-import deleteExperienceRoute from "#routes/profile/delete-experience";
-import deleteEducationRoute from "#routes/profile/delete-education";
-import addExperienceRoute from "#routes/profile/add-experience";
-import addEducationRoute from "#routes/profile/add-education";
-import getGithubReposRoute from "#routes/profile/get-github-repos";
-import addPostRoute from "#routes/posts/add-post";
-import getPostRoute from "#routes/posts/get-post";
-import getPostsRoute from "#routes/posts/get-posts";
-import deletePostRoute from "#routes/posts/delete-post";
-import likeRoute from "#routes/posts/like";
-import getCommentsRoute from "#routes/posts/get-comments";
-import addCommentRoute from "#routes/posts/add-comment";
-import deleteCommentRoute from "#routes/posts/delete-comment";
-import updateCommentRoute from "#routes/posts/update-comment";
+import csrfPlugin from "#plugins/csrf";
 import { errorHandler } from "#helpers/error-handler";
+import { baseOptions, registerRequestIdHook } from "#helpers/request-id";
+import mongoose from "mongoose";
+import AjvErrors from "ajv-errors";
+import addFormats from "ajv-formats";
 import Session from "#modules/auth/session.model";
 import { Types } from "mongoose";
 import {
@@ -37,77 +17,153 @@ import {
   recordSessionToken,
   stubMethod,
 } from "./stubs.ts";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-const AjvErrors = require("ajv-errors");
-const addFormats = require("ajv-formats");
+import registerRoute from "#routes/auth/register";
+import loginRoute from "#routes/auth/login";
+import refreshRoute from "#routes/auth/refresh";
+import logoutRoute from "#routes/auth/logout";
+import logoutAllRoute from "#routes/auth/logout-all";
+import googleRoute from "#routes/auth/google";
+import linkGoogleRoute from "#routes/auth/link-google";
+import profileRoute from "#routes/profiles/profiles";
+import meRoute from "#routes/profiles/me";
+import getByIdRoute from "#routes/profiles/get-by-id";
+import deleteExperienceRoute from "#routes/profiles/delete-experience";
+import deleteEducationRoute from "#routes/profiles/delete-education";
+import addExperienceRoute from "#routes/profiles/add-experience";
+import addEducationRoute from "#routes/profiles/add-education";
+import getGithubReposRoute from "#routes/profiles/get-github-repos";
+import addPostRoute from "#routes/posts/add-post";
+import getPostRoute from "#routes/posts/get-post";
+import getPostsRoute from "#routes/posts/get-posts";
+import deletePostRoute from "#routes/posts/delete-post";
+import likeRoute from "#routes/posts/like";
+import getCommentsRoute from "#routes/posts/get-comments";
+import addCommentRoute from "#routes/posts/add-comment";
+import deleteCommentRoute from "#routes/posts/delete-comment";
+import updateCommentRoute from "#routes/posts/update-comment";
 
 const AUTH_PREFIX = "/auth";
-const PROFILE_PREFIX = "/profile";
+const PROFILE_PREFIX = "/profiles";
 const POSTS_PREFIX = "/posts";
+
+/** Every route the app exposes, in the order autoload registers them.
+ *  `any` on the plugin slot: the TypeBox provider makes a typed tuple
+ *  invariant-incompatible with `app.register`. */
+const ROUTES: Array<[string, any]> = [
+  [AUTH_PREFIX, registerRoute],
+  [AUTH_PREFIX, loginRoute],
+  [AUTH_PREFIX, refreshRoute],
+  [AUTH_PREFIX, logoutRoute],
+  [AUTH_PREFIX, logoutAllRoute],
+  [AUTH_PREFIX, googleRoute],
+  [AUTH_PREFIX, linkGoogleRoute],
+  [PROFILE_PREFIX, profileRoute],
+  [PROFILE_PREFIX, meRoute],
+  [PROFILE_PREFIX, getByIdRoute],
+  [PROFILE_PREFIX, deleteExperienceRoute],
+  [PROFILE_PREFIX, deleteEducationRoute],
+  [PROFILE_PREFIX, addExperienceRoute],
+  [PROFILE_PREFIX, addEducationRoute],
+  [PROFILE_PREFIX, getGithubReposRoute],
+  [POSTS_PREFIX, addPostRoute],
+  [POSTS_PREFIX, getPostRoute],
+  [POSTS_PREFIX, getPostsRoute],
+  [POSTS_PREFIX, deletePostRoute],
+  [POSTS_PREFIX, likeRoute],
+  [POSTS_PREFIX, getCommentsRoute],
+  [POSTS_PREFIX, addCommentRoute],
+  [POSTS_PREFIX, deleteCommentRoute],
+  [POSTS_PREFIX, updateCommentRoute],
+];
+
+const GOOGLE_STUB = {
+  getAccessTokenFromAuthorizationCodeFlow: async () => ({
+    token: { access_token: "google-access-token", token_type: "Bearer" },
+  }),
+};
+
+export interface BuildAppOptions {
+  /** Mount the real route handlers. Off by default: most unit tests only
+   *  need the auth plugin. */
+  withRoutes?: boolean;
+  /** Enable the CSRF origin check. */
+  withCsrf?: boolean;
+  /** Decorate `googleOAuth2` with a stub instead of the real OAuth plugin. */
+  stubGoogle?: boolean;
+  /** Register the mongoose plugin and connect to `mongoUri`. */
+  mongoUri?: string;
+  /** JWT signing secret. Defaults to a fixed test secret. */
+  jwtSecret?: string;
+  /** Extra wrapper around the error handler, for harness bookkeeping. */
+  wrapErrorHandler?: (
+    handler: typeof errorHandler,
+    app: FastifyInstance,
+  ) => Parameters<FastifyInstance["setErrorHandler"]>[0];
+}
 
 export async function buildApp({
   withRoutes = false,
-}: { withRoutes?: boolean } = {}): Promise<FastifyInstance> {
+  withCsrf = false,
+  stubGoogle = false,
+  mongoUri,
+  jwtSecret = "test-jwt-secret",
+  wrapErrorHandler,
+}: BuildAppOptions = {}): Promise<FastifyInstance> {
+  if (mongoUri) {
+    // env.ts validates at import, so every required var must be set first.
+    process.env.MONGODB_URI = mongoUri;
+    process.env.JWT_SECRET = jwtSecret;
+    process.env.GITHUB_ACCESS_TOKEN ??= "integration-test-token";
+    process.env.GOOGLE_CLIENT_SECRET ??= "integration-test-secret";
+    process.env.GOOGLE_CLIENT_ID ??= "integration-test-id";
+    process.env.GOOGLE_CALLBACK_URL ??=
+      "http://localhost:3000/auth/google/callback";
+    if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
+  }
+
   const app = Fastify({
     logger: false,
-    routerOptions: {
-      ignoreTrailingSlash: true,
-    },
+    routerOptions: { ignoreTrailingSlash: true },
+    ...baseOptions,
     ajv: {
       customOptions: { coerceTypes: false, allErrors: true, strict: false },
-      plugins: [AjvErrors, addFormats],
+      plugins: [AjvErrors as any, addFormats as any],
     },
   });
 
   await app.register(cookie);
   await app.register(jwt, {
-    secret: "test-jwt-secret",
+    secret: jwtSecret,
     sign: { algorithm: "HS256" },
     cookie: { cookieName: "access_token", signed: false },
   });
-  await app.register(sensible);
   await app.register(authPlugin);
-  app.setErrorHandler(errorHandler);
+  if (withCsrf) await app.register(csrfPlugin);
+
+  if (mongoUri) {
+    const { default: mongoosePlugin } = await import("#plugins/mongoose");
+    await app.register(mongoosePlugin);
+  }
+
+  registerRequestIdHook(app);
+  app.setErrorHandler(
+    wrapErrorHandler ? wrapErrorHandler(errorHandler, app) : errorHandler,
+  );
+
+  // The unit-test builder never loads the real OAuth plugin, so any route that
+  // needs the namespace gets the stub.
+  if (stubGoogle || withRoutes) {
+    app.decorate("googleOAuth2", GOOGLE_STUB as any);
+  }
 
   if (withRoutes) {
-    await app.decorate("googleOAuth2", {
-      getAccessTokenFromAuthorizationCodeFlow: async () => ({
-        token: { access_token: "google-access-token", token_type: "Bearer" },
-      }),
-    } as unknown as OAuth2Namespace);
-
-    app.register(registerRoute, { prefix: AUTH_PREFIX });
-    app.register(loginRoute, { prefix: AUTH_PREFIX });
-    app.register(refreshRoute, { prefix: AUTH_PREFIX });
-    app.register(logoutRoute, { prefix: AUTH_PREFIX });
-    app.register(googleRoute, { prefix: AUTH_PREFIX });
-    app.register(linkGoogleRoute, { prefix: AUTH_PREFIX });
-    app.register(profileRoute, { prefix: PROFILE_PREFIX });
-    app.register(meRoute, { prefix: PROFILE_PREFIX });
-    app.register(getByIdRoute, { prefix: PROFILE_PREFIX });
-    app.register(deleteExperienceRoute, { prefix: PROFILE_PREFIX });
-    app.register(deleteEducationRoute, { prefix: PROFILE_PREFIX });
-    app.register(addExperienceRoute, { prefix: PROFILE_PREFIX });
-    app.register(addEducationRoute, { prefix: PROFILE_PREFIX });
-    app.register(getGithubReposRoute, { prefix: PROFILE_PREFIX });
-    app.register(addPostRoute, { prefix: POSTS_PREFIX });
-    app.register(getPostRoute, { prefix: POSTS_PREFIX });
-    app.register(getPostsRoute, { prefix: POSTS_PREFIX });
-    app.register(deletePostRoute, { prefix: POSTS_PREFIX });
-    app.register(likeRoute, { prefix: POSTS_PREFIX });
-    app.register(getCommentsRoute, { prefix: POSTS_PREFIX });
-    app.register(addCommentRoute, { prefix: POSTS_PREFIX });
-    app.register(deleteCommentRoute, { prefix: POSTS_PREFIX });
-    app.register(updateCommentRoute, { prefix: POSTS_PREFIX });
-
+    for (const [prefix, route] of ROUTES) {
+      app.register(route, { prefix });
+    }
     app.get(
       "/protected",
       { onRequest: [app.authenticate] },
-      async (_request: FastifyRequest, reply: FastifyReply) => {
-        return reply.send({ ok: true });
-      },
+      async () => ({ ok: true }),
     );
   }
 
@@ -140,9 +196,7 @@ export function signAccessToken(
   const { sub: _s, sessionId: _sid, ...rest } = payload;
   return app.jwt.sign(
     { type: "access", ...rest, sub, sessionId } as AuthPayload,
-    {
-      expiresIn: "15m",
-    },
+    { expiresIn: "15m" },
   );
 }
 
