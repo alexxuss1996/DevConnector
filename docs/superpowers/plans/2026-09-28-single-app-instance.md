@@ -12,12 +12,12 @@
 
 ## Global Constraints
 
-- **The unit test count must never fall below the previous task's, and no test may be deleted, skipped, or commented out to make a run green.** Expected count: **412** at the start, **418** after Task 2, **420** from Task 3 onward. If a suite cannot boot against the real wiring, that is a finding about this design — stop and report it rather than deleting the test.
+- **The unit test count must never fall below the previous task's, and no test may be deleted, skipped, or commented out to make a run green.** Expected count: **412** at the start, **414** after Task 1, **420** after Task 2, **423** from Task 3 onward. (`test:unit` globs `test/{auth,posts,profiles,plugins,helpers}/*.test.ts`; Task 2 adds `test/*.test.ts` so its new root-level file runs.) If a suite cannot boot against the real wiring, that is a finding about this design — stop and report it rather than deleting the test.
 - Integration suite stays at **20** (6 + 7 + 7). Web vitest stays at **21**.
 - No `NODE_ENV === "test"` branch, and no other test-detection, anywhere under `src/`. Substitutions arrive only through the `overrides` parameter.
 - `apps/api` typecheck is two commands, both must stay clean: `npm run build:ts` (compiles `src/` to `dist/`) and `npx tsc -p test/tsconfig.json` (typechecks tests, `noEmit`).
 - Test imports follow the existing dual-resolution pattern already in the repo: `#`-prefixed bare specifiers resolve to **built** `dist/*.js` at runtime and to `src/*.ts` for typechecking, while relative `../helpers/*.ts` specifiers load **source** directly. Do not change this.
-- `pnpm run lint` runs at `--max-warnings 0` and must stay clean.
+- `pnpm run lint` must stay clean. Note it only covers `apps/web`, which is the only package with a `lint` script; `apps/api` is not linted today. Adding one is out of scope, so do not claim api lint coverage as verification.
 - `src/plugins/README.md` is a non-plugin file living in the plugins directory. Explicit registration means nothing scans that directory any more, so it needs no exclusion.
 
 ## Review Focus
@@ -108,7 +108,7 @@ Replace lines 1-6 of `apps/api/src/plugins/rate-limit.ts` so the plugin forwards
 ```ts
 import fp from "fastify-plugin";
 import rateLimit from "@fastify/rate-limit";
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyRequest } from "fastify";
 
 /**
  * `keyGenerator` exists so tests can key every request uniquely and never trip
@@ -116,37 +116,37 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
  * keying. The limits below and the per-route `config.rateLimit` overrides in
  * src/routes are the real ones — this seam does not relax them.
  */
-export default fp<
-  FastifyPluginAsync<{ keyGenerator?: (request: FastifyRequest) => string }>
->(async (fastify, opts) => {
-  await fastify.register(rateLimit, {
-    global: true,
-    max: 100,
-    timeWindow: "1 minute",
-    allowList: ["/", "/docs"],
-    enableDraftSpec: true,
-    addHeaders: {
-      "x-ratelimit-limit": true,
-      "x-ratelimit-remaining": true,
-      "x-ratelimit-reset": true,
-      "retry-after": true,
-    },
-    addHeadersOnExceeding: {
-      "x-ratelimit-limit": true,
-      "x-ratelimit-remaining": true,
-      "x-ratelimit-reset": true,
-    },
-    errorResponseBuilder: (_request, context) => {
-      return {
-        code: "RATE_LIMIT_EXCEEDED",
-        message: `Too many requests, please try again after ${context.after}`,
-        statusCode: 429,
-        retryAfter: context.after,
-      };
-    },
-    ...(opts.keyGenerator ? { keyGenerator: opts.keyGenerator } : {}),
-  });
-});
+export default fp<{ keyGenerator?: (request: FastifyRequest) => string }>(
+  async (fastify, opts) => {
+    await fastify.register(rateLimit, {
+      global: true,
+      max: 100,
+      timeWindow: "1 minute",
+      allowList: ["/", "/docs"],
+      enableDraftSpec: true,
+      addHeaders: {
+        "x-ratelimit-limit": true,
+        "x-ratelimit-remaining": true,
+        "x-ratelimit-reset": true,
+        "retry-after": true,
+      },
+      addHeadersOnExceeding: {
+        "x-ratelimit-limit": true,
+        "x-ratelimit-remaining": true,
+        "x-ratelimit-reset": true,
+      },
+      errorResponseBuilder: (_request, context) => {
+        return {
+          code: "RATE_LIMIT_EXCEEDED",
+          message: `Too many requests, please try again after ${context.after}`,
+          statusCode: 429,
+          retryAfter: context.after,
+        };
+      },
+      ...(opts.keyGenerator ? { keyGenerator: opts.keyGenerator } : {}),
+    });
+  },
+);
 ```
 
 The old comment on lines 5-6 ("tests use buildApp helper without this plugin") is deleted — it describes the harness this plan removes.
@@ -165,7 +165,7 @@ Expected: both tests PASS.
 cd apps/api && npm run test:unit
 ```
 
-Expected: `tests 412`, `pass 412`, `fail 0`. The plugin's behaviour is unchanged when `keyGenerator` is absent, and the suite still runs against the harness, which does not load it.
+Expected: `tests 414`, `pass 414`, `fail 0` — 412 plus the 2 added to `test/plugins/rate-limit.test.ts`, which the `test:unit` glob already covers. The plugin's behaviour is unchanged when `keyGenerator` is absent, and the suite still runs against the harness, which does not load it.
 
 - [ ] **Step 6: Commit**
 
@@ -494,7 +494,7 @@ Expected: all 6 tests PASS, including the plugin-coverage test and the CLI-path 
 cd apps/api && npm run test:unit
 ```
 
-Expected: `tests 418`, `pass 418`, `fail 0` — 412 unchanged plus the 6 new ones. The old harness is still what the 12 suites use at this point, so their count is untouched.
+Expected: `tests 420`, `pass 420`, `fail 0` — 414 plus the 6 new ones. The old harness is still what the 12 suites use at this point, so their count is untouched.
 
 - [ ] **Step 7: Verify the CLI contract against the built output**
 
@@ -661,7 +661,7 @@ Expected: 3 tests PASS.
 cd apps/api && npm run test:unit
 ```
 
-Expected: `tests 420`, `pass 420`, `fail 0` — 418 plus these 3.
+Expected: `tests 423`, `pass 423`, `fail 0` — 420 plus these 3.
 
 - [ ] **Step 6: Confirm the guard actually bites**
 
@@ -679,7 +679,7 @@ Then remove the temporary line and confirm the suite is green again:
 cd apps/api && git diff --stat -- src/routes/auth/google.ts && npm run test:unit
 ```
 
-Expected: `git diff` empty, `tests 420`, `pass 420`, `fail 0`.
+Expected: `git diff` empty, `tests 423`, `pass 423`, `fail 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -782,7 +782,7 @@ Expected: no output.
 cd apps/api && npm run test:unit
 ```
 
-Expected: `tests 420`, `pass 420`, `fail 0`.
+Expected: `tests 423`, `pass 423`, `fail 0`.
 
 If any suite fails, it is a genuine gap between the reconstruction and the real wiring — the real `cors`, `helmet`, `csrf` or `swagger` is now active. Fix the test's assumption to match real behaviour. **Do not** delete or skip the test, and do not weaken a plugin to make it pass. If the fix is not obvious, stop and report it rather than guessing.
 
@@ -863,7 +863,7 @@ export function signRefreshToken(
 cd apps/api && npm run build:ts && npx tsc -p test/tsconfig.json && npm run test:unit
 ```
 
-Expected: `tests 420`, `pass 420`, `fail 0`.
+Expected: `tests 423`, `pass 423`, `fail 0`.
 
 - [ ] **Step 7: Commit**
 
@@ -1032,7 +1032,7 @@ cd apps/api && MONGODB_PORT=27018 bash test/bin/mongo-docker.sh stop
 cd apps/api && npm run test:unit
 ```
 
-Expected: `tests 420`, `pass 420`, `fail 0`.
+Expected: `tests 423`, `pass 423`, `fail 0`.
 
 - [ ] **Step 6: Commit**
 
@@ -1117,7 +1117,7 @@ cd apps/api && MONGODB_PORT=27018 bash test/bin/mongo-docker.sh start && npm run
 cd apps/web && npx vitest run
 ```
 
-Expected: build 3/3, check-types 3/3, lint clean, api unit 420/420, api integration 20/20, web 21/21.
+Expected: build 3/3, check-types 3/3, lint clean, api unit 423/423, api integration 20/20, web 21/21.
 
 - [ ] **Step 5: Commit**
 
@@ -1147,11 +1147,19 @@ needs. `rateLimitKey` is the `AppOptions` field name; `keyGenerator` is the
 plugin's own option name. The two meet at exactly one place — the
 `fastify.register(rateLimitPlugin, ...)` call in Task 2 — and nowhere else.
 
-**Counts.** 412 at the start. Task 2 adds `test/app.test.ts` (6 tests) and adds
-`"test/*.test.ts"` to the `test:unit` glob so the new file is actually run;
-without that glob change the file would be silently skipped and the count would
-lie. 418 after Task 2, 420 after Task 3's 3 tests, and 420 through Tasks 4-6.
-Every count is stated in the task that changes it.
+**Counts.** 412 at the start. `test:unit` globs
+`test/{auth,posts,profiles,plugins,helpers}/*.test.ts`, so a new test in any of
+those five directories runs immediately; Task 2 additionally adds
+`"test/*.test.ts"` to the glob, because without it a new root-level test file
+is silently skipped and the count would lie. 414 after Task 1 (2 tests in
+`test/plugins/rate-limit.test.ts`), 420 after Task 2 (6 in `test/app.test.ts`),
+423 after Task 3 (3 in `test/helpers/plugin-overrides.test.ts`), and 423 through
+Tasks 4-6. Every count is stated in the task that changes it.
+
+These numbers were wrong in the first draft of this plan, which assumed a new
+test in `test/plugins/` would not run and predicted 412/418/420. Task 1's
+implementer caught it. The lint constraint was also over-claimed in the same
+way: `apps/api` has no `lint` script, so `pnpm run lint` only covers `apps/web`.
 
 **Placeholder scan.** No step defers work. Task 3 Step 6 is a verification step
 that deliberately breaks something to prove a guard bites, then reverts it, and
