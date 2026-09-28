@@ -28,15 +28,6 @@ export const LoginUserSchema = Type.Object({
   }),
 });
 
-export const CompleteOnboardingSchema = Type.Object({
-  name: Type.String({
-    minLength: 3,
-    maxLength: 30,
-    pattern: NON_BLANK_PATTERN,
-    errorMessage: "Name must be 3-30 characters and cannot be blank",
-  }),
-});
-
 export const LinkGoogleSchema = Type.Object(
   {
     accessToken: Type.String({
@@ -51,7 +42,6 @@ export type LinkGoogleInput = Static<typeof LinkGoogleSchema>;
 
 export type RegisterUserInput = Static<typeof RegisterUserSchema>;
 export type LoginUserInput = Static<typeof LoginUserSchema>;
-export type CompleteOnboardingInput = Static<typeof CompleteOnboardingSchema>;
 
 export const AuthUserSchema = Type.Object(
   {
