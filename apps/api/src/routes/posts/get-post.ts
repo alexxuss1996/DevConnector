@@ -4,7 +4,7 @@ import { PostIdParamsSchema } from "@dev-conn/contracts";
 
 const getPost: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.get(
     "/:id",
@@ -12,7 +12,7 @@ const getPost: FastifyPluginAsyncTypebox = async (
       onRequest: [fastify.authenticate],
       schema: { params: PostIdParamsSchema },
     },
-    async function (request, reply) {
+    async function (request, _reply) {
       const { id } = request.params;
       const post = await postService.getPost(id);
       return {

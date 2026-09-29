@@ -8,7 +8,7 @@ import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
 const addExperience: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.post(
     "/experience",

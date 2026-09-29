@@ -6,7 +6,7 @@ import { trimEmail } from "#helpers/auth";
 
 const register: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.post(
     "/register",

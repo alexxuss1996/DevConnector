@@ -1,11 +1,14 @@
 import { profileService } from "#modules/profiles/profiles.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { Type } from "typebox";
-import { ErrorResponseSchema, GithubUsernameParamsSchema } from "@dev-conn/contracts";
+import {
+  ErrorResponseSchema,
+  GithubUsernameParamsSchema,
+} from "@dev-conn/contracts";
 
 const getLastGithubRepos: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.get(
     "/github/:username",

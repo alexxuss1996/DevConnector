@@ -1,8 +1,11 @@
-import { ErrorResponseSchema, ProfileResponseSchema } from "@dev-conn/contracts";
+import {
+  ErrorResponseSchema,
+  ProfileResponseSchema,
+} from "@dev-conn/contracts";
 import { profileService } from "#modules/profiles/profiles.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
-const me: FastifyPluginAsyncTypebox = async (fastify, opts) => {
+const me: FastifyPluginAsyncTypebox = async (fastify, _opts) => {
   fastify.get(
     "/me",
     {
@@ -17,7 +20,7 @@ const me: FastifyPluginAsyncTypebox = async (fastify, opts) => {
         },
       },
     },
-    async function (request, reply) {
+    async function (request, _reply) {
       const profile = await profileService.getProfile(request.user.sub);
       return { profile };
     },

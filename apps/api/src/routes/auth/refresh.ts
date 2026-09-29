@@ -4,7 +4,7 @@ import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
 const refresh: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.post(
     "/refresh",
@@ -17,9 +17,11 @@ const refresh: FastifyPluginAsyncTypebox = async (
           .send({ code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
       }
       const result = await authService.refresh(fastify, token);
-      return setAuthCookies(reply, result.accessToken, result.refreshToken).send(
-        result.user,
-      );
+      return setAuthCookies(
+        reply,
+        result.accessToken,
+        result.refreshToken,
+      ).send(result.user);
     },
   );
 };

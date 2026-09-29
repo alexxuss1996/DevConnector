@@ -167,7 +167,7 @@ class AuthService {
       );
     }
 
-    let existingUser = await User.findOne({ email: normalizedEmail });
+    const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
       throw new AppError(409, "REGISTRATION_FAILED", "Email already in use");

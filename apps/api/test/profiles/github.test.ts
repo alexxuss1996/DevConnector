@@ -23,7 +23,9 @@ after(async () => {
   // restore fetch mock if any
   try {
     (global.fetch as any).mock?.restore?.();
-  } catch {}
+  } catch {
+    // fetch was never mocked
+  }
   mock.restoreAll();
 });
 
@@ -33,7 +35,9 @@ afterEach(() => {
   if ((global.fetch as any).mock) {
     try {
       (global.fetch as any).mock.restore();
-    } catch {}
+    } catch {
+      // nothing was mocked
+    }
   }
   // service caches GitHub responses for 60s — clear so mocked fetches re-run
   clearGithubReposCache();

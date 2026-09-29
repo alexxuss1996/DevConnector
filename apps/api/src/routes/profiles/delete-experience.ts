@@ -8,7 +8,7 @@ import {
 
 const deleteExperience: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.delete(
     "/experience/:experienceId",

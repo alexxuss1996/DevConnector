@@ -8,7 +8,7 @@ import {
 
 const deleteEducation: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.delete(
     "/education/:educationId",

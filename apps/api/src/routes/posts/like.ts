@@ -3,7 +3,6 @@ import { postService } from "#modules/posts/posts.service";
 import { PostIdParamsSchema } from "@dev-conn/contracts";
 
 const likePost: FastifyPluginAsyncTypebox = async (fastify) => {
-
   fastify.put(
     "/:id/like",
     {

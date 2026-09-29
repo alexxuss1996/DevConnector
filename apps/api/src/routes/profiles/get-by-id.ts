@@ -1,11 +1,15 @@
-import { ErrorResponseSchema, ProfileIdParamsSchema, ProfileResponseSchema } from "@dev-conn/contracts";
+import {
+  ErrorResponseSchema,
+  ProfileIdParamsSchema,
+  ProfileResponseSchema,
+} from "@dev-conn/contracts";
 import { PUBLIC_CACHE_CONTROL } from "#helpers/request-id";
 import { profileService } from "#modules/profiles/profiles.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
 const getProfileById: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.get(
     "/user/:id",

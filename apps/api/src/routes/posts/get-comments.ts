@@ -4,7 +4,7 @@ import { PostIdParamsSchema } from "@dev-conn/contracts";
 
 const getPostComments: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.get(
     "/:id/comments",
@@ -12,7 +12,7 @@ const getPostComments: FastifyPluginAsyncTypebox = async (
       onRequest: [fastify.authenticate],
       schema: { params: PostIdParamsSchema },
     },
-    async function (request, reply) {
+    async function (request, _reply) {
       const { id } = request.params;
       const comments = await postService.getPostComments(id);
       return {

@@ -3,7 +3,7 @@ import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { PostCommentIdParamsSchema } from "@dev-conn/contracts";
 const deletePostComment: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.delete(
     "/:id/comments/:commentId",

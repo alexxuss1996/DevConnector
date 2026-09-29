@@ -1,10 +1,13 @@
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { postService } from "#modules/posts/posts.service";
-import { CreatePostCommentSchema, PostIdParamsSchema } from "@dev-conn/contracts";
+import {
+  CreatePostCommentSchema,
+  PostIdParamsSchema,
+} from "@dev-conn/contracts";
 
 const addPostComment: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.post(
     "/:id/comments",

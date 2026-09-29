@@ -5,7 +5,7 @@ import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
 const logout: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.post(
     "/logout",

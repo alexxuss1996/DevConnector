@@ -1,16 +1,22 @@
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import { postService } from "#modules/posts/posts.service";
-import { UpdatePostCommentSchema, PostCommentIdParamsSchema } from "@dev-conn/contracts";
+import {
+  UpdatePostCommentSchema,
+  PostCommentIdParamsSchema,
+} from "@dev-conn/contracts";
 
 const updatePostComment: FastifyPluginAsyncTypebox = async (
   fastify,
-  opts,
+  _opts,
 ): Promise<void> => {
   fastify.put(
     "/:id/comments/:commentId",
     {
       onRequest: [fastify.authenticate],
-      schema: { params: PostCommentIdParamsSchema, body: UpdatePostCommentSchema },
+      schema: {
+        params: PostCommentIdParamsSchema,
+        body: UpdatePostCommentSchema,
+      },
     },
     async function (request, reply) {
       const { id, commentId } = request.params;
