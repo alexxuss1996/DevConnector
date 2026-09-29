@@ -19,7 +19,7 @@ export class AuthApiClient extends ApiClient {
   }
 
   refresh(): Promise<AuthResponse> {
-    return this.post<AuthResponse>("/auth/refresh");
+    return this.requestRefreshEndpoint<AuthResponse>();
   }
 }
 
