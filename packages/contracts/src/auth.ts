@@ -54,3 +54,21 @@ export const AuthUserSchema = Type.Object(
 );
 
 export type AuthUser = Static<typeof AuthUserSchema>;
+
+/**
+ * What `POST /auth/login`, `/auth/register` and `/auth/refresh` actually return:
+ * the user plus a freshly issued token pair. `AuthUserSchema` on its own
+ * describes only the user, so a client typed as `Promise<AuthUser>` was
+ * promising a shape the API never sent. Caught by
+ * apps/api/test/contract.test.ts.
+ */
+export const AuthResponseSchema = Type.Object(
+  {
+    user: AuthUserSchema,
+    accessToken: Type.String(),
+    refreshToken: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+export type AuthResponse = Static<typeof AuthResponseSchema>;

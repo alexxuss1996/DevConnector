@@ -1,29 +1,29 @@
 import type {
   RegisterUserInput,
   LoginUserInput,
-  AuthUser,
+  AuthResponse,
 } from "@dev-conn/contracts";
 import { ApiClient } from "@/lib/api/client";
 
 export class AuthApiClient extends ApiClient {
-  register(data: RegisterUserInput): Promise<AuthUser> {
-    return this.post<AuthUser>("/auth/register", data);
+  register(data: RegisterUserInput): Promise<AuthResponse> {
+    return this.post<AuthResponse>("/auth/register", data);
   }
 
-  login(data: LoginUserInput): Promise<AuthUser> {
-    return this.post<AuthUser>("/auth/login", data);
+  login(data: LoginUserInput): Promise<AuthResponse> {
+    return this.post<AuthResponse>("/auth/login", data);
   }
 
   logout(): Promise<void> {
     return this.post<void>("/auth/logout");
   }
 
-  refresh(): Promise<AuthUser> {
-    return this.post<AuthUser>("/auth/refresh");
+  refresh(): Promise<AuthResponse> {
+    return this.post<AuthResponse>("/auth/refresh");
   }
 }
 
 /** Shared instance bound to the default API URL. */
 export const authApi = new AuthApiClient();
 
-export type { AuthUser };
+export type { AuthResponse };

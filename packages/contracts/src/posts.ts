@@ -1,4 +1,5 @@
 import { Static, Type } from "@sinclair/typebox";
+import { ProfileOwnerSchema } from "./profile.js";
 
 const OBJECT_ID_PATTERN = "^[0-9a-fA-F]{24}$";
 const NON_BLANK_PATTERN = ".*\\S.*";
@@ -45,7 +46,11 @@ export const CommentSchema = Type.Object(
 export const PostSchema = Type.Object(
   {
     _id: Type.String({ description: "ObjectId hex string" }),
-    userId: Type.String({ description: "ObjectId hex string" }),
+    // Both `getPosts` and `getPost` populate `userId`, so a post on the wire
+    // carries the owner object rather than a bare id. This is the same reason
+    // `ProfileResponseSchema` models its `userId` as an object; it was missed
+    // here, and caught by apps/api/test/contract.test.ts.
+    userId: ProfileOwnerSchema,
     name: Type.Optional(Type.String()),
     text: Type.String(),
     avatar: Type.Optional(Type.String()),
