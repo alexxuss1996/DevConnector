@@ -35,7 +35,7 @@ export default fp<{ keyGenerator?: (request: FastifyRequest) => string }>(
           retryAfter: context.after,
         };
       },
-      ...(opts.keyGenerator ? { keyGenerator: opts.keyGenerator } : {}),
+      keyGenerator: opts.keyGenerator,
     });
   },
 );

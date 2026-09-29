@@ -11,6 +11,7 @@ import {
 } from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -57,10 +58,9 @@ describe("POST /profiles — create-only — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -72,10 +72,9 @@ describe("POST /profiles — create-only — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -91,10 +90,9 @@ describe("POST /profiles — create-only — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -107,10 +105,9 @@ describe("POST /profiles — create-only — authentication", () => {
       payload: validProfilePayload(),
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -122,7 +119,8 @@ describe("POST /profiles — create-only — authentication", () => {
       Promise.resolve(mockDoc as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -248,7 +246,8 @@ describe("POST /profiles — create-only — validation", () => {
       Promise.resolve(mockDoc as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -288,7 +287,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -332,7 +332,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -360,7 +361,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -388,7 +390,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     await app.inject({
       method: "POST",
@@ -427,7 +430,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -458,7 +462,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -482,7 +487,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -496,7 +502,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
     const update = { $set: createdDoc(create) };
     assert.equal(update.$set.website, undefined);
     // Nothing to unset on an insert: rejected fields are simply absent.
-    assert.equal("website" in update.$set, false);  });
+    assert.equal("website" in update.$set, false);
+  });
 
   test("unsets a github username that sanitizes to nothing", async () => {
     const userId = newId();
@@ -506,7 +513,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -520,7 +528,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
     const update = { $set: createdDoc(create) };
     assert.equal(update.$set.githubusername, undefined);
     // Nothing to unset on an insert: rejected fields are simply absent.
-    assert.equal("githubusername" in update.$set, false);  });
+    assert.equal("githubusername" in update.$set, false);
+  });
 
   test("stores plain-text fields with ampersands intact", async () => {
     const userId = newId();
@@ -534,7 +543,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -559,7 +569,8 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -591,10 +602,9 @@ describe("POST /profiles — create-only — createOrUpdate logic", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
-      requestId: reply.json().requestId,
     });
   });
 });
@@ -608,7 +618,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -621,7 +632,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
     assert.equal(findOneAndUpdate.mock.callCount(), 0);
     const update = { $set: createdDoc(create) };
     // Nothing to unset on an insert: rejected fields are simply absent.
-    assert.equal("company" in update.$set, false);    assert.equal(update.$set?.company, undefined);
+    assert.equal("company" in update.$set, false);
+    assert.equal(update.$set?.company, undefined);
   });
 
   test("wipes multiple top-level fields and social fields together", async () => {
@@ -632,7 +644,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -650,7 +663,7 @@ describe("POST /profiles — create-only — wipe via null", () => {
     assert.equal(findOneAndUpdate.mock.callCount(), 0);
     const update = { $set: createdDoc(create) };
     // Nothing to unset on an insert: rejected fields are simply absent.
-    assert.equal("company" in update.$set, false);    // Nothing to unset on an insert: the field is simply absent.
+    assert.equal("company" in update.$set, false); // Nothing to unset on an insert: the field is simply absent.
     assert.equal("website" in update.$set, false);
     assert.equal("social.twitter" in update.$set, false);
     assert.equal("social.linkedin" in update.$set, false);
@@ -665,7 +678,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -689,7 +703,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
 
     const reply = await app.inject({
       method: "POST",
@@ -708,7 +723,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
     assert.equal(update.$set.company, "NewCo");
     assert.equal(update.$set["social.facebook"], "https://facebook.com/new");
     // Nothing to unset on an insert: rejected fields are simply absent.
-    assert.equal("website" in update.$set, false);  });
+    assert.equal("website" in update.$set, false);
+  });
 
   test("wipes optional fields when empty string is sent (form-friendly)", async () => {
     const userId = newId();
@@ -727,8 +743,9 @@ describe("POST /profiles — create-only — wipe via null", () => {
       const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
         Promise.resolve(persisted as any),
       );
-    stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+      stubMethod(Profile, "exists", () => Promise.resolve(null));
+      const create = stubMethod(Profile, "create", ((doc: any) =>
+        Promise.resolve(mkProfile({ ...doc } as any))) as any);
       const reply = await app.inject({
         method: "POST",
         url: "/profiles/",
@@ -761,7 +778,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
       Promise.resolve(persisted as any),
     );
     stubMethod(Profile, "exists", () => Promise.resolve(null));
-    const create = stubMethod(Profile, "create", ((doc: any) => Promise.resolve(mkProfile({ ...doc } as any))) as any);
+    const create = stubMethod(Profile, "create", ((doc: any) =>
+      Promise.resolve(mkProfile({ ...doc } as any))) as any);
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/",
@@ -774,7 +792,8 @@ describe("POST /profiles — create-only — wipe via null", () => {
     assert.equal(findOneAndUpdate.mock.callCount(), 0);
     const update = { $set: createdDoc(create) };
     // Nothing to unset on an insert: rejected fields are simply absent.
-    assert.equal("company" in update.$set, false);  });
+    assert.equal("company" in update.$set, false);
+  });
 
   test("returns 400 for empty required fields", async () => {
     const userId = newId();
@@ -825,10 +844,9 @@ describe("GET /profiles/me — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({ method: "GET", url: "/profiles/me" });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -843,10 +861,9 @@ describe("GET /profiles/me — authentication", () => {
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -956,10 +973,9 @@ describe("GET /profiles/me — logic", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
-      requestId: reply.json().requestId,
     });
   });
 });

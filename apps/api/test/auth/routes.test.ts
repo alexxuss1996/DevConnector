@@ -13,6 +13,7 @@ import {
 } from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -35,10 +36,13 @@ before(async () => {
       // the app, before it readies — a route added to the returned instance
       // afterwards is rejected.
       extraRoutes: (instance) => {
-        instance
-          .get("/protected", { onRequest: [instance.authenticate] }, async () => ({
+        instance.get(
+          "/protected",
+          { onRequest: [instance.authenticate] },
+          async () => ({
             ok: true,
-          }));
+          }),
+        );
       },
     },
   });
@@ -128,7 +132,11 @@ describe("POST /auth/register", () => {
     const body = reply.json();
     assert.equal(body.code, "REGISTRATION_FAILED");
     assert.equal(body.message, "Email already in use");
-    assert.deepEqual(Object.keys(body).sort(), ["code", "message", "requestId"]);
+    assert.deepEqual(Object.keys(body).sort(), [
+      "code",
+      "message",
+      "requestId",
+    ]);
   });
 });
 
@@ -190,10 +198,9 @@ describe("POST /auth/login", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -318,7 +325,9 @@ describe("GET /protected (authenticate decorator)", () => {
     const reply = await app.inject({ method: "GET", url: "/protected" });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -361,7 +370,9 @@ describe("GET /protected (authenticate decorator)", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -375,7 +386,9 @@ describe("GET /protected (authenticate decorator)", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 });
@@ -423,7 +436,10 @@ describe("GET /auth/google/callback", () => {
     });
 
     assert.equal(reply.statusCode, 302);
-    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_auth_failed`,
+    );
   });
 });
 
@@ -477,10 +493,9 @@ describe("POST /auth/register — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 409);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "REGISTRATION_FAILED",
       message: "Email already in use",
-      requestId: reply.json().requestId,
     });
 
     assert.equal(create.mock.callCount(), 0);
@@ -541,10 +556,9 @@ describe("POST /auth/login — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
 
     assert.equal(setCookieNames(reply).length, 0);
@@ -606,10 +620,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -640,10 +653,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -674,10 +686,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -708,10 +719,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -739,7 +749,9 @@ describe("POST /auth/refresh — additional cases", () => {
 
     stubMethod(Session, "findById", () => mkQuery(session));
     // Reuse detection revokes the session on token mismatch.
-    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
+    stubMethod(Session, "findByIdAndUpdate", () =>
+      Promise.resolve(session as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
@@ -750,10 +762,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -784,10 +795,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -869,7 +879,9 @@ describe("POST /auth/refresh — additional cases", () => {
 
     stubMethod(Session, "findById", () => mkQuery(session));
     // Reuse detection revokes the session when the old token is replayed.
-    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
+    stubMethod(Session, "findByIdAndUpdate", () =>
+      Promise.resolve(session as any),
+    );
 
     stubMethod(User, "findById", () =>
       mkQuery(
@@ -910,10 +922,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(secondReply.statusCode, 401);
-    assert.deepEqual(secondReply.json(), {
+    assertErrorBody(secondReply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: secondReply.json().requestId,
     });
 
     // The rotated token must still be valid.
@@ -942,10 +953,9 @@ describe("POST /auth/refresh — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INVALID_CREDENTIALS",
       message: "Invalid Credentials",
-      requestId: reply.json().requestId,
     });
   });
 });
@@ -1049,10 +1059,9 @@ describe("GET /protected — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -1070,10 +1079,9 @@ describe("GET /protected — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -1087,10 +1095,9 @@ describe("GET /protected — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 });
@@ -1108,7 +1115,10 @@ describe("GET /auth/google/callback — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 302);
-    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_auth_failed`,
+    );
   });
 
   test("redirects with error param when Google email is not verified", async () => {
@@ -1133,7 +1143,10 @@ describe("GET /auth/google/callback — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 302);
-    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_auth_failed`,
+    );
     assert.equal(create.mock.callCount(), 0);
   });
 
@@ -1153,7 +1166,10 @@ describe("GET /auth/google/callback — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 302);
-    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_auth_failed`,
+    );
   });
 
   test("redirects with error param when Google user does not contain email", async () => {
@@ -1172,7 +1188,10 @@ describe("GET /auth/google/callback — additional cases", () => {
     });
 
     assert.equal(reply.statusCode, 302);
-    assert.equal(reply.headers.location, `${process.env.FRONTEND_URL}?error=google_auth_failed`);
+    assert.equal(
+      reply.headers.location,
+      `${process.env.FRONTEND_URL}?error=google_auth_failed`,
+    );
   });
 
   test("redirects with conflict error instead of auto-linking an existing local account", async () => {
@@ -1444,8 +1463,10 @@ describe("DELETE /auth/google/link", () => {
         mkUser({ _id: userId, googleId: "g-sub", passwordHash: "hash" }) as any,
       ),
     );
-    const updateOne = stubMethod(User, "updateOne", () =>
-      Promise.resolve({ acknowledged: true }) as any,
+    const updateOne = stubMethod(
+      User,
+      "updateOne",
+      () => Promise.resolve({ acknowledged: true }) as any,
     );
 
     const reply = await app.inject({
@@ -1464,7 +1485,11 @@ describe("DELETE /auth/google/link", () => {
     const userId = newId();
     stubMethod(User, "findById", () =>
       mkQuery(
-        mkUser({ _id: userId, googleId: "g-sub", passwordHash: undefined }) as any,
+        mkUser({
+          _id: userId,
+          googleId: "g-sub",
+          passwordHash: undefined,
+        }) as any,
       ),
     );
 

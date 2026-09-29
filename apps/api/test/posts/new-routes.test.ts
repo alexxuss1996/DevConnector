@@ -13,10 +13,10 @@ import {
 } from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-
 
 let app: FastifyInstance;
 
@@ -53,9 +53,14 @@ function authHeader(userId?: string) {
 // ============================================================
 describe("PUT /posts/:id/like — authentication", () => {
   test("returns 401 without a token", async () => {
-    const reply = await app.inject({ method: "PUT", url: `/posts/${newId()}/like` });
+    const reply = await app.inject({
+      method: "PUT",
+      url: `/posts/${newId()}/like`,
+    });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -69,7 +74,10 @@ describe("PUT /posts/:id/like — authentication", () => {
   });
 
   test("returns 401 for refresh token", async () => {
-    const refreshToken = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
+    const refreshToken = signRefreshToken(app, {
+      sub: newId().toString(),
+      sessionId: newId().toString(),
+    });
     const reply = await app.inject({
       method: "PUT",
       url: `/posts/${newId()}/like`,
@@ -116,7 +124,9 @@ describe("PUT /posts/:id/like — logic", () => {
     const user = mkUser({ _id: userId, name: "Liker" });
     const post: any = mkPost({ _id: postId, likes: [{ userId }] });
     stubMethod(User, "findById", () => mkQuery(user as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "PUT",
@@ -126,7 +136,8 @@ describe("PUT /posts/:id/like — logic", () => {
     assert.equal(reply.statusCode, 204);
     assert.equal(reply.body, "");
     assert.equal(updateStub.mock.callCount(), 1);
-    const [likeFilter, likeUpdate] = updateStub.mock.calls[0].arguments as any[];
+    const [likeFilter, likeUpdate] = updateStub.mock.calls[0]
+      .arguments as any[];
     assert.equal(likeFilter._id.toString(), postId.toString());
     assert.ok(likeUpdate.$addToSet);
   });
@@ -136,7 +147,9 @@ describe("PUT /posts/:id/like — logic", () => {
     const postId = newId();
     const post: any = mkPost({ _id: postId, likes: [{ userId }] });
     stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "PUT",
@@ -145,7 +158,8 @@ describe("PUT /posts/:id/like — logic", () => {
     });
     assert.equal(reply.statusCode, 204);
     assert.equal(updateStub.mock.callCount(), 1);
-    const [guardFilter, guardUpdate] = updateStub.mock.calls[0].arguments as any[];
+    const [guardFilter, guardUpdate] = updateStub.mock.calls[0]
+      .arguments as any[];
     assert.equal(guardFilter._id.toString(), postId.toString());
     // $ne guard means concurrent likes cannot both match
     assert.ok(guardFilter["likes.userId"].$ne);
@@ -162,7 +176,9 @@ describe("PUT /posts/:id/like — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
     });
   });
 
@@ -175,7 +191,9 @@ describe("PUT /posts/:id/like — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "USER_NOT_FOUND",
+      message: "User not found",
     });
   });
 
@@ -191,13 +209,17 @@ describe("PUT /posts/:id/like — logic", () => {
       headers: authHeader(userId.toString()),
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "ALREADY_LIKED", message: "User already liked the post", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "ALREADY_LIKED",
+      message: "User already liked the post",
     });
   });
 
   test("returns 500 for DB error on update", async () => {
     stubMethod(User, "findById", () => mkQuery(mkUser() as any));
-    stubMethod(Post, "findOneAndUpdate", () => { throw new Error("DB boom"); });
+    stubMethod(Post, "findOneAndUpdate", () => {
+      throw new Error("DB boom");
+    });
     const reply = await app.inject({
       method: "PUT",
       url: `/posts/${newId()}/like`,
@@ -210,7 +232,9 @@ describe("PUT /posts/:id/like — logic", () => {
     const userId = newId();
     stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId }) as any));
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
-    stubMethod(Post, "exists", () => { throw new Error("boom"); });
+    stubMethod(Post, "exists", () => {
+      throw new Error("boom");
+    });
 
     const reply = await app.inject({
       method: "PUT",
@@ -225,7 +249,9 @@ describe("PUT /posts/:id/like — logic", () => {
     const attackerId = newId().toString();
     const post: any = mkPost({ likes: [{ userId }] });
     const user = mkUser({ _id: userId });
-    const findUserStub = stubMethod(User, "findById", () => mkQuery(user as any));
+    const findUserStub = stubMethod(User, "findById", () =>
+      mkQuery(user as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
 
     const reply = await app.inject({
@@ -235,7 +261,10 @@ describe("PUT /posts/:id/like — logic", () => {
       payload: { userId: attackerId } as any,
     });
     assert.equal(reply.statusCode, 204);
-    assert.equal(findUserStub.mock.calls[0].arguments[0].toString(), userId.toString());
+    assert.equal(
+      findUserStub.mock.calls[0].arguments[0].toString(),
+      userId.toString(),
+    );
   });
 });
 
@@ -244,11 +273,17 @@ describe("PUT /posts/:id/like — logic", () => {
 // ============================================================
 describe("PUT /posts/:id/unlike — authentication", () => {
   test("returns 401 without token", async () => {
-    const reply = await app.inject({ method: "PUT", url: `/posts/${newId()}/unlike` });
+    const reply = await app.inject({
+      method: "PUT",
+      url: `/posts/${newId()}/unlike`,
+    });
     assert.equal(reply.statusCode, 401);
   });
   test("returns 401 for refresh token", async () => {
-    const refreshToken = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
+    const refreshToken = signRefreshToken(app, {
+      sub: newId().toString(),
+      sessionId: newId().toString(),
+    });
     const reply = await app.inject({
       method: "PUT",
       url: `/posts/${newId()}/unlike`,
@@ -279,7 +314,9 @@ describe("PUT /posts/:id/unlike — logic", () => {
     const userId = newId();
     const post: any = mkPost({ likes: [] });
     stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "PUT",
@@ -302,7 +339,9 @@ describe("PUT /posts/:id/unlike — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
     });
   });
 
@@ -314,7 +353,9 @@ describe("PUT /posts/:id/unlike — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "USER_NOT_FOUND",
+      message: "User not found",
     });
   });
 
@@ -329,13 +370,17 @@ describe("PUT /posts/:id/unlike — logic", () => {
       headers: authHeader(userId.toString()),
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "NOT_LIKED", message: "User did not like the post", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "NOT_LIKED",
+      message: "User did not like the post",
     });
   });
 
   test("returns 500 for DB error", async () => {
     stubMethod(User, "findById", () => mkQuery(mkUser() as any));
-    stubMethod(Post, "findOneAndUpdate", () => { throw new Error("boom"); });
+    stubMethod(Post, "findOneAndUpdate", () => {
+      throw new Error("boom");
+    });
     const reply = await app.inject({
       method: "PUT",
       url: `/posts/${newId()}/unlike`,
@@ -350,9 +395,14 @@ describe("PUT /posts/:id/unlike — logic", () => {
 // ============================================================
 describe("GET /posts/:id/comments — authentication", () => {
   test("returns 401 without a token", async () => {
-    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments` });
+    const reply = await app.inject({
+      method: "GET",
+      url: `/posts/${newId()}/comments`,
+    });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -363,7 +413,11 @@ describe("GET /posts/:id/comments — authentication", () => {
     const post = mkPost({ _id: postId, comments: [c1 as any, c2 as any] });
     stubMethod(Post, "findById", () => mkQuery(post as any));
 
-    const reply = await app.inject({ method: "GET", url: `/posts/${postId}/comments`, headers: authHeader() });
+    const reply = await app.inject({
+      method: "GET",
+      url: `/posts/${postId}/comments`,
+      headers: authHeader(),
+    });
     assert.equal(reply.statusCode, 200);
     const body = reply.json() as any;
     assert.ok(Array.isArray(body.comments));
@@ -384,16 +438,26 @@ describe("GET /posts/:id/comments — authentication", () => {
 
   test("returns 404 when post not found", async () => {
     stubMethod(Post, "findById", () => mkQuery(null));
-    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments`, headers: authHeader() });
+    const reply = await app.inject({
+      method: "GET",
+      url: `/posts/${newId()}/comments`,
+      headers: authHeader(),
+    });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
     });
   });
 
   test("returns 200 with empty array when no comments", async () => {
     const post = mkPost({ comments: [] });
     stubMethod(Post, "findById", () => mkQuery(post as any));
-    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments`, headers: authHeader() });
+    const reply = await app.inject({
+      method: "GET",
+      url: `/posts/${newId()}/comments`,
+      headers: authHeader(),
+    });
     assert.equal(reply.statusCode, 200);
     assert.deepEqual((reply.json() as any).comments, []);
   });
@@ -402,15 +466,25 @@ describe("GET /posts/:id/comments — authentication", () => {
     const postId = newId();
     const post = mkPost({ _id: postId, comments: [] });
     const stub = stubMethod(Post, "findById", () => mkQuery(post as any));
-    const reply = await app.inject({ method: "GET", url: `/posts/${postId}/comments`, headers: authHeader() });
+    const reply = await app.inject({
+      method: "GET",
+      url: `/posts/${postId}/comments`,
+      headers: authHeader(),
+    });
     assert.equal(reply.statusCode, 200);
     assert.equal(stub.mock.callCount(), 1);
     assert.equal(stub.mock.calls[0].arguments[0].toString(), postId.toString());
   });
 
   test("returns 500 for DB error", async () => {
-    stubMethod(Post, "findById", () => { throw new Error("boom"); });
-    const reply = await app.inject({ method: "GET", url: `/posts/${newId()}/comments`, headers: authHeader() });
+    stubMethod(Post, "findById", () => {
+      throw new Error("boom");
+    });
+    const reply = await app.inject({
+      method: "GET",
+      url: `/posts/${newId()}/comments`,
+      headers: authHeader(),
+    });
     assert.equal(reply.statusCode, 500);
   });
 });
@@ -428,7 +502,10 @@ describe("POST /posts/:id/comments — authentication", () => {
     assert.equal(reply.statusCode, 401);
   });
   test("returns 401 for refresh token", async () => {
-    const refreshToken = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
+    const refreshToken = signRefreshToken(app, {
+      sub: newId().toString(),
+      sessionId: newId().toString(),
+    });
     const reply = await app.inject({
       method: "POST",
       url: `/posts/${newId()}/comments`,
@@ -440,8 +517,15 @@ describe("POST /posts/:id/comments — authentication", () => {
   test("accepts cookie token", async () => {
     const userId = newId();
     const postId = newId();
-    const user = mkUser({ _id: userId, name: "Commenter", avatar: "https://example.com/a.png" });
-    const post: any = mkPost({ _id: postId, comments: [mkComment({ userId, text: "cookie comment" }) as any] });
+    const user = mkUser({
+      _id: userId,
+      name: "Commenter",
+      avatar: "https://example.com/a.png",
+    });
+    const post: any = mkPost({
+      _id: postId,
+      comments: [mkComment({ userId, text: "cookie comment" }) as any],
+    });
     stubMethod(User, "findById", () => mkQuery(user as any));
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
     const token = signAccessToken(app, { sub: userId.toString() });
@@ -491,7 +575,9 @@ describe("POST /posts/:id/comments — validation", () => {
   test("accepts valid text", async () => {
     const userId = newId();
     const user = mkUser({ _id: userId, name: "Valid" });
-    const post: any = mkPost({ comments: [mkComment({ userId, text: "valid comment" }) as any] });
+    const post: any = mkPost({
+      comments: [mkComment({ userId, text: "valid comment" }) as any],
+    });
     stubMethod(User, "findById", () => mkQuery(user as any));
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
     const reply = await app.inject({
@@ -511,10 +597,21 @@ describe("POST /posts/:id/comments — logic", () => {
   test("creates comment and returns 201", async () => {
     const userId = newId();
     const postId = newId();
-    const user = mkUser({ _id: userId, name: "Jane", avatar: "https://example.com/j.png" });
-    const post: any = mkPost({ _id: postId, comments: [mkComment({ userId, text: "my comment", name: "Jane" }) as any] });
+    const user = mkUser({
+      _id: userId,
+      name: "Jane",
+      avatar: "https://example.com/j.png",
+    });
+    const post: any = mkPost({
+      _id: postId,
+      comments: [
+        mkComment({ userId, text: "my comment", name: "Jane" }) as any,
+      ],
+    });
     stubMethod(User, "findById", () => mkQuery(user as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
@@ -533,10 +630,18 @@ describe("POST /posts/:id/comments — logic", () => {
 
   test("uses avatar fallback when user has no avatar", async () => {
     const userId = newId();
-    const user = mkUser({ _id: userId, name: "NoAvatar", avatar: undefined as any });
-    const post: any = mkPost({ comments: [mkComment({ text: "fallback", avatar: "" }) as any] });
+    const user = mkUser({
+      _id: userId,
+      name: "NoAvatar",
+      avatar: undefined as any,
+    });
+    const post: any = mkPost({
+      comments: [mkComment({ text: "fallback", avatar: "" }) as any],
+    });
     stubMethod(User, "findById", () => mkQuery(user as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
@@ -559,7 +664,9 @@ describe("POST /posts/:id/comments — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
     });
   });
 
@@ -572,7 +679,9 @@ describe("POST /posts/:id/comments — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "USER_NOT_FOUND",
+      message: "User not found",
     });
   });
 
@@ -586,13 +695,17 @@ describe("POST /posts/:id/comments — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "VALIDATION_ERROR", message: "User has no name", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "VALIDATION_ERROR",
+      message: "User has no name",
     });
   });
 
   test("returns 500 for update error", async () => {
     stubMethod(User, "findById", () => mkQuery(mkUser() as any));
-    stubMethod(Post, "findOneAndUpdate", () => { throw new Error("boom"); });
+    stubMethod(Post, "findOneAndUpdate", () => {
+      throw new Error("boom");
+    });
     const reply = await app.inject({
       method: "POST",
       url: `/posts/${newId()}/comments`,
@@ -604,9 +717,13 @@ describe("POST /posts/:id/comments — logic", () => {
 
   test("uses JWT sub not payload userId", async () => {
     const userId = newId();
-    const post: any = mkPost({ comments: [mkComment({ userId, text: "hijack" }) as any] });
+    const post: any = mkPost({
+      comments: [mkComment({ userId, text: "hijack" }) as any],
+    });
     const user = mkUser({ _id: userId, name: "Legit" });
-    const findUserStub = stubMethod(User, "findById", () => mkQuery(user as any));
+    const findUserStub = stubMethod(User, "findById", () =>
+      mkQuery(user as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
     const reply = await app.inject({
       method: "POST",
@@ -615,7 +732,10 @@ describe("POST /posts/:id/comments — logic", () => {
       payload: { text: "hijack", userId: newId().toString() } as any,
     });
     assert.equal(reply.statusCode, 201);
-    assert.equal(findUserStub.mock.calls[0].arguments[0].toString(), userId.toString());
+    assert.equal(
+      findUserStub.mock.calls[0].arguments[0].toString(),
+      userId.toString(),
+    );
   });
 });
 
@@ -624,11 +744,17 @@ describe("POST /posts/:id/comments — logic", () => {
 // ============================================================
 describe("DELETE /posts/:id/comments/:commentId — authentication", () => {
   test("returns 401 without token", async () => {
-    const reply = await app.inject({ method: "DELETE", url: `/posts/${newId()}/comments/${newId()}` });
+    const reply = await app.inject({
+      method: "DELETE",
+      url: `/posts/${newId()}/comments/${newId()}`,
+    });
     assert.equal(reply.statusCode, 401);
   });
   test("returns 401 for refresh token", async () => {
-    const refreshToken = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
+    const refreshToken = signRefreshToken(app, {
+      sub: newId().toString(),
+      sessionId: newId().toString(),
+    });
     const reply = await app.inject({
       method: "DELETE",
       url: `/posts/${newId()}/comments/${newId()}`,
@@ -661,7 +787,9 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
     const comment = mkComment({ userId, text: "to delete" });
     const post: any = mkPost({ comments: [] });
     stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
@@ -671,7 +799,10 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
     assert.equal(reply.statusCode, 204);
     assert.equal(reply.body, "");
     const [, pullUpdate] = updateStub.mock.calls[0].arguments as any[];
-    assert.equal(pullUpdate.$pull.comments._id.toString(), comment._id.toString());
+    assert.equal(
+      pullUpdate.$pull.comments._id.toString(),
+      comment._id.toString(),
+    );
   });
 
   test("returns 404 when post not found", async () => {
@@ -684,7 +815,9 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
     });
   });
 
@@ -696,7 +829,9 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "USER_NOT_FOUND",
+      message: "User not found",
     });
   });
 
@@ -712,7 +847,9 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(userId.toString()),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "COMMENT_NOT_FOUND", message: "Comment not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "COMMENT_NOT_FOUND",
+      message: "Comment not found",
     });
   });
 
@@ -721,7 +858,9 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
     const otherUserId = newId();
     const comment = mkComment({ userId: authorId });
     const post: any = mkPost({ comments: [comment as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: otherUserId }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: otherUserId }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
 
@@ -731,13 +870,14 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
       headers: authHeader(otherUserId.toString()),
     });
     assert.equal(reply.statusCode, 403);
-    assert.deepEqual(reply.json(), { code: "FORBIDDEN", message: "Not authorized", requestId: reply.json().requestId,
-    });
+    assertErrorBody(reply, { code: "FORBIDDEN", message: "Not authorized" });
   });
 
   test("returns 500 for DB error", async () => {
     stubMethod(User, "findById", () => mkQuery(mkUser() as any));
-    stubMethod(Post, "findOneAndUpdate", () => { throw new Error("boom"); });
+    stubMethod(Post, "findOneAndUpdate", () => {
+      throw new Error("boom");
+    });
     const reply = await app.inject({
       method: "DELETE",
       url: `/posts/${newId()}/comments/${newId()}`,
@@ -752,7 +892,9 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
     const c2 = mkComment({ userId, text: "c2" });
     const post: any = mkPost({ comments: [c2 as any] });
     stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
@@ -761,7 +903,10 @@ describe("DELETE /posts/:id/comments/:commentId — logic", () => {
     });
     assert.equal(reply.statusCode, 204);
     const [, targetedUpdate] = updateStub.mock.calls[0].arguments as any[];
-    assert.equal(targetedUpdate.$pull.comments._id.toString(), c1._id.toString());
+    assert.equal(
+      targetedUpdate.$pull.comments._id.toString(),
+      c1._id.toString(),
+    );
   });
 });
 
@@ -794,11 +939,23 @@ describe("postService — unit (new methods)", () => {
   test("createPostComment pushes atomically and returns comments", async () => {
     const { postService } = await import("#modules/posts/posts.service");
     const userId = newId();
-    const user = mkUser({ _id: userId, name: "Tester", avatar: "https://example.com/a.png" });
-    const post: any = mkPost({ comments: [mkComment({ userId, text: "hello", name: "Tester" }) as any] });
+    const user = mkUser({
+      _id: userId,
+      name: "Tester",
+      avatar: "https://example.com/a.png",
+    });
+    const post: any = mkPost({
+      comments: [mkComment({ userId, text: "hello", name: "Tester" }) as any],
+    });
     stubMethod(User, "findById", () => mkQuery(user as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
-    const result = await postService.createPostComment(userId.toString(), newId().toString(), "hello");
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
+    const result = await postService.createPostComment(
+      userId.toString(),
+      newId().toString(),
+      "hello",
+    );
     assert.ok(Array.isArray(result));
     assert.equal(result.length, 1);
     assert.equal(result[0].text, "hello");
@@ -844,8 +1001,14 @@ describe("postService — unit (new methods)", () => {
     const c = mkComment({ userId });
     const post: any = mkPost({ comments: [] });
     stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
-    await postService.deletePostComment(userId.toString(), newId().toString(), c._id.toString());
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
+    await postService.deletePostComment(
+      userId.toString(),
+      newId().toString(),
+      c._id.toString(),
+    );
     const [, removeUpdate] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(removeUpdate.$pull.comments._id.toString(), c._id.toString());
   });
@@ -858,7 +1021,12 @@ describe("postService — unit (new methods)", () => {
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
     await assert.rejects(
-      () => postService.deletePostComment(userId.toString(), newId().toString(), newId().toString()),
+      () =>
+        postService.deletePostComment(
+          userId.toString(),
+          newId().toString(),
+          newId().toString(),
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 404);
         assert.equal(err.code, "COMMENT_NOT_FOUND");
@@ -871,11 +1039,19 @@ describe("postService — unit (new methods)", () => {
     const { postService } = await import("#modules/posts/posts.service");
     const userId = newId();
     const post = mkPost({ comments: [] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "n" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "n" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
     await assert.rejects(
-      () => postService.updatePostComment(userId.toString(), newId().toString(), newId().toString(), "new"),
+      () =>
+        postService.updatePostComment(
+          userId.toString(),
+          newId().toString(),
+          newId().toString(),
+          "new",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 404);
         assert.equal(err.code, "COMMENT_NOT_FOUND");
@@ -889,9 +1065,18 @@ describe("postService — unit (new methods)", () => {
     const userId = newId();
     const c = mkComment({ userId, text: "new text" });
     const post: any = mkPost({ comments: [c as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: userId, name: "n" }) as any));
-    const updateStub = stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(post as any));
-    const result = await postService.updatePostComment(userId.toString(), newId().toString(), c._id.toString(), "new text");
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: userId, name: "n" }) as any),
+    );
+    const updateStub = stubMethod(Post, "findOneAndUpdate", () =>
+      Promise.resolve(post as any),
+    );
+    const result = await postService.updatePostComment(
+      userId.toString(),
+      newId().toString(),
+      c._id.toString(),
+      "new text",
+    );
     assert.equal(result.text, "new text");
     const [, setUpdate] = updateStub.mock.calls[0].arguments as any[];
     assert.equal(setUpdate.$set["comments.$.text"], "new text");
@@ -903,11 +1088,19 @@ describe("postService — unit (new methods)", () => {
     const otherId = newId();
     const c = mkComment({ userId: authorId, text: "old" });
     const post = mkPost({ comments: [c as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: otherId, name: "x" }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: otherId, name: "x" }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
     await assert.rejects(
-      () => postService.updatePostComment(otherId.toString(), newId().toString(), c._id.toString(), "hacked"),
+      () =>
+        postService.updatePostComment(
+          otherId.toString(),
+          newId().toString(),
+          c._id.toString(),
+          "hacked",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 403);
         assert.equal(err.code, "FORBIDDEN");
@@ -922,7 +1115,13 @@ describe("postService — unit (new methods)", () => {
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(null));
     await assert.rejects(
-      () => postService.updatePostComment(newId().toString(), newId().toString(), newId().toString(), "t"),
+      () =>
+        postService.updatePostComment(
+          newId().toString(),
+          newId().toString(),
+          newId().toString(),
+          "t",
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 404);
         assert.equal(err.code, "POST_NOT_FOUND");
@@ -937,11 +1136,18 @@ describe("postService — unit (new methods)", () => {
     const otherId = newId();
     const c = mkComment({ userId: authorId });
     const post = mkPost({ comments: [c as any] });
-    stubMethod(User, "findById", () => mkQuery(mkUser({ _id: otherId }) as any));
+    stubMethod(User, "findById", () =>
+      mkQuery(mkUser({ _id: otherId }) as any),
+    );
     stubMethod(Post, "findOneAndUpdate", () => Promise.resolve(null));
     stubMethod(Post, "findById", () => mkQuery(post as any));
     await assert.rejects(
-      () => postService.deletePostComment(otherId.toString(), newId().toString(), c._id.toString()),
+      () =>
+        postService.deletePostComment(
+          otherId.toString(),
+          newId().toString(),
+          c._id.toString(),
+        ),
       (err: any) => {
         assert.equal(err.statusCode, 403);
         assert.equal(err.code, "FORBIDDEN");

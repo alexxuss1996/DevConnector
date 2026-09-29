@@ -13,6 +13,7 @@ import {
 } from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -65,10 +66,9 @@ describe("PUT /posts/:id/comments/:commentId — authentication", () => {
       payload: { text: "new" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -274,10 +274,9 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "POST_NOT_FOUND",
       message: "Post not found",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -292,10 +291,9 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "USER_NOT_FOUND",
       message: "User not found",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -312,10 +310,9 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "VALIDATION_ERROR",
       message: "User has no name",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -334,10 +331,9 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "COMMENT_NOT_FOUND",
       message: "Comment not found",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -359,11 +355,7 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hacked" },
     });
     assert.equal(reply.statusCode, 403);
-    assert.deepEqual(reply.json(), {
-      code: "FORBIDDEN",
-      message: "Not authorized",
-      requestId: reply.json().requestId,
-    });
+    assertErrorBody(reply, { code: "FORBIDDEN", message: "Not authorized" });
     // ensure not mutated
     assert.equal(comment.text, "orig");
   });
@@ -380,10 +372,9 @@ describe("PUT /posts/:id/comments/:commentId — logic", () => {
       payload: { text: "hi" },
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error",
-      requestId: reply.json().requestId,
     });
   });
 

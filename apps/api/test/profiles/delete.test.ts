@@ -2,9 +2,15 @@ import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import Profile from "#modules/profiles/profiles.model";
 import { profileService } from "#modules/profiles/profiles.service";
-import { newId, mkProfile, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
+import {
+  newId,
+  mkProfile,
+  stubMethod,
+  restoreAllStubs,
+} from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import { Types } from "mongoose";
@@ -51,7 +57,10 @@ describe("DELETE /profiles/experience/:experienceId — authentication", () => {
       url: `/profiles/experience/${newId().toString()}`,
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for an empty Bearer token", async () => {
@@ -92,9 +101,18 @@ describe("DELETE /profiles/experience/:experienceId — authentication", () => {
     const expId = newId();
     const mockProfile = mkProfile({
       userId,
-      experience: [{ _id: newId(), title: "Dev", company: "Acme", from: new Date() } as any],
+      experience: [
+        {
+          _id: newId(),
+          title: "Dev",
+          company: "Acme",
+          from: new Date(),
+        } as any,
+      ],
     });
-    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mockProfile as any));
+    stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(mockProfile as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
@@ -168,18 +186,24 @@ describe("DELETE /profiles/experience/:experienceId — validation (ObjectId)", 
     const replyLower = await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expIdLower}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
     assert.equal(replyLower.statusCode, 200);
     restoreAllStubs();
 
     const expIdUpper = newId().toString().toUpperCase();
     const mockProfile2 = mkProfile({ userId, experience: [] });
-    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mockProfile2 as any));
+    stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(mockProfile2 as any),
+    );
     const replyUpper = await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expIdUpper}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
     assert.equal(replyUpper.statusCode, 200);
     // ensure upper was cast to ObjectId correctly — filter should still be ObjectId
@@ -191,7 +215,12 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
   test("returns 200 and profile when experience is deleted", async () => {
     const userId = newId();
     const expId = newId();
-    const remaining = { _id: newId(), title: "Other", company: "OtherCo", from: new Date() } as any;
+    const remaining = {
+      _id: newId(),
+      title: "Other",
+      company: "OtherCo",
+      from: new Date(),
+    } as any;
     const persisted = mkProfile({ userId, experience: [remaining] });
     const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
       Promise.resolve(persisted as any),
@@ -200,18 +229,27 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
     const reply = await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 200);
     const body = reply.json() as any;
     assert.ok(body.profile);
     assert.equal(findOneAndUpdate.mock.callCount(), 1);
-    const [filter, update, options] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    const [filter, update, options] = findOneAndUpdate.mock.calls[0]
+      .arguments as any[];
     // filter.userId is string from JWT, filter["experience._id"] must be ObjectId
     assert.equal(filter.userId, userId.toString());
-    assert.ok(filter["experience._id"] instanceof Types.ObjectId, "filter should contain ObjectId");
-    assert.equal((filter["experience._id"] as Types.ObjectId).toString(), expId.toString());
+    assert.ok(
+      filter["experience._id"] instanceof Types.ObjectId,
+      "filter should contain ObjectId",
+    );
+    assert.equal(
+      (filter["experience._id"] as Types.ObjectId).toString(),
+      expId.toString(),
+    );
     // $pull must contain ObjectId as well
     assert.ok(update.$pull.experience._id instanceof Types.ObjectId);
     assert.equal(update.$pull.experience._id.toString(), expId.toString());
@@ -229,7 +267,9 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
     await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     // Ensure we never fell back to string-based filter
@@ -247,7 +287,9 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
     const reply = await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 404);
@@ -258,12 +300,16 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
     const userId = newId();
     const expId = newId();
     stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null));
-    stubMethod(Profile, "exists", () => Promise.resolve({ _id: newId() } as any));
+    stubMethod(Profile, "exists", () =>
+      Promise.resolve({ _id: newId() } as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 404);
@@ -274,13 +320,17 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
   test("distinguishes PROFILE_NOT_FOUND vs EXPERIENCE_NOT_FOUND via exists check", async () => {
     const userId = newId();
     const expId = newId();
-    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null));
+    const findOneAndUpdate = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(null),
+    );
     const exists = stubMethod(Profile, "exists", () => Promise.resolve(null));
 
     await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(findOneAndUpdate.mock.callCount(), 1);
@@ -301,7 +351,10 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
+    });
   });
 
   test("uses userId from JWT sub, not from URL or body", async () => {
@@ -316,7 +369,9 @@ describe("DELETE /profiles/experience/:experienceId — logic", () => {
     const reply = await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { userId: attackerId } as any,
     });
 
@@ -358,7 +413,9 @@ describe("DELETE /profiles/education/:educationId — authentication", () => {
     const accessToken = signAccessToken(app, { sub: userId.toString() });
     const eduId = newId();
     const mockProfile = mkProfile({ userId, education: [] });
-    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mockProfile as any));
+    stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(mockProfile as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
@@ -420,12 +477,15 @@ describe("DELETE /profiles/education/:educationId — logic", () => {
     const reply = await app.inject({
       method: "DELETE",
       url: `/profiles/education/${eduId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 200);
     assert.ok((reply.json() as any).profile);
-    const [filter, update, options] = findOneAndUpdate.mock.calls[0].arguments as any[];
+    const [filter, update, options] = findOneAndUpdate.mock.calls[0]
+      .arguments as any[];
     assert.equal(filter.userId, userId.toString());
     assert.ok(filter["education._id"] instanceof Types.ObjectId);
     assert.equal(filter["education._id"].toString(), eduId.toString());
@@ -450,7 +510,9 @@ describe("DELETE /profiles/education/:educationId — logic", () => {
 
   test("returns 404 EDUCATION_NOT_FOUND when education missing but profile exists", async () => {
     stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null));
-    stubMethod(Profile, "exists", () => Promise.resolve({ _id: newId() } as any));
+    stubMethod(Profile, "exists", () =>
+      Promise.resolve({ _id: newId() } as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
@@ -475,7 +537,10 @@ describe("DELETE /profiles/education/:educationId — logic", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
+    });
   });
 });
 
@@ -487,23 +552,35 @@ describe("DELETE routes — DRY and ObjectId invariants", () => {
     const mock = mkProfile({ userId });
 
     // experience
-    const f1 = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mock as any));
+    const f1 = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(mock as any),
+    );
     await app.inject({
       method: "DELETE",
       url: `/profiles/experience/${expId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
-    assert.ok(f1.mock.calls[0].arguments[0]["experience._id"] instanceof Types.ObjectId);
+    assert.ok(
+      f1.mock.calls[0].arguments[0]["experience._id"] instanceof Types.ObjectId,
+    );
     restoreAllStubs();
 
     // education
-    const f2 = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(mock as any));
+    const f2 = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(mock as any),
+    );
     await app.inject({
       method: "DELETE",
       url: `/profiles/education/${eduId.toString()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
-    assert.ok(f2.mock.calls[0].arguments[0]["education._id"] instanceof Types.ObjectId);
+    assert.ok(
+      f2.mock.calls[0].arguments[0]["education._id"] instanceof Types.ObjectId,
+    );
   });
 
   test("service fallback validates ObjectId if route validation is bypassed (direct service call)", async () => {

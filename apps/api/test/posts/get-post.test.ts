@@ -10,6 +10,7 @@ import {
 } from "../helpers/stubs.ts";
 import { signAccessToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -40,9 +41,10 @@ afterEach(() => {
 });
 
 function authHeader() {
-  return { authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}` };
+  return {
+    authorization: `Bearer ${signAccessToken(app, { sub: newId().toString() })}`,
+  };
 }
-
 
 // ============================================================
 // GET /posts/:id — success (requires auth, like the posts feed)
@@ -72,10 +74,9 @@ describe("GET /posts/:id — success", () => {
       url: `/posts/${newId().toString()}`,
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FAILED_AUTHENTICATION",
       message: "Unauthorized",
-      requestId: reply.json().requestId,
     });
   });
 
@@ -98,7 +99,9 @@ describe("GET /posts/:id — success", () => {
   test("calls Post.findById with correct id param", async () => {
     const postId = newId();
     const post = mkPost({ _id: postId });
-    const findByIdStub = stubMethod(Post, "findById", () => mkQuery(post as any));
+    const findByIdStub = stubMethod(Post, "findById", () =>
+      mkQuery(post as any),
+    );
 
     const reply = await app.inject({
       method: "GET",
@@ -181,7 +184,9 @@ describe("GET /posts/:id — not found", () => {
     });
 
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
     });
   });
 
@@ -199,7 +204,9 @@ describe("GET /posts/:id — not found", () => {
     // Generic errors not from AppError are treated as 500 by errorHandler
     // (service now throws AppError for known not-found; generic throw is unexpected)
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
     });
   });
 
@@ -217,7 +224,9 @@ describe("GET /posts/:id — not found", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
     });
   });
 
@@ -233,7 +242,9 @@ describe("GET /posts/:id — not found", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
     });
   });
 
@@ -357,7 +368,9 @@ describe("postService.getPost — unit", () => {
     const { postService } = await import("#modules/posts/posts.service");
     const postId = newId().toString();
     const post = mkPost({ text: "id pass through" });
-    const findByIdStub = stubMethod(Post, "findById", () => mkQuery(post as any));
+    const findByIdStub = stubMethod(Post, "findById", () =>
+      mkQuery(post as any),
+    );
 
     await postService.getPost(postId);
     assert.equal(findByIdStub.mock.callCount(), 1);

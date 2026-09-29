@@ -1,9 +1,13 @@
 import { describe, test, before, after, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { profileService, clearGithubReposCache } from "#modules/profiles/profiles.service";
+import {
+  profileService,
+  clearGithubReposCache,
+} from "#modules/profiles/profiles.service";
 import { newId } from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -27,7 +31,9 @@ before(async () => {
 after(async () => {
   await app.close();
   // restore fetch mock if any
-  try { (global.fetch as any).mock?.restore?.(); } catch {}
+  try {
+    (global.fetch as any).mock?.restore?.();
+  } catch {}
   mock.restoreAll();
 });
 
@@ -35,7 +41,9 @@ afterEach(() => {
   mock.restoreAll();
   // ensure fetch restored
   if ((global.fetch as any).mock) {
-    try { (global.fetch as any).mock.restore(); } catch {}
+    try {
+      (global.fetch as any).mock.restore();
+    } catch {}
   }
   // service caches GitHub responses for 60s — clear so mocked fetches re-run
   clearGithubReposCache();
@@ -47,20 +55,30 @@ function authHeader(userId?: string) {
 }
 
 function mockFetchSuccess(repos: any[]) {
-  const fetchMock = mock.method(global, "fetch", async () => ({
-    ok: true,
-    status: 200,
-    json: async () => repos,
-  } as any));
+  const fetchMock = mock.method(
+    global,
+    "fetch",
+    async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => repos,
+      }) as any,
+  );
   return fetchMock;
 }
 
 function mockFetchNotFound(body: any = { message: "Not Found" }) {
-  const fetchMock = mock.method(global, "fetch", async () => ({
-    ok: false,
-    status: 404,
-    json: async () => body,
-  } as any));
+  const fetchMock = mock.method(
+    global,
+    "fetch",
+    async () =>
+      ({
+        ok: false,
+        status: 404,
+        json: async () => body,
+      }) as any,
+  );
   return fetchMock;
 }
 
@@ -69,9 +87,15 @@ function mockFetchNotFound(body: any = { message: "Not Found" }) {
 // ============================================================
 describe("GET /profiles/github/:username — authentication", () => {
   test("returns 401 without token", async () => {
-    const reply = await app.inject({ method: "GET", url: "/profiles/github/octocat" });
+    const reply = await app.inject({
+      method: "GET",
+      url: "/profiles/github/octocat",
+    });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for empty Bearer token", async () => {
@@ -84,14 +108,20 @@ describe("GET /profiles/github/:username — authentication", () => {
   });
 
   test("returns 401 for refresh token (must be access)", async () => {
-    const refresh = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
+    const refresh = signRefreshToken(app, {
+      sub: newId().toString(),
+      sessionId: newId().toString(),
+    });
     const reply = await app.inject({
       method: "GET",
       url: "/profiles/github/octocat",
       headers: { authorization: `Bearer ${refresh}` },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
+    });
   });
 
   test("returns 401 for tampered access token", async () => {
@@ -239,15 +269,25 @@ describe("GET /profiles/github/:username — logic", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
+    });
   });
 
   test("returns 500 when fetch json throws", async () => {
-    mock.method(global, "fetch", async () => ({
-      ok: true,
-      status: 200,
-      json: async () => { throw new Error("json parse boom"); },
-    } as any));
+    mock.method(
+      global,
+      "fetch",
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => {
+            throw new Error("json parse boom");
+          },
+        }) as any,
+    );
 
     const reply = await app.inject({
       method: "GET",
@@ -268,13 +308,20 @@ describe("profileService.getGithubReposForProfile — unit", () => {
     process.env.GITHUB_ACCESS_TOKEN = "unit-test-token";
 
     const expected = [{ id: 42, name: "my-repo" }];
-    const fetchMock = mock.method(global, "fetch", async (url: string, opts: any) => {
-      assert.equal(url, "https://api.github.com/users/octocat/repos?per_page=5&sort=created&direction=asc");
-      assert.equal(opts.headers["User-Agent"], "node.js");
-      assert.equal(opts.headers.Accept, "application/vnd.github.v3+json");
-      assert.equal(opts.headers.Authorization, "Bearer unit-test-token");
-      return { ok: true, status: 200, json: async () => expected } as any;
-    });
+    const fetchMock = mock.method(
+      global,
+      "fetch",
+      async (url: string, opts: any) => {
+        assert.equal(
+          url,
+          "https://api.github.com/users/octocat/repos?per_page=5&sort=created&direction=asc",
+        );
+        assert.equal(opts.headers["User-Agent"], "node.js");
+        assert.equal(opts.headers.Accept, "application/vnd.github.v3+json");
+        assert.equal(opts.headers.Authorization, "Bearer unit-test-token");
+        return { ok: true, status: 200, json: async () => expected } as any;
+      },
+    );
 
     const result = await profileService.getGithubReposForProfile("octocat");
     assert.deepEqual(result, expected);
@@ -285,11 +332,16 @@ describe("profileService.getGithubReposForProfile — unit", () => {
   });
 
   test("throws 404 GITHUB_REPOS_NOT_FOUND when response.ok is false", async () => {
-    mock.method(global, "fetch", async () => ({
-      ok: false,
-      status: 404,
-      json: async () => ({ message: "Not Found" }),
-    } as any));
+    mock.method(
+      global,
+      "fetch",
+      async () =>
+        ({
+          ok: false,
+          status: 404,
+          json: async () => ({ message: "Not Found" }),
+        }) as any,
+    );
 
     await assert.rejects(
       () => profileService.getGithubReposForProfile("unknown123"),
@@ -298,19 +350,21 @@ describe("profileService.getGithubReposForProfile — unit", () => {
         assert.equal(err.code, "GITHUB_REPOS_NOT_FOUND");
         assert.equal(err.message, "No repos found");
         return true;
-      }
+      },
     );
   });
 
   test("propagates fetch throw as unhandled (will be 500 at route layer)", async () => {
-    mock.method(global, "fetch", async () => { throw new Error("fetch failed"); });
+    mock.method(global, "fetch", async () => {
+      throw new Error("fetch failed");
+    });
 
     await assert.rejects(
       () => profileService.getGithubReposForProfile("octocat"),
       (err: any) => {
         assert.equal(err.message, "fetch failed");
         return true;
-      }
+      },
     );
   });
 
@@ -332,11 +386,16 @@ describe("profileService.getGithubReposForProfile — unit", () => {
 
   test("caches successful responses and skips fetch on repeat", async () => {
     const repos = [{ id: 7, name: "cached" }];
-    const fetchMock = mock.method(global, "fetch", async () => ({
-      ok: true,
-      status: 200,
-      json: async () => repos,
-    }) as any);
+    const fetchMock = mock.method(
+      global,
+      "fetch",
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => repos,
+        }) as any,
+    );
 
     const first = await profileService.getGithubReposForProfile("cache-user");
     const second = await profileService.getGithubReposForProfile("cache-user");
@@ -346,14 +405,23 @@ describe("profileService.getGithubReposForProfile — unit", () => {
   });
 
   test("does not cache failed responses", async () => {
-    mock.method(global, "fetch", async () => ({
-      ok: false,
-      status: 404,
-      json: async () => ({ message: "Not Found" }),
-    }) as any);
+    mock.method(
+      global,
+      "fetch",
+      async () =>
+        ({
+          ok: false,
+          status: 404,
+          json: async () => ({ message: "Not Found" }),
+        }) as any,
+    );
 
-    await assert.rejects(() => profileService.getGithubReposForProfile("missing-user"));
-    await assert.rejects(() => profileService.getGithubReposForProfile("missing-user"));
+    await assert.rejects(() =>
+      profileService.getGithubReposForProfile("missing-user"),
+    );
+    await assert.rejects(() =>
+      profileService.getGithubReposForProfile("missing-user"),
+    );
     // second call re-fetched instead of serving the 404 from cache
     assert.equal((global.fetch as any).mock.callCount(), 2);
   });

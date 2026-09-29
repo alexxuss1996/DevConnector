@@ -5,9 +5,16 @@ import User from "#modules/users/user.model";
 import Post from "#modules/posts/posts.model";
 import Session from "#modules/auth/session.model";
 import { profileService } from "#modules/profiles/profiles.service";
-import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
+import {
+  newId,
+  mkProfile,
+  mkQuery,
+  stubMethod,
+  restoreAllStubs,
+} from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import mongoose, { Types } from "mongoose";
@@ -83,9 +90,14 @@ describe("createOrUpdateProfile — uncovered branches", () => {
     // to hit if (!Object.keys(update).length) branch
     stubMethod(Profile, "findOne", () => mkQuery(existing as any));
     // findOneAndUpdate should NOT be called if existing found
-    const spy = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(null as any));
+    const spy = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(null as any),
+    );
 
-    const result = await profileService.createOrUpdateProfile(userId, {} as any);
+    const result = await profileService.createOrUpdateProfile(
+      userId,
+      {} as any,
+    );
     // Empty updates short-circuit to the existing profile, normalised for the
     // public response contract.
     assert.equal(result._id, String(existing._id));
@@ -113,19 +125,30 @@ describe("createOrUpdateProfile — uncovered branches", () => {
     const userId = newId().toString();
     const persisted = mkProfile({ userId: new Types.ObjectId(userId) as any });
     stubMethod(Profile, "findOne", () => mkQuery(null));
-    stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(persisted as any));
+    stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(persisted as any),
+    );
 
     // {} will have empty update, no existing, so it will call findOneAndUpdate
     // With persisted returned, it should succeed (runValidators mocked)
-    const result = await profileService.createOrUpdateProfile(userId, {} as any);
+    const result = await profileService.createOrUpdateProfile(
+      userId,
+      {} as any,
+    );
     assert.ok(result);
   });
 
   test("covers required-field preserve branch (48) — status/skills null are ignored via direct service call", async () => {
     const userId = newId().toString();
     // status = "" should be skipped (continue) not added to $unset, skills = null also skipped
-    const persisted = mkProfile({ userId: new Types.ObjectId(userId) as any, status: "Developer", skills: ["JS"] });
-    const spy = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(persisted as any));
+    const persisted = mkProfile({
+      userId: new Types.ObjectId(userId) as any,
+      status: "Developer",
+      skills: ["JS"],
+    });
+    const spy = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(persisted as any),
+    );
 
     // bypass route validation via direct service call
     const result = await profileService.createOrUpdateProfile(userId, {
@@ -146,8 +169,6 @@ describe("createOrUpdateProfile — uncovered branches", () => {
     assert.equal(update.$set.skills, undefined);
   });
 });
-
-
 
 // ============================================================
 // GET /profiles/ — uncovered 21-24
@@ -196,7 +217,10 @@ describe("GET /profiles/ — uncovered", () => {
     });
     const reply = await app.inject({ method: "GET", url: "/profiles/" });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
+    });
   });
 });
 
@@ -210,7 +234,10 @@ describe("DELETE /profiles/ — authentication and logic", () => {
   });
 
   test("returns 401 for refresh token", async () => {
-    const refresh = signRefreshToken(app, { sub: newId().toString(), sessionId: newId().toString() });
+    const refresh = signRefreshToken(app, {
+      sub: newId().toString(),
+      sessionId: newId().toString(),
+    });
     const reply = await app.inject({
       method: "DELETE",
       url: "/profiles/",
@@ -227,9 +254,15 @@ describe("DELETE /profiles/ — authentication and logic", () => {
     const usr = { _id: userId } as any;
     stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(prof as any));
     stubMethod(User, "findOneAndDelete", () => Promise.resolve(usr as any));
-    stubMethod(Post, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
-    stubMethod(Post, "updateMany", () => Promise.resolve({ acknowledged: true } as any));
-    stubMethod(Session, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
+    stubMethod(Post, "deleteMany", () =>
+      Promise.resolve({ acknowledged: true } as any),
+    );
+    stubMethod(Post, "updateMany", () =>
+      Promise.resolve({ acknowledged: true } as any),
+    );
+    stubMethod(Session, "deleteMany", () =>
+      Promise.resolve({ acknowledged: true } as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
@@ -271,16 +304,28 @@ describe("DELETE /profiles/ — authentication and logic", () => {
     const userId = newId();
     const prof = mkProfile({ userId });
     const usr = { _id: userId } as any;
-    const delProfile = stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(prof as any));
-    const delUser = stubMethod(User, "findOneAndDelete", () => Promise.resolve(usr as any));
-    stubMethod(Post, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
-    stubMethod(Post, "updateMany", () => Promise.resolve({ acknowledged: true } as any));
-    stubMethod(Session, "deleteMany", () => Promise.resolve({ acknowledged: true } as any));
+    const delProfile = stubMethod(Profile, "findOneAndDelete", () =>
+      Promise.resolve(prof as any),
+    );
+    const delUser = stubMethod(User, "findOneAndDelete", () =>
+      Promise.resolve(usr as any),
+    );
+    stubMethod(Post, "deleteMany", () =>
+      Promise.resolve({ acknowledged: true } as any),
+    );
+    stubMethod(Post, "updateMany", () =>
+      Promise.resolve({ acknowledged: true } as any),
+    );
+    stubMethod(Session, "deleteMany", () =>
+      Promise.resolve({ acknowledged: true } as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
       url: "/profiles/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
     assert.equal(reply.statusCode, 204);
     // body is empty for 204 but our handler sends {message}
@@ -378,7 +423,12 @@ describe("POST /profiles/experience — validation", () => {
       method: "POST",
       url: "/profiles/experience",
       headers: authHeader(),
-      payload: { title: "Dev", company: "Acme", from: "2023-01-01", to: "bad-date" },
+      payload: {
+        title: "Dev",
+        company: "Acme",
+        from: "2023-01-01",
+        to: "bad-date",
+      },
     });
     assert.equal(reply.statusCode, 400);
   });
@@ -400,7 +450,9 @@ describe("POST /profiles/experience — logic (108-136)", () => {
   test("pushes experience atomically with all fields and returns 201", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: [] });
-    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(prof as any),
+    );
 
     const payload = {
       title: "Engineer",
@@ -415,7 +467,9 @@ describe("POST /profiles/experience — logic (108-136)", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/experience",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload,
     });
     assert.equal(reply.statusCode, 201);
@@ -436,12 +490,16 @@ describe("POST /profiles/experience — logic (108-136)", () => {
   test("handles optional fields omitted (to/current undefined)", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: [] });
-    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(prof as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/experience",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
     assert.equal(reply.statusCode, 201);
@@ -454,13 +512,22 @@ describe("POST /profiles/experience — logic (108-136)", () => {
   test("handles current=true without to date", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, experience: [] });
-    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(prof as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/experience",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
-      payload: { title: "Dev", company: "Acme", from: "2023-01-01", current: true },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+      payload: {
+        title: "Dev",
+        company: "Acme",
+        from: "2023-01-01",
+        current: true,
+      },
     });
     assert.equal(reply.statusCode, 201);
     const [, currentPush] = updateStub.mock.calls[0].arguments as any[];
@@ -477,7 +544,9 @@ describe("POST /profiles/experience — logic (108-136)", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/experience",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { title: "Dev", company: "Acme", from: "2023-01-01" },
     });
     assert.equal(reply.statusCode, 201);
@@ -506,7 +575,12 @@ describe("POST /profiles/education — authentication", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/education",
-      payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
+      payload: {
+        school: "MIT",
+        degree: "BS",
+        fieldofstudy: "CS",
+        from: "2020-01-01",
+      },
     });
     assert.equal(reply.statusCode, 401);
   });
@@ -561,7 +635,12 @@ describe("POST /profiles/education — logic (139-167)", () => {
       method: "POST",
       url: "/profiles/education",
       headers: authHeader(),
-      payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
+      payload: {
+        school: "MIT",
+        degree: "BS",
+        fieldofstudy: "CS",
+        from: "2020-01-01",
+      },
     });
     assert.equal(reply.statusCode, 404);
   });
@@ -569,7 +648,9 @@ describe("POST /profiles/education — logic (139-167)", () => {
   test("pushes education atomically with all fields and returns 201", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: [] });
-    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(prof as any),
+    );
 
     const payload = {
       school: "MIT",
@@ -584,7 +665,9 @@ describe("POST /profiles/education — logic (139-167)", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/education",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload,
     });
     assert.equal(reply.statusCode, 201);
@@ -601,13 +684,22 @@ describe("POST /profiles/education — logic (139-167)", () => {
   test("handles optional to/current omitted", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: [] });
-    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(prof as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/education",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
-      payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+      payload: {
+        school: "MIT",
+        degree: "BS",
+        fieldofstudy: "CS",
+        from: "2020-01-01",
+      },
     });
     assert.equal(reply.statusCode, 201);
     const [, omittedEduPush] = updateStub.mock.calls[0].arguments as any[];
@@ -617,13 +709,23 @@ describe("POST /profiles/education — logic (139-167)", () => {
   test("handles current=true without to", async () => {
     const userId = newId();
     const prof = mkSavableProfile({ userId, education: [] });
-    const updateStub = stubMethod(Profile, "findOneAndUpdate", () => Promise.resolve(prof as any));
+    const updateStub = stubMethod(Profile, "findOneAndUpdate", () =>
+      Promise.resolve(prof as any),
+    );
 
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/education",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
-      payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01", current: true },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+      payload: {
+        school: "MIT",
+        degree: "BS",
+        fieldofstudy: "CS",
+        from: "2020-01-01",
+        current: true,
+      },
     });
     assert.equal(reply.statusCode, 201);
     const [, currentEduPush] = updateStub.mock.calls[0].arguments as any[];
@@ -638,8 +740,15 @@ describe("POST /profiles/education — logic (139-167)", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/profiles/education",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
-      payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
+      payload: {
+        school: "MIT",
+        degree: "BS",
+        fieldofstudy: "CS",
+        from: "2020-01-01",
+      },
     });
     assert.equal(reply.statusCode, 201);
   });
@@ -653,7 +762,12 @@ describe("POST /profiles/education — logic (139-167)", () => {
       method: "POST",
       url: "/profiles/education",
       headers: authHeader(),
-      payload: { school: "MIT", degree: "BS", fieldofstudy: "CS", from: "2020-01-01" },
+      payload: {
+        school: "MIT",
+        degree: "BS",
+        fieldofstudy: "CS",
+        from: "2020-01-01",
+      },
     });
     assert.equal(reply.statusCode, 500);
   });

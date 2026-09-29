@@ -28,7 +28,7 @@ pnpm --filter api dev        # or pnpm dev from repo root via turbo
 
 ## Interactive documentation
 
-Registered in `src/plugins/swagger.ts` and registered explicitly in `src/app.ts`, after the other plugins and before the routes. Both UIs serve the same spec generated dynamically from route schemas (`@fastify/swagger` `openapi: 3.0.3`, `info.title: "DevConnector API"`).
+Configured in `src/plugins/swagger.ts` and registered explicitly in `src/app.ts`, after the other plugins and before the routes. The UI serves the spec generated dynamically from route schemas (`@fastify/swagger` `openapi: 3.0.3`, `info.title: "DevConnector API"`).
 * `GET /docs` — Swagger UI (`@fastify/swagger-ui@^6`, `routePrefix: "/docs"`, `uiConfig.docExpansion: "list"`)
 
 Security schemes exposed in OpenAPI:
@@ -63,9 +63,9 @@ To hide a route from docs: `schema: { hide: true }`. To hide untagged routes glo
 ```
 src/
   app.ts                # explicit plugin registration + createApp() factory; routes via AutoLoad (dirNameRoutePrefix: true)
-  plugins/              # swagger.ts, auth.ts, jwt.ts, cookie.ts, rate-limit.ts, mongoose.ts, oath.ts
-  routes/               # auth/{register,login,refresh,logout,google}, profiles/{profiles,me,...}, posts/{...}
-  modules/{auth,profiles,posts,users}/  # *.service.ts, *.model.ts (Mongoose)
+  plugins/              # auth, cookie, cors, csrf, helmet, jwt, mongoose, oauth, rate-limit, swagger — registered explicitly in app.ts, in that order
+  routes/               # auth/{register,login,refresh,logout,logout-all,google,link-google}, profiles/{profiles,me,...}, posts/{...}
+  modules/{auth,profiles,posts,users}/  # *.service.ts, *.model.ts (Mongoose), *.schemas.ts
   helpers/              # error-handler.ts, auth.ts, auth.cookies.ts
   config/env.ts        # EnvSchema (TypeBox)
 ```

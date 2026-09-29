@@ -25,7 +25,9 @@ describe("oauthStub", () => {
   });
 
   test("exposes every method the routes call on it", () => {
-    const routesDir = fileURLToPath(new URL("../../src/routes/", import.meta.url));
+    const routesDir = fileURLToPath(
+      new URL("../../src/routes/", import.meta.url),
+    );
     const called = new Set<string>();
     for (const entry of readdirSync(routesDir, { recursive: true })) {
       if (!String(entry).endsWith(".ts")) continue;
@@ -34,10 +36,14 @@ describe("oauthStub", () => {
         called.add(match[1]);
       }
     }
-    assert.ok(called.size > 0, "expected at least one googleOAuth2 call in src/routes");
+    assert.ok(
+      called.size > 0,
+      "expected at least one googleOAuth2 call in src/routes",
+    );
+    const namespace = oauthStubNamespace() as Record<string, unknown>;
     for (const name of called) {
       assert.equal(
-        typeof (oauthStubNamespace as Record<string, unknown>)[name],
+        typeof namespace[name],
         "function",
         `src/routes calls googleOAuth2.${name} but the stub does not provide it`,
       );

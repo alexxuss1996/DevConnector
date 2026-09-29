@@ -1,8 +1,15 @@
 import { describe, test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import Profile from "#modules/profiles/profiles.model";
-import { newId, mkProfile, mkQuery, stubMethod, restoreAllStubs } from "../helpers/stubs.ts";
+import {
+  newId,
+  mkProfile,
+  mkQuery,
+  stubMethod,
+  restoreAllStubs,
+} from "../helpers/stubs.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -60,7 +67,10 @@ describe("GET /profiles/user/:id", () => {
     });
 
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "PROFILE_NOT_FOUND", message: "Profile not found", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "PROFILE_NOT_FOUND",
+      message: "Profile not found",
+    });
   });
 
   test("returns 400 VALIDATION_ERROR for malformed id", async () => {
@@ -84,6 +94,9 @@ describe("GET /profiles/user/:id", () => {
     });
 
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId });
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
+    });
   });
 });

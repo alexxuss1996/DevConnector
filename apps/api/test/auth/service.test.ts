@@ -16,12 +16,23 @@ import {
 import { signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
 import { createApp } from "#app";
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;
 
 before(async () => {
-  app = await createApp({ logger: false, overrides: { oauth: oauthStub, db: noDb } });
+  app = await createApp({
+    logger: false,
+    overrides: {
+      oauth: oauthStub,
+      db: noDb,
+      // Key per request so a suite that starts making HTTP calls cannot
+      // start failing with an unexplained 429. This suite currently makes
+      // none, which is why it got left out when the others were migrated.
+      rateLimitKey: () => randomUUID(),
+    },
+  });
 });
 
 after(async () => {
@@ -338,7 +349,9 @@ describe("AuthService.refresh", () => {
     );
     stubMethod(Session, "findById", () => mkQuery(session));
     // Reuse detection revokes the session on token mismatch.
-    stubMethod(Session, "findByIdAndUpdate", () => Promise.resolve(session as any));
+    stubMethod(Session, "findByIdAndUpdate", () =>
+      Promise.resolve(session as any),
+    );
 
     await assert.rejects(
       () => authService.refresh(app, refreshToken),

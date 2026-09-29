@@ -36,7 +36,10 @@ describe("the real wiring", () => {
         `expected route ${method} ${url} to be mounted`,
       );
     }
-    assert.equal(server.hasRoute({ method: "GET", url: "/no-such-route" }), false);
+    assert.equal(
+      server.hasRoute({ method: "GET", url: "/no-such-route" }),
+      false,
+    );
   });
 
   test("registers cors, which the old harness never loaded", async () => {
@@ -82,8 +85,11 @@ describe("the real wiring", () => {
       [...appSource.matchAll(/=\s*(\w+Plugin)\b/g)].map((m) => m[1]),
     );
     const importedFrom = new Map(
-      [...appSource.matchAll(/^\s*import\s+(\w+)\s+from\s+"#plugins\/([\w-]+)"/gm)]
-        .map((m) => [m[2], m[1]]),
+      [
+        ...appSource.matchAll(
+          /^\s*import\s+(\w+)\s+from\s+"#plugins\/([\w-]+)"/gm,
+        ),
+      ].map((m) => [m[2], m[1]]),
     );
 
     for (const file of files) {
@@ -138,9 +144,16 @@ describe("the real wiring", () => {
   });
 });
 
+// fastify-cli does `fastify.register(app, { ...options })` against a
+// Fastify(options) root — see start.js. Mirroring that rather than passing
+// {overrides} means a future required option on the app would fail here too,
+// instead of the test passing and production breaking.
 test("the default export is still a plugin the CLI can boot", async () => {
   const server = Fastify(options);
-  await server.register(app, { overrides: { oauth: oauthStub, db: noDb } });
+  await server.register(app, {
+    ...options,
+    overrides: { oauth: oauthStub, db: noDb },
+  });
   await server.ready();
   assert.ok(server.hasRoute({ method: "POST", url: "/auth/login" }));
   await server.close();

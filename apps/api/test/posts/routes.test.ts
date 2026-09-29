@@ -12,6 +12,7 @@ import {
 } from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import { createApp } from "#app";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -57,7 +58,9 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello world" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -69,7 +72,9 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -85,7 +90,9 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -98,14 +105,20 @@ describe("POST /posts/ — authentication", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
   test("accepts access token from cookie", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
-    const user = mkUser({ _id: userId, name: "Test User", avatar: "https://example.com/a.png" });
+    const user = mkUser({
+      _id: userId,
+      name: "Test User",
+      avatar: "https://example.com/a.png",
+    });
     stubMethod(User, "findById", () => mkQuery(user as any));
     const saved = mkPost({ userId, text: "Hello" });
     stubMethod(Post.prototype as any, "save", async function (this: any) {
@@ -161,12 +174,16 @@ describe("POST /posts/ — validation", () => {
     assert.equal(reply.statusCode, 400);
     assert.equal(reply.json().code, "VALIDATION_ERROR");
     const body = reply.json() as any;
-    const details = [...(body.issues ?? []), ...Object.values(body.fieldErrors ?? {}).flat()] as any[];
+    const details = [
+      ...(body.issues ?? []),
+      ...Object.values(body.fieldErrors ?? {}).flat(),
+    ] as any[];
     assert.ok(
       details.some((e: any) =>
         typeof e === "string"
           ? e.includes("Text")
-          : (e.path ?? []).includes("text") || (e.message ?? "").includes("Text"),
+          : (e.path ?? []).includes("text") ||
+            (e.message ?? "").includes("Text"),
       ),
     );
   });
@@ -203,7 +220,9 @@ describe("POST /posts/ — validation", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/posts/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { text: "Valid post text" },
     });
     assert.equal(reply.statusCode, 201);
@@ -219,7 +238,9 @@ describe("POST /posts/ — validation", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/posts/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { text: "Hello 🌍! Special chars: @#$%^&*()" },
     });
     assert.equal(reply.statusCode, 201);
@@ -233,8 +254,14 @@ describe("POST /posts/ — createPost logic", () => {
   test("creates post and returns 201 with persisted document", async () => {
     const userId = newId();
     const accessToken = signAccessToken(app, { sub: userId.toString() });
-    const user = mkUser({ _id: userId, name: "Jane Doe", avatar: "https://example.com/avatar.png" });
-    const findByIdStub = stubMethod(User, "findById", () => mkQuery(user as any));
+    const user = mkUser({
+      _id: userId,
+      name: "Jane Doe",
+      avatar: "https://example.com/avatar.png",
+    });
+    const findByIdStub = stubMethod(User, "findById", () =>
+      mkQuery(user as any),
+    );
     const postId = newId();
     const createdAt = new Date("2024-01-01T00:00:00.000Z");
     stubMethod(Post.prototype as any, "save", async function (this: any) {
@@ -281,7 +308,9 @@ describe("POST /posts/ — createPost logic", () => {
     const userId = newId();
     const attackerId = newId().toString();
     const user = mkUser({ _id: userId, name: "Legit User" });
-    const findByIdStub = stubMethod(User, "findById", () => mkQuery(user as any));
+    const findByIdStub = stubMethod(User, "findById", () =>
+      mkQuery(user as any),
+    );
     stubMethod(Post.prototype as any, "save", async function (this: any) {
       return this;
     });
@@ -289,7 +318,9 @@ describe("POST /posts/ — createPost logic", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/posts/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { text: "Hijack attempt", userId: attackerId } as any,
     });
 
@@ -308,7 +339,9 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "USER_NOT_FOUND", message: "User not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "USER_NOT_FOUND",
+      message: "User not found",
     });
   });
 
@@ -319,11 +352,15 @@ describe("POST /posts/ — createPost logic", () => {
     const reply = await app.inject({
       method: "POST",
       url: "/posts/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 400);
-    assert.deepEqual(reply.json(), { code: "VALIDATION_ERROR", message: "User has no name", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "VALIDATION_ERROR",
+      message: "User has no name",
     });
   });
 
@@ -338,7 +375,9 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
     });
   });
 
@@ -355,29 +394,45 @@ describe("POST /posts/ — createPost logic", () => {
       payload: { text: "Hello" },
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
     });
   });
 
   test("creates post with correct avatar from user", async () => {
     const userId = newId();
-    const user = mkUser({ _id: userId, name: "Avatar User", avatar: "https://example.com/avatar2.png" });
+    const user = mkUser({
+      _id: userId,
+      name: "Avatar User",
+      avatar: "https://example.com/avatar2.png",
+    });
     stubMethod(User, "findById", () => mkQuery(user as any));
     let capturedText: string | undefined;
     stubMethod(Post.prototype as any, "save", async function (this: any) {
       capturedText = this.text;
-      this.toJSON = () => ({ text: this.text, avatar: this.avatar, name: this.name, userId: this.userId });
+      this.toJSON = () => ({
+        text: this.text,
+        avatar: this.avatar,
+        name: this.name,
+        userId: this.userId,
+      });
       return this;
     });
     const reply = await app.inject({
       method: "POST",
       url: "/posts/",
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { text: "Check avatar" },
     });
     assert.equal(reply.statusCode, 201);
     assert.equal(capturedText, "Check avatar");
-    assert.equal((reply.json() as any).avatar, "https://example.com/avatar2.png");
+    assert.equal(
+      (reply.json() as any).avatar,
+      "https://example.com/avatar2.png",
+    );
   });
 });
 
@@ -388,7 +443,9 @@ describe("GET /posts/ — authentication", () => {
   test("returns 401 without a token", async () => {
     const reply = await app.inject({ method: "GET", url: "/posts/" });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -412,7 +469,9 @@ describe("GET /posts/ — authentication", () => {
       headers: { authorization: `Bearer ${refreshToken}` },
     });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -454,8 +513,14 @@ describe("GET /posts/ — authentication", () => {
 // ============================================================
 describe("GET /posts/ — logic", () => {
   test("returns 200 with posts array when posts exist", async () => {
-    const p1 = mkPost({ text: "Post 1", createdAt: new Date("2024-01-02T00:00:00Z") });
-    const p2 = mkPost({ text: "Post 2", createdAt: new Date("2024-01-01T00:00:00Z") });
+    const p1 = mkPost({
+      text: "Post 1",
+      createdAt: new Date("2024-01-02T00:00:00Z"),
+    });
+    const p2 = mkPost({
+      text: "Post 2",
+      createdAt: new Date("2024-01-01T00:00:00Z"),
+    });
     stubMethod(Post, "find", () => mkQuery([p1, p2] as any));
 
     const reply = await app.inject({
@@ -471,9 +536,18 @@ describe("GET /posts/ — logic", () => {
   });
 
   test("requests posts sorted descending by createdAt (newest first)", async () => {
-    const older = mkPost({ text: "Older", createdAt: new Date("2023-01-01T00:00:00Z") });
-    const newer = mkPost({ text: "Newer", createdAt: new Date("2024-06-01T00:00:00Z") });
-    const middle = mkPost({ text: "Middle", createdAt: new Date("2023-06-15T00:00:00Z") });
+    const older = mkPost({
+      text: "Older",
+      createdAt: new Date("2023-01-01T00:00:00Z"),
+    });
+    const newer = mkPost({
+      text: "Newer",
+      createdAt: new Date("2024-06-01T00:00:00Z"),
+    });
+    const middle = mkPost({
+      text: "Middle",
+      createdAt: new Date("2023-06-15T00:00:00Z"),
+    });
     // The DB performs the sort; the stub returns already-sorted, as the DB would.
     const q = mkQuery([newer, middle, older] as any);
     let sortArgs: any[] | undefined;
@@ -545,7 +619,9 @@ describe("GET /posts/ — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
     });
   });
 
@@ -569,9 +645,14 @@ describe("GET /posts/ — logic", () => {
 // ============================================================
 describe("DELETE /posts/ — authentication", () => {
   test("returns 401 without a token", async () => {
-    const reply = await app.inject({ method: "DELETE", url: `/posts/${newId()}` });
+    const reply = await app.inject({
+      method: "DELETE",
+      url: `/posts/${newId()}`,
+    });
     assert.equal(reply.statusCode, 401);
-    assert.deepEqual(reply.json(), { code: "FAILED_AUTHENTICATION", message: "Unauthorized", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "FAILED_AUTHENTICATION",
+      message: "Unauthorized",
     });
   });
 
@@ -628,18 +709,25 @@ describe("DELETE /posts/ — logic", () => {
   test("returns 204 on successful delete", async () => {
     const userId = newId();
     const post = mkPost({ userId });
-    const findOneAndDelete = stubMethod(Post, "findOneAndDelete", () => Promise.resolve(post as any));
+    const findOneAndDelete = stubMethod(Post, "findOneAndDelete", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
       url: `/posts/${post._id}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
     });
 
     assert.equal(reply.statusCode, 204);
     assert.equal(findOneAndDelete.mock.callCount(), 1);
     const [filter] = findOneAndDelete.mock.calls[0].arguments as any[];
-    assert.deepEqual(filter, { _id: post._id.toString(), userId: userId.toString() });
+    assert.deepEqual(filter, {
+      _id: post._id.toString(),
+      userId: userId.toString(),
+    });
     // 204 strips body — ensure no json body or empty
     assert.equal(reply.body, "");
   });
@@ -648,12 +736,16 @@ describe("DELETE /posts/ — logic", () => {
     const userId = newId();
     const attackerId = newId().toString();
     const post = mkPost({ userId });
-    const findOneAndDelete = stubMethod(Post, "findOneAndDelete", () => Promise.resolve(post as any));
+    const findOneAndDelete = stubMethod(Post, "findOneAndDelete", () =>
+      Promise.resolve(post as any),
+    );
 
     const reply = await app.inject({
       method: "DELETE",
       url: `/posts/${post._id}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userId.toString() })}`,
+      },
       payload: { userId: attackerId } as any,
     });
 
@@ -671,7 +763,9 @@ describe("DELETE /posts/ — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 404);
-    assert.deepEqual(reply.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
     });
   });
 
@@ -685,12 +779,16 @@ describe("DELETE /posts/ — logic", () => {
       headers: authHeader(),
     });
     assert.equal(reply.statusCode, 500);
-    assert.deepEqual(reply.json(), { code: "INTERNAL_SERVER_ERROR", message: "Internal server error", requestId: reply.json().requestId,
+    assertErrorBody(reply, {
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error",
     });
   });
 
   test("returns 500 when findOneAndDelete rejects", async () => {
-    stubMethod(Post, "findOneAndDelete", () => Promise.reject(new Error("rejected")));
+    stubMethod(Post, "findOneAndDelete", () =>
+      Promise.reject(new Error("rejected")),
+    );
     const reply = await app.inject({
       method: "DELETE",
       url: `/posts/${newId()}`,
@@ -704,30 +802,42 @@ describe("DELETE /posts/ — logic", () => {
     const userIdB = newId();
     const postA = mkPost({ userId: userIdA, text: "User A post" });
     // Stub to assert filter isolates by userId
-    const findOneAndDelete = stubMethod(Post, "findOneAndDelete", ((filter: any) => {
+    const findOneAndDelete = stubMethod(Post, "findOneAndDelete", ((
+      filter: any,
+    ) => {
       // Simulate DB: only delete if filter matches userIdA
-      if (filter.userId === userIdA.toString()) return Promise.resolve(postA as any);
+      if (filter.userId === userIdA.toString())
+        return Promise.resolve(postA as any);
       return Promise.resolve(null);
     }) as any);
 
     const replyA = await app.inject({
       method: "DELETE",
       url: `/posts/${postA._id}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userIdA.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userIdA.toString() })}`,
+      },
     });
     assert.equal(replyA.statusCode, 204);
     assert.equal(findOneAndDelete.mock.callCount(), 1);
     restoreAllStubs();
 
     // Now try with B — should not delete A's post
-    const findB = stubMethod(Post, "findOneAndDelete", () => Promise.resolve(null));
+    const findB = stubMethod(Post, "findOneAndDelete", () =>
+      Promise.resolve(null),
+    );
     const replyB = await app.inject({
       method: "DELETE",
       url: `/posts/${newId()}`,
-      headers: { authorization: `Bearer ${signAccessToken(app, { sub: userIdB.toString() })}` },
+      headers: {
+        authorization: `Bearer ${signAccessToken(app, { sub: userIdB.toString() })}`,
+      },
     });
     assert.equal(replyB.statusCode, 404);
-    assert.deepEqual(replyB.json(), { code: "POST_NOT_FOUND", message: "Post not found", requestId: replyB.json().requestId });
+    assertErrorBody(replyB, {
+      code: "POST_NOT_FOUND",
+      message: "Post not found",
+    });
     assert.equal(findB.mock.callCount(), 1);
     assert.equal(findB.mock.calls[0].arguments[0].userId, userIdB.toString());
     assert.ok(findB.mock.calls[0].arguments[0]._id);

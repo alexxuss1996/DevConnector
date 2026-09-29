@@ -7,12 +7,16 @@ import fp from "fastify-plugin";
  * typecheck against the real OAuth2Namespace while failing here at runtime
  * with an unnamed TypeError. The test that guards this lives next to this
  * file and greps src/routes for the methods it calls.
+ *
+ * A factory, not a shared object: it is decorated into every instance the
+ * suite builds, and one route assigning to `fastify.googleOAuth2` would
+ * otherwise mutate it for all of them.
  */
-export const oauthStubNamespace = {
+export const oauthStubNamespace = () => ({
   getAccessTokenFromAuthorizationCodeFlow: async () => ({
     token: { access_token: "google-access-token", token_type: "Bearer" },
   }),
-};
+});
 
 /**
  * Stands in for @fastify/oauth2, which fetches Google's OIDC discovery
@@ -20,10 +24,10 @@ export const oauthStubNamespace = {
  * escapes encapsulation exactly as the real plugin's does.
  */
 export const oauthStub = fp(async (fastify) => {
-  // `as any` for the same reason test/helpers/app.ts:156 needs it: the
+  // `as any` for the same reason test/helpers/app.ts:156 needed it: the
   // decoration is typed as the full OAuth2Namespace by a module augmentation,
   // and a stub will never carry its other members.
-  fastify.decorate("googleOAuth2", oauthStubNamespace as any);
+  fastify.decorate("googleOAuth2", oauthStubNamespace() as any);
 });
 
 /**
