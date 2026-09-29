@@ -48,8 +48,16 @@ describe("errorHandler", () => {
     const { reply, captured } = fakeReply();
     const validationError = Object.assign(new Error("validation failed"), {
       validation: [
-        { instancePath: "/email", keyword: "format", message: "must match format" },
-        { instancePath: "/password", keyword: "minLength", message: "too short" },
+        {
+          instancePath: "/email",
+          keyword: "format",
+          message: "must match format",
+        },
+        {
+          instancePath: "/password",
+          keyword: "minLength",
+          message: "too short",
+        },
       ],
     }) as any;
 

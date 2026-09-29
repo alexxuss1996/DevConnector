@@ -10,30 +10,32 @@ cp .env.example .env   # set JWT_SECRET, MONGODB_URI, GOOGLE_*, GITHUB_ACCESS_TO
 pnpm --filter api dev        # or pnpm dev from repo root via turbo
 ```
 
-* API: http://localhost:4000
-* Interactive docs (Swagger UI): http://localhost:4000/docs
-* OpenAPI JSON: http://localhost:4000/docs/json
-* OpenAPI YAML: http://localhost:4000/docs/yaml
+- API: http://localhost:4000
+- Interactive docs (Swagger UI): http://localhost:4000/docs
+- OpenAPI JSON: http://localhost:4000/docs/json
+- OpenAPI YAML: http://localhost:4000/docs/yaml
 
 `npm start` / `pnpm start` runs production build on port `4000` (`fastify start -p 4000 dist/app.js`).
 
 ## Available scripts
 
-| script | description |
-|---|---|
-| `pnpm dev` | `tsc -w` + `fastify start --watch` on `4000` |
-| `pnpm start` | clean + build + `fastify start -p 4000 dist/app.js` |
-| `pnpm run build:ts` | `tsc` to `dist/` |
-| `pnpm test` | `build:ts` + `tsc -p test/tsconfig.json` + `c8 node --test` |
+| script              | description                                                 |
+| ------------------- | ----------------------------------------------------------- |
+| `pnpm dev`          | `tsc -w` + `fastify start --watch` on `4000`                |
+| `pnpm start`        | clean + build + `fastify start -p 4000 dist/app.js`         |
+| `pnpm run build:ts` | `tsc` to `dist/`                                            |
+| `pnpm test`         | `build:ts` + `tsc -p test/tsconfig.json` + `c8 node --test` |
 
 ## Interactive documentation
 
 Configured in `src/plugins/swagger.ts` and registered explicitly in `src/app.ts`, after the other plugins and before the routes. The UI serves the spec generated dynamically from route schemas (`@fastify/swagger` `openapi: 3.0.3`, `info.title: "DevConnector API"`).
-* `GET /docs` — Swagger UI (`@fastify/swagger-ui@^6`, `routePrefix: "/docs"`, `uiConfig.docExpansion: "list"`)
+
+- `GET /docs` — Swagger UI (`@fastify/swagger-ui@^6`, `routePrefix: "/docs"`, `uiConfig.docExpansion: "list"`)
 
 Security schemes exposed in OpenAPI:
-* `bearerAuth` — `Authorization: Bearer <accessToken>` (from `POST /auth/login` / `/auth/register`)
-* `cookieAuth` — `refreshToken` httpOnly cookie
+
+- `bearerAuth` — `Authorization: Bearer <accessToken>` (from `POST /auth/login` / `/auth/register`)
+- `cookieAuth` — `refreshToken` httpOnly cookie
 
 ### Adding docs for a new route
 
@@ -41,17 +43,27 @@ Schemas are JSON-Schema via TypeBox (`typebox@1.3.15` + `@fastify/type-provider-
 
 ```ts
 // src/routes/posts/add-post.ts
-fastify.post("/", {
-  onRequest: [fastify.authenticate],
-  schema: {
-    tags: ["Posts"],
-    summary: "Create a post",
-    description: "Requires bearerAuth",
-    security: [{ bearerAuth: [] }],
-    body: CreatePostSchema,          // TypeBox -> JSON Schema
-    response: { 200: { description: "Created", type: "object", properties: { _id: {type:"string"} } } }
-  }
-}, handler)
+fastify.post(
+  "/",
+  {
+    onRequest: [fastify.authenticate],
+    schema: {
+      tags: ["Posts"],
+      summary: "Create a post",
+      description: "Requires bearerAuth",
+      security: [{ bearerAuth: [] }],
+      body: CreatePostSchema, // TypeBox -> JSON Schema
+      response: {
+        200: {
+          description: "Created",
+          type: "object",
+          properties: { _id: { type: "string" } },
+        },
+      },
+    },
+  },
+  handler,
+);
 ```
 
 For clean examples avoid bare `pattern: ".*\\S.*"` without `example`/`examples` — the UI faker will generate gibberish to satisfy the regex. See `src/modules/profiles/profiles.schemas.ts` for pattern + `example: "Developer"`, top-level `example: { status: "Developer", skills: ["JavaScript","Node.js","React"], ... }`.
@@ -79,10 +91,10 @@ wiring `fastify start` loads. There is no separate test harness.
 const app = await createApp({
   logger: false,
   overrides: {
-    oauth: oauthStub,                // stands in for the OIDC discovery fetch
-    db: noDb,                        // unit tests stub Mongoose models instead
-    rateLimitKey: () => randomUUID() // per-request bucket, budgets unchanged
-  }
+    oauth: oauthStub, // stands in for the OIDC discovery fetch
+    db: noDb, // unit tests stub Mongoose models instead
+    rateLimitKey: () => randomUUID(), // per-request bucket, budgets unchanged
+  },
 });
 ```
 
@@ -99,5 +111,5 @@ Required (`src/config/env.ts`): `JWT_SECRET`, `MONGODB_URI`, `FRONTEND_URL`, `GI
 
 ## Learn more
 
-* [Fastify](https://fastify.dev/docs/latest/) — [Fastify Swagger](https://github.com/fastify/fastify-swagger), [fastify-swagger-ui](https://github.com/fastify/fastify-swagger-ui)
-* [TypeBox](https://github.com/sinclairzx81/typebox)
+- [Fastify](https://fastify.dev/docs/latest/) — [Fastify Swagger](https://github.com/fastify/fastify-swagger), [fastify-swagger-ui](https://github.com/fastify/fastify-swagger-ui)
+- [TypeBox](https://github.com/sinclairzx81/typebox)

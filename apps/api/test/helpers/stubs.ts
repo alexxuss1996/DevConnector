@@ -41,7 +41,9 @@ function sameKey(a: object, b: object): boolean {
   );
 }
 
-export type MockFn<T extends (...args: any[]) => any = (...args: any[]) => any> = Mock<T>;
+export type MockFn<
+  T extends (...args: any[]) => any = (...args: any[]) => any,
+> = Mock<T>;
 
 export function newId(): Types.ObjectId {
   return new Types.ObjectId();
@@ -81,7 +83,9 @@ export interface SessionDoc {
   revokedAt?: Date;
 }
 
-export function mkSessionDoc(overrides: Partial<SessionDoc> = {}): SessionDoc & {
+export function mkSessionDoc(
+  overrides: Partial<SessionDoc> = {},
+): SessionDoc & {
   save: () => Promise<any>;
 } {
   const session: SessionDoc & { save: () => Promise<any> } = {

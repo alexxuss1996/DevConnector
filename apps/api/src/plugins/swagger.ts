@@ -24,7 +24,10 @@ export default fp(async (fastify) => {
       ],
       tags: [
         { name: "Auth", description: "Authentication & session" },
-        { name: "Profiles", description: "User profiles, experience, education" },
+        {
+          name: "Profiles",
+          description: "User profiles, experience, education",
+        },
         { name: "Posts", description: "Posts, likes, comments" },
         { name: "System", description: "Health / root" },
       ],
@@ -34,13 +37,15 @@ export default fp(async (fastify) => {
             type: "http",
             scheme: "bearer",
             bearerFormat: "JWT",
-            description: "Paste access token from login/register response (Authorization: Bearer <token>)",
+            description:
+              "Paste access token from login/register response (Authorization: Bearer <token>)",
           },
           cookieAuth: {
             type: "apiKey",
             in: "cookie",
             name: "refresh_token",
-            description: "Refresh token is set as httpOnly cookie on login/register",
+            description:
+              "Refresh token is set as httpOnly cookie on login/register",
           },
         },
       },
@@ -50,7 +55,10 @@ export default fp(async (fastify) => {
     // but we add a small transform to auto-hide docs routes themselves if needed
   });
 
-  if (process.env.NODE_ENV === "production" && process.env.ENABLE_DOCS !== "true") {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ENABLE_DOCS !== "true"
+  ) {
     return;
   }
 

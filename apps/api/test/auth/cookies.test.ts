@@ -34,7 +34,10 @@ describe("auth.cookies", () => {
     const ret = setAuthCookies(reply, "access-jwt", "refresh-jwt");
 
     assert.equal(ret, reply);
-    assert.deepEqual(Object.keys(cookies).sort(), ["access_token", "refresh_token"]);
+    assert.deepEqual(Object.keys(cookies).sort(), [
+      "access_token",
+      "refresh_token",
+    ]);
 
     assert.equal(cookies.access_token.value, "access-jwt");
     assert.equal(cookies.access_token.opts.httpOnly, true);

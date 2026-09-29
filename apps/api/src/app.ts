@@ -78,8 +78,12 @@ const options: AppOptions = {
 };
 
 const app = fp<AppOptions>(async (fastify, opts): Promise<void> => {
-  const { oauth = oauthPlugin, db = mongoosePlugin, rateLimitKey, extraRoutes } =
-    opts.overrides ?? {};
+  const {
+    oauth = oauthPlugin,
+    db = mongoosePlugin,
+    rateLimitKey,
+    extraRoutes,
+  } = opts.overrides ?? {};
 
   // Order is load-bearing and matches what autoload's alphabetical sort
   // produced: `auth` decorates `authenticate`, and `csrf` adds an onRequest

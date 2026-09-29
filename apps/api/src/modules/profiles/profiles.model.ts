@@ -158,6 +158,7 @@ profileSchema.index({ createdAt: -1 });
 const Profile = mongoose.model<IProfile>("Profile", profileSchema);
 
 /** A loaded profile document, with the Mongoose helpers the service relies on. */
-export type ProfileDocument = mongoose.Document & IProfile & { _id: Types.ObjectId };
+export type ProfileDocument = mongoose.Document &
+  IProfile & { _id: Types.ObjectId };
 
 export default Profile;

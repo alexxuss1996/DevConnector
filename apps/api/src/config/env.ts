@@ -1,6 +1,7 @@
 /** Required env vars and how to validate them, checked once at import. */
 const REQUIRED = {
-  JWT_SECRET: (v: string) => (v.length >= 32 ? undefined : "must be >= 32 characters"),
+  JWT_SECRET: (v: string) =>
+    v.length >= 32 ? undefined : "must be >= 32 characters",
   MONGODB_URI: (v: string) => (v ? undefined : "must not be empty"),
   FRONTEND_URL: (v: string) =>
     URL.canParse(v) ? undefined : "must be a valid URL",

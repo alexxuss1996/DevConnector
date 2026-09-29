@@ -20,11 +20,7 @@ export function assertErrorBody(
   const body = reply.json();
   assert.equal(body.code, expected.code);
   assert.equal(body.message, expected.message);
-  assert.deepEqual(Object.keys(body).sort(), [
-    "code",
-    "message",
-    "requestId",
-  ]);
+  assert.deepEqual(Object.keys(body).sort(), ["code", "message", "requestId"]);
   assert.equal(typeof body.requestId, "string");
   assert.notEqual(body.requestId, "");
   assert.equal(body.requestId, reply.headers["x-request-id"]);
