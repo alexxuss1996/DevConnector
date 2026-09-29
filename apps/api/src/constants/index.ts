@@ -15,7 +15,7 @@ export const ALLOWED_PROFILE_FIELDS = new Set([
 ]);
 
 /** How long a cached GitHub repos response stays fresh. */
-export const GITHUB_CACHE_TTL_MS = 60_000;
+export const GITHUB_CACHE_TTL_MS = 60_000 * 15;
 
 /** Cap on cached GitHub repos responses before oldest-first eviction. */
 export const GITHUB_CACHE_MAX_ENTRIES = 200;
