@@ -14,7 +14,8 @@
       "#test/*": ["test/*.ts"],
       "#types/*": ["src/types/*.ts"],
       "#plugins/*": ["src/plugins/*.ts"],
-      "#config/*": ["src/config/*.ts"]
+      "#config/*": ["src/config/*.ts"],
+      "#constants": ["src/constants/index.ts"]
     }
   },
   "include": ["../src/**/*.ts", "**/*.ts"]

@@ -1,6 +1,8 @@
 import AppError from "#helpers/app-error";
 import env from "#config/env";
-import Profile, { type ProfileDocument } from "#modules/profiles/profiles.model";
+import Profile, {
+  type ProfileDocument,
+} from "#modules/profiles/profiles.model";
 import User from "#modules/users/user.model";
 import Post from "#modules/posts/posts.model";
 import Session from "#modules/auth/session.model";
@@ -13,197 +15,18 @@ import {
   UpdateProfileInput,
 } from "@dev-conn/contracts";
 import mongoose, { Types } from "mongoose";
+import { sanitizePlainText } from "#helpers/sanitize";
+import { isDuplicateKeyError } from "#helpers/mongo";
 import {
-  sanitizePlainText,
-  sanitizeUrl,
-  sanitizeGithubUsername,
-} from "#helpers/sanitize";
-
-/**
- * Validates experience/education date combinations that JSON Schema
- * cannot express (cross-field rules). Throws 400 instead of letting
- * `new Date()` produce `Invalid Date` cast errors (500s).
- */
-function validateDateRange(
-  from: string,
-  to: string | undefined,
-  current: boolean | undefined,
-  kind: "Experience" | "Education",
-): { fromDate: Date; toDate?: Date } {
-  const fromDate = new Date(from);
-  if (Number.isNaN(fromDate.getTime())) {
-    throw new AppError(
-      400,
-      "VALIDATION_ERROR",
-      `${kind} 'from' is not a valid date`,
-    );
-  }
-  let toDate: Date | undefined;
-  if (to !== undefined) {
-    toDate = new Date(to);
-    if (Number.isNaN(toDate.getTime())) {
-      throw new AppError(
-        400,
-        "VALIDATION_ERROR",
-        `${kind} 'to' is not a valid date`,
-      );
-    }
-    if (toDate < fromDate) {
-      throw new AppError(
-        400,
-        "VALIDATION_ERROR",
-        `${kind} 'to' must be after 'from'`,
-      );
-    }
-  }
-  if (current === true && toDate !== undefined) {
-    throw new AppError(
-      400,
-      "VALIDATION_ERROR",
-      `${kind} cannot have both 'current: true' and a 'to' date`,
-    );
-  }
-  return { fromDate, toDate };
-}
-
-/**
- * Normalises the owner into the `{ _id, name?, avatar? }` object the response
- * schemas declare. Handles both an already-populated subdocument and a bare
- * ObjectId or hex string, so a missed `populate` degrades to `{ _id }` instead
- * of serialising as an empty object.
- */
-function toOwner(
-  value: unknown,
-): { _id: string; name?: string; avatar?: string } | null {
-  if (value && typeof value === "object" && "_id" in value) {
-    const owner = value as { _id: unknown; name?: unknown; avatar?: unknown };
-    return {
-      _id: String(owner._id),
-      ...(typeof owner.name === "string" && owner.name ? { name: owner.name } : {}),
-      ...(typeof owner.avatar === "string" && owner.avatar
-        ? { avatar: owner.avatar }
-        : {}),
-    };
-  }
-  // `populate` yields null when the referenced user is gone, and `String(null)`
-  // is the literal "null" — which would become a link to /profiles/null.
-  if (value === null || value === undefined) return null;
-  return { _id: String(value) };
-}
-
-/** Reduces an ISO timestamp to the `YYYY-MM-DD` the contract promises. */
-function toDateOnly(value: unknown): string | undefined {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().slice(0, 10);
-  }
-  return undefined;
-}
-
-/** Applies {@link toDateOnly} to the `from`/`to` of each subdocument. */
-function mapDates<T extends { from?: unknown; to?: unknown }>(
-  entries: T[] | undefined,
-): (Omit<T, "from" | "to"> & { from: string; to?: string })[] {
-  return (entries ?? []).map((entry) => {
-    const { from, to, ...rest } = entry;
-    const fromDate = toDateOnly(from);
-    const toDate = toDateOnly(to);
-    return {
-      ...rest,
-      ...(fromDate !== undefined ? { from: fromDate } : ({} as { from: string })),
-      ...(toDate !== undefined ? { to: toDate } : {}),
-    };
-  });
-}
-
-/** True for a MongoDB unique-index violation (error code 11000). */
-function isDuplicateKeyError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === 11000
-  );
-}
-
-const ALLOWED_PROFILE_FIELDS = new Set([
-  "company",
-  "website",
-  "location",
-  "status",
-  "skills",
-  "bio",
-  "githubusername",
-]);
-
-/**
- * Turns a create/update payload into a sanitised Mongo update document, shared
- * by the create, upsert and partial-update paths so all three sanitise alike.
- */
-function buildProfileUpdate(data: CreateProfileInput | UpdateProfileInput): {
-  $set: Record<string, unknown>;
-  $unset: Record<string, 1>;
-} {
-  const { facebook, instagram, linkedin, twitter, youtube, ...rest } = data;
-
-  const toSet: Record<string, unknown> = {};
-  const toUnset: Record<string, 1> = {};
-
-  for (const [key, value] of Object.entries(rest)) {
-    if (!ALLOWED_PROFILE_FIELDS.has(key)) continue;
-    if (
-      value === null ||
-      (typeof value === "string" && value.trim() === "")
-    ) {
-      // `status`/`skills` are required: an empty value means "leave as is",
-      // because unsetting them would violate the model.
-      if (key === "status" || key === "skills") continue;
-      toUnset[key] = 1;
-    } else if (value !== undefined) {
-      if (key === "website") {
-        const sanitized = sanitizeUrl(value as string | undefined | null);
-        if (sanitized) toSet[key] = sanitized;
-        else toUnset[key] = 1;
-      } else if (key === "githubusername") {
-        const sanitized = sanitizeGithubUsername(
-          value as string | undefined | null,
-        );
-        if (sanitized) toSet[key] = sanitized;
-        else toUnset[key] = 1;
-      } else if (typeof value === "string") {
-        toSet[key] = sanitizePlainText(value);
-      } else if (Array.isArray(value)) {
-        toSet[key] = value.map((v) =>
-          sanitizePlainText(v as string | undefined | null),
-        );
-      } else {
-        toSet[key] = value;
-      }
-    }
-  }
-
-  for (const [key, value] of Object.entries({
-    facebook,
-    instagram,
-    linkedin,
-    twitter,
-    youtube,
-  })) {
-    if (
-      value === null ||
-      (typeof value === "string" && value.trim() === "")
-    ) {
-      toUnset[`social.${key}`] = 1;
-    } else if (value !== undefined) {
-      const sanitized = sanitizeUrl(value as string | undefined | null);
-      if (sanitized) toSet[`social.${key}`] = sanitized;
-      else toUnset[`social.${key}`] = 1;
-    }
-  }
-
-  return { $set: toSet, $unset: toUnset };
-}
+  getCachedGithubRepos,
+  setCachedGithubRepos,
+} from "#helpers/github.cache";
+import {
+  buildProfileUpdate,
+  mapDates,
+  toOwner,
+  validateDateRange,
+} from "#helpers/profile";
 
 class ProfileService {
   /**
@@ -284,14 +107,16 @@ class ProfileService {
     const summaries: PublicProfileSummary[] = profiles.flatMap((doc) => {
       const owner = toOwner(doc.toJSON().userId);
       if (!owner) return [];
-      return [{
-        _id: String(doc._id),
-        userId: owner,
-        status: doc.status,
-        company: doc.company,
-        location: doc.location,
-        skills: doc.skills,
-      }];
+      return [
+        {
+          _id: String(doc._id),
+          userId: owner,
+          status: doc.status,
+          company: doc.company,
+          location: doc.location,
+          skills: doc.skills,
+        },
+      ];
     });
 
     return { profiles: summaries, total };
@@ -662,40 +487,6 @@ class ProfileService {
     setCachedGithubRepos(cacheKey, repos);
     return repos;
   }
-}
-
-const GITHUB_CACHE_TTL_MS = 60_000;
-const GITHUB_CACHE_MAX_ENTRIES = 200;
-const githubReposCache = new Map<
-  string,
-  { expiresAt: number; data: unknown }
->();
-
-function getCachedGithubRepos(key: string): unknown | undefined {
-  const entry = githubReposCache.get(key);
-  if (!entry) return undefined;
-  if (entry.expiresAt <= Date.now()) {
-    githubReposCache.delete(key);
-    return undefined;
-  }
-  return entry.data;
-}
-
-function setCachedGithubRepos(key: string, data: unknown): void {
-  if (githubReposCache.size >= GITHUB_CACHE_MAX_ENTRIES) {
-    // Evict the oldest entry (Maps preserve insertion order).
-    const oldest = githubReposCache.keys().next();
-    if (!oldest.done) githubReposCache.delete(oldest.value);
-  }
-  githubReposCache.set(key, {
-    expiresAt: Date.now() + GITHUB_CACHE_TTL_MS,
-    data,
-  });
-}
-
-/** Clears the GitHub repos cache. Exported for tests. */
-export function clearGithubReposCache(): void {
-  githubReposCache.clear();
 }
 
 export const profileService = new ProfileService();

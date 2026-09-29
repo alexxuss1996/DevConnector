@@ -1,9 +1,7 @@
 import { describe, test, before, after, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import {
-  profileService,
-  clearGithubReposCache,
-} from "#modules/profiles/profiles.service";
+import { profileService } from "#modules/profiles/profiles.service";
+import { clearGithubReposCache } from "#helpers/github.cache";
 import { newId } from "../helpers/stubs.ts";
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";

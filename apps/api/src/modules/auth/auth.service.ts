@@ -6,6 +6,7 @@ import argon2 from "argon2";
 import gravatarUrl from "gravatar-url";
 import { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
+import { GOOGLE_USERINFO_URL } from "#constants";
 
 export interface RegisterInput {
   name: string;
@@ -25,9 +26,6 @@ interface GoogleUser {
   name?: string;
   picture?: string;
 }
-
-export const GOOGLE_USERINFO_URL =
-  "https://openidconnect.googleapis.com/v1/userinfo";
 
 class AuthService {
   private async getGoogleUser(accessToken: string): Promise<GoogleUser> {
@@ -363,9 +361,7 @@ class AuthService {
 
   /** Removes the Google link from the currently authenticated user. */
   async unlinkGoogleAccount(userId: string) {
-    const user = await User.findById(userId).select(
-      "+googleId +passwordHash",
-    );
+    const user = await User.findById(userId).select("+googleId +passwordHash");
     if (!user) {
       throw new AppError(404, "USER_NOT_FOUND", "User not found");
     }

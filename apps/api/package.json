@@ -63,6 +63,7 @@
     "#test/*": "./dist/test/*.js",
     "#types/*": "./dist/types/*.js",
     "#plugins/*": "./dist/plugins/*.js",
-    "#config/*": "./dist/config/*.js"
+    "#config/*": "./dist/config/*.js",
+    "#constants": "./dist/constants/index.js"
   }
 }
