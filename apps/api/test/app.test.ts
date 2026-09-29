@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import Fastify, { type FastifyInstance } from "fastify";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { randomUUID } from "node:crypto";
 import { app, options, createApp } from "#app";
 import { oauthStub, noDb } from "./helpers/plugin-overrides.ts";
+import { createRateLimitedTestApp } from "./helpers/test-app.ts";
 
 const srcFile = (relative: string) =>
   fileURLToPath(new URL(`../src/${relative}`, import.meta.url));
@@ -17,13 +17,9 @@ describe("the real wiring", () => {
   let server: FastifyInstance;
 
   before(async () => {
-    server = await createApp({
-      logger: false,
-      overrides: {
-        oauth: oauthStub,
-        db: noDb,
-        rateLimitKey: () => randomUUID(),
-      },
+    server = await createRateLimitedTestApp({
+      oauth: oauthStub,
+      db: noDb,
     });
   });
   after(async () => {
@@ -158,10 +154,17 @@ describe("the real wiring", () => {
 // {overrides} means a future required option on the app would fail here too,
 // instead of the test passing and production breaking.
 /**
- * Walks every `createApp(` call in the test tree and returns the call sites
- * that do not pass a `rateLimitKey`.
+ * Every direct call to the app factory in the test tree that is not marked
+ * as a deliberate opt-out. `createRateLimitedTestApp` is the way to build a
+ * test app; reaching for the factory directly means bypassing the rate-limit
+ * keying, and the only legitimate reason is to exercise production keying.
+ *
+ * The needle is assembled at runtime so this function's own text is not a
+ * match for the scan it performs.
  */
-function createAppCallsWithoutRateLimitKey(): string[] {
+const FACTORY_CALL = ["createApp", "("].join("");
+
+function unkeyedCreateAppCalls(): string[] {
   const root = testFile("");
   const offenders: string[] = [];
 
@@ -170,23 +173,16 @@ function createAppCallsWithoutRateLimitKey(): string[] {
     if (!name.endsWith(".test.ts")) continue;
     const source = readFileSync(testFile(name), "utf8");
 
-    for (let at = source.indexOf("createApp("); at !== -1; ) {
-      // Walk to the matching close paren so the argument text is the call,
-      // not the rest of the file.
+    for (let at = source.indexOf(FACTORY_CALL); at !== -1; ) {
       let depth = 0;
       let end = at;
       for (; end < source.length; end++) {
         if (source[end] === "(") depth++;
         else if (source[end] === ")" && --depth === 0) break;
       }
-      const call = source.slice(at, end + 1);
-      const before = source.slice(Math.max(0, at - 200), at);
-
-      const optedOut =
-        call.includes("rateLimitKey") || before.includes("no-rate-limit-key:");
-      if (!optedOut) {
-        const line = source.slice(0, at).split("\n").length;
-        offenders.push(`${name}:${line}`);
+      const before = source.slice(Math.max(0, at - 300), at);
+      if (!before.includes("no-rate-limit-key:")) {
+        offenders.push(`${name}:${source.slice(0, at).split("\n").length}`);
       }
       at = source.indexOf("createApp(", end + 1);
     }
@@ -194,19 +190,18 @@ function createAppCallsWithoutRateLimitKey(): string[] {
   return offenders;
 }
 
-test("every createApp call in the test tree keys the rate limiter", () => {
-  // The real limiter is on and budgets are the production ones, so a suite
-  // that fires more than 100 requests at one address starts failing with a
-  // 429 that has nothing to do with what it is testing. Passing
-  // `rateLimitKey` moves the bucket per request and leaves the budget real.
+test("tests build their app through createRateLimitedTestApp", () => {
+  // The real limiter runs with production budgets, so a suite that fires
+  // more than 100 requests at one address starts failing with a 429
+  // unrelated to what it tests. createRateLimitedTestApp supplies the
+  // per-request keying, so a call site cannot forget it.
   //
-  // The default cannot live in createApp itself: defaulting it to a per-
-  // request key would silently switch rate limiting OFF in production for
-  // any caller who forgot the argument, and a DoS control should fail shut.
-  // A test that greps the call sites is what makes the convention a
-  // guarantee. A site that genuinely needs production keying opts out with
-  // a `no-rate-limit-key:` comment saying why.
-  assert.deepEqual(createAppCallsWithoutRateLimitKey(), []);
+  // The keying deliberately does not become a default on `createApp`:
+  // defaulting it would switch rate limiting OFF in production for any
+  // caller who omitted the argument, and a DoS control should fail shut.
+  // A site that needs production keying marks itself
+  // `no-rate-limit-key:` and says why.
+  assert.deepEqual(unkeyedCreateAppCalls(), []);
 });
 
 test("the default export is still a plugin the CLI can boot", async () => {

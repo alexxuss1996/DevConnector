@@ -6,9 +6,8 @@ import Profile from "#modules/profiles/profiles.model";
 import { profileService } from "#modules/profiles/profiles.service";
 import { signAccessToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
-import { createApp } from "#app";
-import { randomUUID } from "node:crypto";
 import { mkProfile, mkQuery, newId, stubMethod } from "../helpers/stubs.ts";
+import { createRateLimitedTestApp } from "../helpers/test-app.ts";
 
 /**
  * The response serializer decides the wire format, so these pin the bytes a
@@ -83,17 +82,10 @@ describe("POST /profiles/ — create-only", () => {
   const payload = { status: "Developer", skills: ["JS"] };
 
   async function post(body: unknown = payload) {
-    const app = await createApp({
-    logger: false,
-    overrides: {
+    const app = await createRateLimitedTestApp({
       oauth: oauthStub,
       db: noDb,
-      // Real per-IP keying, so a suite that fires many requests at one
-      // address trips the production budget. Key per request instead; the
-      // limits themselves stay real.
-      rateLimitKey: () => randomUUID(),
-    },
-  });
+    });
     try {
       return await app.inject({
         method: "POST",
@@ -129,8 +121,12 @@ describe("POST /profiles/ — create-only", () => {
   });
 
   test("returns 409 when a profile already exists", async () => {
-    stubMethod(Profile, "exists", () => Promise.resolve({ _id: newId() } as any));
-    const create = stubMethod(Profile, "create", () => Promise.resolve(null as any));
+    stubMethod(Profile, "exists", () =>
+      Promise.resolve({ _id: newId() } as any),
+    );
+    const create = stubMethod(Profile, "create", () =>
+      Promise.resolve(null as any),
+    );
 
     const reply = await post();
 
@@ -155,17 +151,10 @@ describe("POST /profiles/ — create-only", () => {
 
 describe("request id and cache headers", () => {
   test("echoes an inbound x-request-id", async () => {
-    const app = await createApp({
-    logger: false,
-    overrides: {
+    const app = await createRateLimitedTestApp({
       oauth: oauthStub,
       db: noDb,
-      // Real per-IP keying, so a suite that fires many requests at one
-      // address trips the production budget. Key per request instead; the
-      // limits themselves stay real.
-      rateLimitKey: () => randomUUID(),
-    },
-  });
+    });
     try {
       const reply = await app.inject({
         method: "GET",
@@ -179,17 +168,10 @@ describe("request id and cache headers", () => {
   });
 
   test("replaces an unbounded or forged inbound request id", async () => {
-    const app = await createApp({
-    logger: false,
-    overrides: {
+    const app = await createRateLimitedTestApp({
       oauth: oauthStub,
       db: noDb,
-      // Real per-IP keying, so a suite that fires many requests at one
-      // address trips the production budget. Key per request instead; the
-      // limits themselves stay real.
-      rateLimitKey: () => randomUUID(),
-    },
-  });
+    });
     try {
       // Too long, and full of characters that would poison a log line.
       const reply = await app.inject({
@@ -205,17 +187,10 @@ describe("request id and cache headers", () => {
   });
 
   test("generates an id when none is supplied", async () => {
-    const app = await createApp({
-    logger: false,
-    overrides: {
+    const app = await createRateLimitedTestApp({
       oauth: oauthStub,
       db: noDb,
-      // Real per-IP keying, so a suite that fires many requests at one
-      // address trips the production budget. Key per request instead; the
-      // limits themselves stay real.
-      rateLimitKey: () => randomUUID(),
-    },
-  });
+    });
     try {
       const reply = await app.inject({ method: "GET", url: "/profiles/" });
       assert.ok(reply.headers["x-request-id"]);
@@ -225,17 +200,10 @@ describe("request id and cache headers", () => {
   });
 
   test("caches the public list and the public profile, but not /me", async () => {
-    const app = await createApp({
-    logger: false,
-    overrides: {
+    const app = await createRateLimitedTestApp({
       oauth: oauthStub,
       db: noDb,
-      // Real per-IP keying, so a suite that fires many requests at one
-      // address trips the production budget. Key per request instead; the
-      // limits themselves stay real.
-      rateLimitKey: () => randomUUID(),
-    },
-  });
+    });
     try {
       stubMethod(Profile, "find", () => mkQuery([] as any));
       stubMethod(Profile, "countDocuments", () => mkQuery(0) as any);

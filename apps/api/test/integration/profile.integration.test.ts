@@ -1,8 +1,14 @@
 import { describe, test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { appendDbSuffix, cleanDb, testEmail, testName, toLocalMongoUri } from "../helpers/integration.ts";
+import {
+  appendDbSuffix,
+  cleanDb,
+  testEmail,
+  testName,
+  toLocalMongoUri,
+} from "../helpers/integration.ts";
 import { oauthStub } from "../helpers/plugin-overrides.ts";
-import { createApp } from "#app";
+import { createRateLimitedTestApp } from "../helpers/test-app.ts";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 
@@ -10,7 +16,8 @@ let app: FastifyInstance;
 
 before(async () => {
   const runId = randomUUID().slice(0, 8);
-  const baseUri = process.env.MONGODB_URI ?? "mongodb://localhost:27018/devconnector_test";
+  const baseUri =
+    process.env.MONGODB_URI ?? "mongodb://localhost:27018/devconnector_test";
   // Per-run database and secret, so parallel runs do not collide. Both are
   // read by src/config/env and src/plugins/mongoose at registration time,
   // which happens inside createApp below — after these assignments.
@@ -18,14 +25,10 @@ before(async () => {
   process.env.JWT_SECRET = `test-jwt-secret-${randomUUID().slice(0, 16)}`;
   process.env.FRONTEND_URL = "http://localhost:3000";
 
-  app = await createApp({
-    logger: false,
-    overrides: {
-      oauth: oauthStub,
-      // `db` is deliberately absent: integration tests want the real mongoose
-      // plugin and a real connection.
-      rateLimitKey: () => randomUUID(),
-    },
+  app = await createRateLimitedTestApp({
+    oauth: oauthStub,
+    // `db` is deliberately absent: integration tests want the real mongoose
+    // plugin and a real connection.,
   });
 });
 
@@ -42,11 +45,13 @@ describe("integration — profile", () => {
     const email = testEmail("profile");
     const password = "Password123!";
     const name = testName("profile");
-    const userId = (await app.inject({
-      method: "POST",
-      url: "/auth/register",
-      payload: { name, email, password },
-    })).json().id;
+    const userId = (
+      await app.inject({
+        method: "POST",
+        url: "/auth/register",
+        payload: { name, email, password },
+      })
+    ).json().id;
 
     const headers = { authorization: "" };
     let accessToken = "";
@@ -190,7 +195,10 @@ describe("integration — profile", () => {
       },
     });
     assert.equal(valid.statusCode, 201);
-    assert.equal((valid.json().profile as any).social.twitter, "https://twitter.com/jane");
+    assert.equal(
+      (valid.json().profile as any).social.twitter,
+      "https://twitter.com/jane",
+    );
 
     // Invalid (non-URI)
     const invalid = await app.inject({
@@ -262,7 +270,9 @@ async function setupBasicUser(email: string) {
     payload: { email, password },
   });
   assert.equal(loginReply.statusCode, 200);
-  const accessToken = loginReply.cookies.find((c) => c.name === "access_token")!.value;
+  const accessToken = loginReply.cookies.find(
+    (c) => c.name === "access_token",
+  )!.value;
   return {
     headers: { authorization: `Bearer ${accessToken}` },
   };

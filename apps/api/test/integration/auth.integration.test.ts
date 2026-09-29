@@ -1,8 +1,14 @@
 import { describe, test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { appendDbSuffix, cleanDb, testEmail, testName, toLocalMongoUri } from "../helpers/integration.ts";
+import {
+  appendDbSuffix,
+  cleanDb,
+  testEmail,
+  testName,
+  toLocalMongoUri,
+} from "../helpers/integration.ts";
 import { oauthStub } from "../helpers/plugin-overrides.ts";
-import { createApp } from "#app";
+import { createRateLimitedTestApp } from "../helpers/test-app.ts";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 
@@ -12,7 +18,8 @@ const frontendUrl = "http://localhost:3000";
 
 before(async () => {
   const runId = randomUUID().slice(0, 8);
-  const baseUri = process.env.MONGODB_URI ?? "mongodb://localhost:27018/devconnector_test";
+  const baseUri =
+    process.env.MONGODB_URI ?? "mongodb://localhost:27018/devconnector_test";
   // Per-run database and secret, so parallel runs do not collide. Both are
   // read by src/config/env and src/plugins/mongoose at registration time,
   // which happens inside createApp below — after these assignments.
@@ -20,14 +27,10 @@ before(async () => {
   process.env.JWT_SECRET = `test-jwt-secret-${randomUUID().slice(0, 16)}`;
   process.env.FRONTEND_URL = "http://localhost:3000";
 
-  app = await createApp({
-    logger: false,
-    overrides: {
-      oauth: oauthStub,
-      // `db` is deliberately absent: integration tests want the real mongoose
-      // plugin and a real connection.
-      rateLimitKey: () => randomUUID(),
-    },
+  app = await createRateLimitedTestApp({
+    oauth: oauthStub,
+    // `db` is deliberately absent: integration tests want the real mongoose
+    // plugin and a real connection.,
   });
 });
 
@@ -40,17 +43,17 @@ beforeEach(async () => {
 });
 
 /** Registers a user via POST /auth/register and returns the parsed JSON body. */
-async function register(
-  email: string,
-  password: string,
-  name: string,
-) {
+async function register(email: string, password: string, name: string) {
   const reply = await app.inject({
     method: "POST",
     url: "/auth/register",
     payload: { name, email, password },
   });
-  assert.equal(reply.statusCode, 201, `register failed: ${reply.statusCode}\nbody: ${reply.body}\nerror: ${(app as any).lastError ?? "none"}`);
+  assert.equal(
+    reply.statusCode,
+    201,
+    `register failed: ${reply.statusCode}\nbody: ${reply.body}\nerror: ${(app as any).lastError ?? "none"}`,
+  );
   return reply.json() as {
     id: string;
     name: string;
@@ -72,14 +75,18 @@ async function login(email: string, password: string) {
 }
 
 /** Extracts the access_token cookie value from a reply. */
-function accessCookie(reply: { cookies: Array<{ name: string; value: string }> }) {
+function accessCookie(reply: {
+  cookies: Array<{ name: string; value: string }>;
+}) {
   const c = reply.cookies.find((c) => c.name === "access_token");
   assert.ok(c, "access_token cookie not set");
   return c.value;
 }
 
 /** Extracts the refresh_token cookie value from a reply. */
-function refreshCookie(reply: { cookies: Array<{ name: string; value: string }> }) {
+function refreshCookie(reply: {
+  cookies: Array<{ name: string; value: string }>;
+}) {
   const c = reply.cookies.find((c) => c.name === "refresh_token");
   assert.ok(c, "refresh_token cookie not set");
   return c.value;
@@ -207,10 +214,7 @@ describe("integration — auth flow", () => {
 
     const loginReply = await login(rawEmail, "Password123!");
     assert.equal(loginReply.statusCode, 200);
-    assert.equal(
-      (loginReply.json() as { email: string }).email,
-      normalized,
-    );
+    assert.equal((loginReply.json() as { email: string }).email, normalized);
   });
 
   test("logout-all revokes every session for the user", async () => {
@@ -232,19 +236,23 @@ describe("integration — auth flow", () => {
 
     // Both sessions are alive: both refresh tokens work.
     assert.equal(
-      (await app.inject({
-        method: "POST",
-        url: "/auth/refresh",
-        cookies: { refresh_token: ref1 },
-      })).statusCode,
+      (
+        await app.inject({
+          method: "POST",
+          url: "/auth/refresh",
+          cookies: { refresh_token: ref1 },
+        })
+      ).statusCode,
       200,
     );
     assert.equal(
-      (await app.inject({
-        method: "POST",
-        url: "/auth/refresh",
-        cookies: { refresh_token: ref2 },
-      })).statusCode,
+      (
+        await app.inject({
+          method: "POST",
+          url: "/auth/refresh",
+          cookies: { refresh_token: ref2 },
+        })
+      ).statusCode,
       200,
     );
 
@@ -258,19 +266,23 @@ describe("integration — auth flow", () => {
 
     // Both refresh tokens are now dead.
     assert.equal(
-      (await app.inject({
-        method: "POST",
-        url: "/auth/refresh",
-        cookies: { refresh_token: ref1 },
-      })).statusCode,
+      (
+        await app.inject({
+          method: "POST",
+          url: "/auth/refresh",
+          cookies: { refresh_token: ref1 },
+        })
+      ).statusCode,
       401,
     );
     assert.equal(
-      (await app.inject({
-        method: "POST",
-        url: "/auth/refresh",
-        cookies: { refresh_token: ref2 },
-      })).statusCode,
+      (
+        await app.inject({
+          method: "POST",
+          url: "/auth/refresh",
+          cookies: { refresh_token: ref2 },
+        })
+      ).statusCode,
       401,
     );
   });
@@ -305,9 +317,6 @@ describe("integration — auth flow", () => {
       payload: { status: "Developer", skills: ["JS"] },
     });
     assert.equal(badReply.statusCode, 403);
-    assert.equal(
-      (badReply.json() as { code: string }).code,
-      "FORBIDDEN",
-    );
+    assert.equal((badReply.json() as { code: string }).code, "FORBIDDEN");
   });
 });

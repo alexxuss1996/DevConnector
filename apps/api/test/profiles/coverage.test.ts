@@ -15,8 +15,7 @@ import {
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
 import { assertErrorBody } from "../helpers/assertions.ts";
-import { createApp } from "#app";
-import { randomUUID } from "node:crypto";
+import { createRateLimitedTestApp } from "../helpers/test-app.ts";
 import mongoose, { Types } from "mongoose";
 import type { FastifyInstance } from "fastify";
 
@@ -42,16 +41,9 @@ function stubMongooseSession() {
 let app: FastifyInstance;
 
 before(async () => {
-  app = await createApp({
-    logger: false,
-    overrides: {
-      oauth: oauthStub,
-      db: noDb,
-      // Real per-IP keying, so a suite that fires many requests at one
-      // address trips the production budget. Key per request instead; the
-      // limits themselves stay real.
-      rateLimitKey: () => randomUUID(),
-    },
+  app = await createRateLimitedTestApp({
+    oauth: oauthStub,
+    db: noDb,
   });
 });
 

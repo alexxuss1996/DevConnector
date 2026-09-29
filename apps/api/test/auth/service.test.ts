@@ -15,23 +15,15 @@ import {
 } from "../helpers/stubs.ts";
 import { signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
-import { createApp } from "#app";
-import { randomUUID } from "node:crypto";
+import { createRateLimitedTestApp } from "../helpers/test-app.ts";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;
 
 before(async () => {
-  app = await createApp({
-    logger: false,
-    overrides: {
-      oauth: oauthStub,
-      db: noDb,
-      // Key per request so a suite that starts making HTTP calls cannot
-      // start failing with an unexplained 429. This suite currently makes
-      // none, which is why it got left out when the others were migrated.
-      rateLimitKey: () => randomUUID(),
-    },
+  app = await createRateLimitedTestApp({
+    oauth: oauthStub,
+    db: noDb,
   });
 });
 

@@ -14,36 +14,28 @@ import {
 import { signAccessToken, signRefreshToken } from "../helpers/app.ts";
 import { oauthStub, noDb } from "../helpers/plugin-overrides.ts";
 import { assertErrorBody } from "../helpers/assertions.ts";
-import { createApp } from "#app";
-import { randomUUID } from "node:crypto";
+import { createRateLimitedTestApp } from "../helpers/test-app.ts";
 import type { FastifyInstance } from "fastify";
 
 let app: FastifyInstance;
 
 before(async () => {
-  app = await createApp({
-    logger: false,
-    overrides: {
-      oauth: oauthStub,
-      db: noDb,
-      // Real per-IP keying, so a suite that fires many requests at one
-      // address trips the production budget. Key per request instead; the
-      // limits themselves stay real.
-      rateLimitKey: () => randomUUID(),
-      // The `authenticate` decorator needs a route to guard. The old harness
-      // invented /protected for this and the real wiring has no such route,
-      // so register one guarded by the real decorator. It has to go through
-      // the app, before it readies — a route added to the returned instance
-      // afterwards is rejected.
-      extraRoutes: (instance) => {
-        instance.get(
-          "/protected",
-          { onRequest: [instance.authenticate] },
-          async () => ({
-            ok: true,
-          }),
-        );
-      },
+  app = await createRateLimitedTestApp({
+    oauth: oauthStub,
+    db: noDb,
+    // The `authenticate` decorator needs a route to guard. The old harness
+    // invented /protected for this and the real wiring has no such route,
+    // so register one guarded by the real decorator. It has to go through
+    // the app, before it readies — a route added to the returned instance
+    // afterwards is rejected.
+    extraRoutes: (instance) => {
+      instance.get(
+        "/protected",
+        { onRequest: [instance.authenticate] },
+        async () => ({
+          ok: true,
+        }),
+      );
     },
   });
 });
