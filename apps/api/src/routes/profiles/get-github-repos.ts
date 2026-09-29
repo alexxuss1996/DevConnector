@@ -1,6 +1,6 @@
 import { profileService } from "#modules/profiles/profiles.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
-import { Type } from "typebox";
+import { Type } from "@sinclair/typebox";
 import {
   ErrorResponseSchema,
   GithubUsernameParamsSchema,

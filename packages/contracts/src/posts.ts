@@ -1,4 +1,4 @@
-import { Static, Type } from "typebox";
+import { Static, Type } from "@sinclair/typebox";
 
 const OBJECT_ID_PATTERN = "^[0-9a-fA-F]{24}$";
 const NON_BLANK_PATTERN = ".*\\S.*";

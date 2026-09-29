@@ -1,4 +1,4 @@
-import { Static, Type } from "typebox";
+import { Static, Type } from "@sinclair/typebox";
 
 export const exampleFormSchema = Type.Object({
   name: Type.String({

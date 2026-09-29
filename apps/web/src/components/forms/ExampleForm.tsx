@@ -2,8 +2,7 @@
 
 import { Input, Textarea } from "@chakra-ui/react";
 import * as React from "react";
-import { Controller, Resolver, useForm } from "react-hook-form";
-import { Value } from "typebox/value";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
@@ -13,47 +12,8 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Radio, RadioGroup } from "@/components/ui/radio";
 import { Switch } from "@/components/ui/switch";
 import { TagsInputControl, TagsInputRoot } from "@/components/ui/tags-input";
-import {
-  ExampleFormValues,
-  exampleFormSchema,
-} from "@/components/forms/exampleFormSchema";
-
-// TypeBox ignores the `errorMessage` keyword in Value.Errors, so map its
-// default messages to friendly ones in a single place.
-const FIELD_MESSAGES: Record<string, string> = {
-  name: "Name needs at least 2 characters.",
-  email: "Enter a valid email address.",
-  password: "Password needs at least 8 characters.",
-  age: "Must be 13 or older.",
-  bio: "Bio must be 280 characters or less.",
-  role: "Pick a role.",
-  gender: "Pick an option.",
-  birthdate: "Pick a birthdate.",
-  terms: "You must accept the terms.",
-  tags: "Add at least one tag.",
-};
-
-// ponytail: hand-rolled resolver, @hookform/resolvers/typebox peers on
-// @sinclair/typebox 0.x and doesn't accept typebox v1 schemas.
-const friendlyResolver: Resolver<ExampleFormValues> = async (values) => {
-  const errors: Record<string, { type: string; message: string }> = {};
-  for (const e of Value.Errors(exampleFormSchema, values)) {
-    const params = e.params as { requiredProperties?: string[] } | undefined;
-    const keys =
-      e.instancePath === "" && params?.requiredProperties
-        ? params.requiredProperties
-        : [e.instancePath.slice(1)];
-    for (const key of keys) {
-      if (!errors[key] && FIELD_MESSAGES[key]) {
-        errors[key] = { type: e.keyword ?? "validation", message: FIELD_MESSAGES[key] };
-      }
-    }
-  }
-  return {
-    values: Object.keys(errors).length > 0 ? {} : values,
-    errors,
-  };
-};
+import type { ExampleFormValues } from "@/components/forms/exampleFormSchema";
+import { exampleFormResolver } from "@/components/forms/exampleFormResolver";
 
 export interface ExampleFormProps {
   onSubmit: (values: ExampleFormValues) => void;
@@ -66,7 +26,7 @@ export function ExampleForm({ onSubmit }: ExampleFormProps) {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<ExampleFormValues>({
-    resolver: friendlyResolver,
+    resolver: exampleFormResolver,
     defaultValues: {
       name: "",
       email: "",

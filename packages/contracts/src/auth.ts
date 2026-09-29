@@ -1,4 +1,4 @@
-import { Static, Type } from "typebox";
+import { Static, Type } from "@sinclair/typebox";
 
 const NON_BLANK_PATTERN = ".*\\S.*";
 
