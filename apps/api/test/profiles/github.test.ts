@@ -62,17 +62,22 @@ function mockFetchSuccess(repos: any[]) {
   return fetchMock;
 }
 
-function mockFetchNotFound(body: any = { message: "Not Found" }) {
-  const fetchMock = mock.method(
+/** GitHub answered with `status` and a body that is not JSON-parsable. */
+function mockUpstreamStatus(status: number, body: any = { message: "upstream" }) {
+  return mock.method(
     global,
     "fetch",
     async () =>
       ({
         ok: false,
-        status: 404,
+        status,
         json: async () => body,
       }) as any,
   );
+}
+
+function mockFetchNotFound(body: any = { message: "Not Found" }) {
+  const fetchMock = mockUpstreamStatus(404, body);
   return fetchMock;
 }
 
@@ -250,6 +255,33 @@ describe("GET /profiles/github/:username — logic", () => {
     assert.equal(reply.statusCode, 404);
     assert.equal((reply.json() as any).code, "GITHUB_REPOS_NOT_FOUND");
   });
+
+  // The upstream status mapping was entirely uncovered apart from 404, including
+  // the 502 the error handler treats specially.
+  for (const [upstream, expectedStatus, expectedCode] of [
+    [401, 401, "GITHUB_AUTH_FAILED"],
+    [403, 403, "GITHUB_RATE_LIMITED"],
+    [429, 429, "GITHUB_RATE_LIMITED"],
+    [500, 502, "GITHUB_UPSTREAM_ERROR"],
+    [503, 502, "GITHUB_UPSTREAM_ERROR"],
+    [418, 502, "GITHUB_UPSTREAM_ERROR"],
+  ] as const) {
+    test(`maps GitHub ${upstream} to ${expectedStatus} ${expectedCode}`, async () => {
+      clearGithubReposCache();
+      mockUpstreamStatus(upstream);
+
+      const reply = await app.inject({
+        method: "GET",
+        url: `/profiles/github/upstream-${upstream}`,
+        headers: authHeader(),
+      });
+
+      assert.equal(reply.statusCode, expectedStatus);
+      assert.equal((reply.json() as any).code, expectedCode);
+      // The body must never carry GitHub's own payload verbatim.
+      assert.ok(reply.body.includes("requestId"), "error body must stay correlatable");
+    });
+  }
 
   test("returns 500 for fetch network error (unexpected error)", async () => {
     mock.method(global, "fetch", async () => {

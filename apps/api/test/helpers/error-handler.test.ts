@@ -75,6 +75,49 @@ describe("errorHandler", () => {
     assert.deepEqual(body.fieldErrors.email, ["must match format"]);
   });
 
+  test("does not leak the message of an unexpected 4xx", async () => {
+    // A bug that happens to carry a 4xx statusCode used to ship its message
+    // verbatim to the client. Only Fastify's own HTTP errors carry text written
+    // for users, so only those are forwarded.
+    const leaky: any = new Error("db password is hunter2");
+    leaky.statusCode = 400;
+    leaky.code = "FST_ERR_SOMETHING";
+
+    const { reply, captured } = fakeReply();
+    await errorHandler(leaky, fakeRequest(), reply);
+
+    assert.equal(captured.status, 400);
+    assert.deepEqual(captured.body, {
+      code: "FST_ERR_SOMETHING",
+      message: "Bad request",
+      requestId: "req-test",
+    });
+    assert.ok(
+      !JSON.stringify(captured.body).includes("hunter2"),
+      "internal detail must never reach the client",
+    );
+  });
+
+  test("still forwards a Fastify-authored 4xx message", async () => {
+    // Fastify's own errors (e.g. malformed JSON) are written for users and are
+    // far more useful than "Bad request".
+    const fastifyError: any = new Error(
+      "Body is not valid JSON but content-type is set to 'application/json'",
+    );
+    fastifyError.name = "FastifyError";
+    fastifyError.code = "FST_ERR_CTP_INVALID_JSON_BODY";
+    fastifyError.statusCode = 400;
+
+    const { reply, captured } = fakeReply();
+    await errorHandler(fastifyError, fakeRequest(), reply);
+
+    assert.equal(captured.status, 400);
+    assert.equal(
+      (captured.body as any).message,
+      "Body is not valid JSON but content-type is set to 'application/json'",
+    );
+  });
+
   test("maps unexpected errors to 500 INTERNAL_SERVER_ERROR and logs them", async () => {
     const { reply, captured } = fakeReply();
     const logError = mock.fn();

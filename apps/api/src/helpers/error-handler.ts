@@ -84,9 +84,13 @@ export const errorHandler = (
     }
     if (statusCode < 500) {
       const err = error as FastifyError & { code?: string };
+      // Only Fastify's own HTTP errors carry a message written for users. Any
+      // other error that merely happens to have a 4xx statusCode — a bug, a
+      // driver error, a rejected promise — would otherwise ship its internals.
+      const authoredForUsers = error.name === "FastifyError";
       return fail(statusCode, {
         code: err.code ?? "BAD_REQUEST",
-        message: error.message ?? "Bad request",
+        message: authoredForUsers ? (error.message ?? "Bad request") : "Bad request",
       });
     }
   }

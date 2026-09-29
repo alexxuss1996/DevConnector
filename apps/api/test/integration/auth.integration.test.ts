@@ -319,4 +319,34 @@ describe("integration — auth flow", () => {
     assert.equal(badReply.statusCode, 403);
     assert.equal((badReply.json() as { code: string }).code, "FORBIDDEN");
   });
+
+  // `refresh_token` is scoped to path `/auth`, so a cross-site request to these
+  // two routes carries it while `/profiles/` never would. They are the
+  // highest-value CSRF targets in the app and had no integration coverage.
+  for (const [label, url, payload] of [
+    ["logout-all", "/auth/logout-all", undefined],
+    ["link-google", "/auth/link-google", { email: "someone@example.com" }],
+  ] as const) {
+    test(`CSRF: cookie-authenticated ${label} from a different origin is rejected`, async () => {
+      const email = testEmail(`csrf-${label}`);
+      const password = "Password123!";
+      await register(email, password, testName(`csrf-${label}`));
+
+      const loginReply = await login(email, password);
+      const accessToken = accessCookie(loginReply);
+
+      // The request must be rejected on origin, not on payload validation, so
+      // a rejected request must not mention the route's own validation code.
+      const badReply = await app.inject({
+        method: "POST",
+        url,
+        cookies: { access_token: accessToken },
+        headers: { origin: "https://evil.example.com" },
+        ...(payload ? { payload } : {}),
+      });
+
+      assert.equal(badReply.statusCode, 403, `${url} should reject a foreign origin`);
+      assert.equal((badReply.json() as { code: string }).code, "FORBIDDEN");
+    });
+  }
 });
