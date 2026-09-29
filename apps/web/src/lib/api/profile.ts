@@ -4,7 +4,6 @@ import type {
   AddExperienceInput,
   AddEducationInput,
   ProfileIdParams,
-  GithubUsernameParams,
   ExperienceIdParams,
   EducationIdParams,
   PublicProfile,
@@ -38,10 +37,6 @@ export class ProfileApiClient extends ApiClient {
 
   getProfileById(params: ProfileIdParams): Promise<{ profile: PublicProfile }> {
     return this.get<{ profile: PublicProfile }>(`/profiles/user/${params.id}`);
-  }
-
-  getGithubRepos(params: GithubUsernameParams): Promise<unknown> {
-    return this.get<unknown>(`/profiles/github/${params.username}`);
   }
 
   addExperience(data: AddExperienceInput): Promise<{ profile: PublicProfile }> {

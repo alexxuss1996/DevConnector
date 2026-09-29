@@ -28,14 +28,26 @@ import { postsApi } from "@/lib/api/posts";
 
 // Auth queries/mutations
 export function useRegisterMutation() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: RegisterUserInput) => authApi.register(data),
+    // A fresh session changes what `/profiles/me` returns, so the cached
+    // profile has to be refetched or the UI still shows the signed-out state.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+    },
   });
 }
 
 export function useLoginMutation() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: LoginUserInput) => authApi.login(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+    },
   });
 }
 
@@ -44,6 +56,9 @@ export function useLogoutMutation() {
   return useMutation({
     mutationFn: () => authApi.logout(),
     onSuccess: () => qc.clear(),
+    // A logout that fails server-side still has to leave nothing behind, which
+    // is the entire point of logging out on a shared device.
+    onSettled: () => qc.clear(),
   });
 }
 

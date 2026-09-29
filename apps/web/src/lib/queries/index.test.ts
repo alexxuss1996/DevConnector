@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  mutationOptions: undefined as { onSuccess?: (...args: unknown[]) => unknown } | undefined,
+  mutationOptions: undefined as
+    | {
+        onSuccess?: (...args: unknown[]) => unknown;
+        onSettled?: (...args: unknown[]) => unknown;
+      }
+    | undefined,
   queryOptions: undefined as Record<string, unknown> | undefined,
   useMutation: vi.fn((options: typeof mocks.mutationOptions) => {
     mocks.mutationOptions = options;
@@ -23,13 +28,19 @@ vi.mock("@tanstack/react-query", () => ({
 import {
   useAddCommentMutation,
   useCreateProfileMutation,
+  useLoginMutation,
   useLogoutMutation,
   useProfileById,
   useProfiles,
+  useRegisterMutation,
 } from "@/lib/queries/index";
 
 function runOnSuccess(...args: unknown[]) {
   mocks.mutationOptions?.onSuccess?.(...args);
+}
+
+function runOnSettled(...args: unknown[]) {
+  mocks.mutationOptions?.onSettled?.(...args);
 }
 
 describe("query cache invalidation", () => {
@@ -48,6 +59,34 @@ describe("query cache invalidation", () => {
     runOnSuccess(undefined, undefined, undefined);
 
     expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("clears cached data even when logout fails", () => {
+    // Logging out exists to leave nothing behind on a shared device. Clearing
+    // only in onSuccess meant an offline or 500 logout left every cached
+    // profile and post in memory for the next person to find.
+    useLogoutMutation();
+    runOnSettled(undefined, undefined, new Error("network down"));
+
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("refetches the profile after a successful login", () => {
+    // Without this a successful login rendered exactly the same UI as no
+    // session, because nothing was invalidated.
+    useLoginMutation();
+    runOnSuccess(undefined, undefined, undefined);
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["profile"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["profiles"] });
+  });
+
+  it("refetches the profile after a successful registration", () => {
+    useRegisterMutation();
+    runOnSuccess(undefined, undefined, undefined);
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["profile"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["profiles"] });
   });
 
   it("invalidates profile lists after a profile mutation", () => {

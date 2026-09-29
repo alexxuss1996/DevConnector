@@ -111,7 +111,6 @@ await profileApi.deleteProfile(); // deletes profile + user, resolves void
 | `getProfiles({ page, limit }?)` | `{ profiles: PublicProfileSummary[]; total: number; page: number; limit: number }` |
 | `getMyProfile()` | `{ profile: PublicProfile }` |
 | `getProfileById({ id })` | `{ profile: PublicProfile }` |
-| `getGithubRepos({ username })` | `unknown` (raw GitHub payload) |
 | `addExperience(data)` / `addEducation(data)` | `{ profile: PublicProfile }` |
 | `deleteExperience({ experienceId })` / `deleteEducation({ educationId })` | `{ profile: PublicProfile }` |
 | `deleteProfile()` | `void` |
