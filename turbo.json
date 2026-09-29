@@ -17,6 +17,10 @@
       "dependsOn": ["^test"],
       "env": ["CI"]
     },
+    "test:e2e": {
+      "dependsOn": ["^test"],
+      "cache": false
+    },
     "dev": {
       "cache": false,
       "persistent": true
