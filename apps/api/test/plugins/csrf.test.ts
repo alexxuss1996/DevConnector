@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import Fastify from "fastify";
 import fastifyCookie from "@fastify/cookie";
 import csrfPlugin from "#plugins/csrf";
+import { errorHandler } from "#helpers/error-handler";
+import { registerRequestIdHook } from "#helpers/request-id";
+import { assertErrorBody } from "../helpers/assertions.ts";
 import type { FastifyInstance } from "fastify";
 
 const allowedOrigin = new URL(
@@ -12,12 +15,19 @@ const allowedOrigin = new URL(
 interface InjectResponse {
   statusCode: number;
   json: () => any;
+  headers: Record<string, any>;
 }
 
 let app: FastifyInstance;
 
 before(async () => {
   app = Fastify({ logger: false });
+  // Same wiring production has: the CSRF 403 must reach the client through
+  // the error handler so the body carries the correlation id like every other
+  // error. Set before the plugins, because an encapsulated context inherits
+  // the handler present at register time.
+  app.setErrorHandler(errorHandler);
+  registerRequestIdHook(app);
   await app.register(fastifyCookie);
   await app.register(csrfPlugin);
   app.post("/mutate", async () => ({ ok: true }));
@@ -82,7 +92,7 @@ describe("csrf plugin", () => {
       origin: "https://evil.example",
     });
     assert.equal(reply.statusCode, 403);
-    assert.deepEqual(reply.json(), {
+    assertErrorBody(reply, {
       code: "FORBIDDEN",
       message: "Invalid origin",
     });
@@ -94,5 +104,9 @@ describe("csrf plugin", () => {
       origin: "not a url",
     });
     assert.equal(reply.statusCode, 403);
+    assertErrorBody(reply, {
+      code: "FORBIDDEN",
+      message: "Invalid origin",
+    });
   });
 });

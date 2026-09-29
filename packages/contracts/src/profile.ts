@@ -1,15 +1,36 @@
 import { Static, Type } from "@sinclair/typebox";
 
+/**
+ * Field ceilings. Every one of these is stored verbatim in a Mongo document,
+ * so an unbounded string is a way to push a write at the 16MB BSON limit. The
+ * numbers are generous against real input rather than tight: a company or
+ * location is a label and gets 200, a GitHub username is capped at GitHub's
+ * own 39, a skill is a single word, and `skills` is a list of those words so
+ * its count is bounded too. `bio` already had a cap and keeps it: 500 is
+ * plenty for a profile blurb. `UpdateProfileSchema` is a `Type.Partial` of
+ * this, so it inherits every limit below.
+ */
+export const PROFILE_LIMITS = {
+  company: 200,
+  location: 200,
+  status: 200,
+  githubusername: 39,
+  skill: 100,
+  skills: 50,
+  bio: 500,
+} as const;
+
 export const CreateProfileSchema = Type.Object(
   {
     company: Type.Optional(
       Type.Union([
         Type.String({
           minLength: 1,
+          maxLength: PROFILE_LIMITS.company,
           description: "Company name",
           examples: ["Acme Corp"],
           example: "Acme Corp",
-          errorMessage: "Company must be at least 1 character",
+          errorMessage: "Company must be 1-200 characters",
         }),
         Type.Literal(""),
         Type.Null(),
@@ -32,10 +53,11 @@ export const CreateProfileSchema = Type.Object(
       Type.Union([
         Type.String({
           minLength: 1,
+          maxLength: PROFILE_LIMITS.location,
           description: "Location, e.g. Seattle, WA",
           examples: ["Seattle, WA"],
           example: "Seattle, WA",
-          errorMessage: "Location must be at least 1 character",
+          errorMessage: "Location must be 1-200 characters",
         }),
         Type.Literal(""),
         Type.Null(),
@@ -43,35 +65,38 @@ export const CreateProfileSchema = Type.Object(
     ),
     status: Type.String({
       minLength: 1,
+      maxLength: PROFILE_LIMITS.status,
       pattern: ".*\\S.*",
       description:
         "Professional status - e.g. Developer, Junior Developer, Senior Developer, Manager, Student",
       examples: ["Developer"],
       example: "Developer",
-      errorMessage: "Status is required and cannot be empty",
+      errorMessage: "Status is required and must be 1-200 characters",
     }),
     skills: Type.Array(
       Type.String({
         minLength: 1,
+        maxLength: PROFILE_LIMITS.skill,
         pattern: ".*\\S.*",
         description: "A skill",
         examples: ["JavaScript"],
         example: "JavaScript",
-        errorMessage: "Skill cannot be empty",
+        errorMessage: "Skill must be 1-100 characters",
       }),
       {
         minItems: 1,
+        maxItems: PROFILE_LIMITS.skills,
         description: "List of skills",
         examples: [["JavaScript", "Node.js", "React"]],
         example: ["JavaScript", "Node.js", "React"],
-        errorMessage: "At least one skill is required",
+        errorMessage: "Between 1 and 50 skills are required",
       },
     ),
     bio: Type.Optional(
       Type.Union([
         Type.String({
           minLength: 1,
-          maxLength: 500,
+          maxLength: PROFILE_LIMITS.bio,
           description: "Short bio",
           examples: ["Full-stack developer passionate about open source"],
           example: "Full-stack developer passionate about open source",
@@ -85,10 +110,11 @@ export const CreateProfileSchema = Type.Object(
       Type.Union([
         Type.String({
           minLength: 1,
+          maxLength: PROFILE_LIMITS.githubusername,
           description: "GitHub username",
           examples: ["octocat"],
           example: "octocat",
-          errorMessage: "GitHub username must be at least 1 character",
+          errorMessage: "GitHub username must be 1-39 characters",
         }),
         Type.Literal(""),
         Type.Null(),
@@ -473,14 +499,23 @@ export interface PaginationQuery {
   limit?: number | string;
 }
 
-/** Normalises a pagination query to safe integers, clamped to `limit` 1-100. */
+/**
+ * Normalises a pagination query to safe integers, clamped to `limit` 1-100 and
+ * `page` 1-10_000.
+ */
 export function parsePagination(query: PaginationQuery = {}): { page: number; limit: number } {
   const toInt = (value: unknown, fallback: number) => {
     const n = typeof value === "string" ? Number(value) : (value as number);
     if (!Number.isFinite(n) || !Number.isInteger(n)) return fallback;
     return n;
   };
-  const page = Math.max(1, toInt(query.page, 1));
+  // Clamped like `limit`, and it has to be: `page` reaches the query as
+  // `skip((page - 1) * limit)`, so an unbounded page is an unbounded skip and
+  // `Number("99999999999999999999")` is a legal integer JS will happily carry
+  // to 1e20. 10_000 pages at the 100-per-page ceiling is a million rows deep,
+  // far past any real listing, and keeps every product of the two a safe
+  // integer.
+  const page = Math.min(10_000, Math.max(1, toInt(query.page, 1)));
   const limit = Math.min(100, Math.max(1, toInt(query.limit, 20)));
   return { page, limit };
 }

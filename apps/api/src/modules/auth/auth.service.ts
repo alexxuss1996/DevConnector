@@ -3,6 +3,14 @@ import Session from "#modules/auth/session.model";
 import AppError from "#helpers/app-error";
 import { sanitizePlainText } from "#helpers/sanitize";
 import argon2 from "argon2";
+
+/**
+ * An argon2id hash of a value no account can have, with the same default cost
+ * parameters `argon2.hash()` uses for real passwords. Login verifies against it
+ * when there is nothing to verify, so a miss costs the same as a wrong password.
+ */
+const DUMMY_PASSWORD_HASH =
+  "$argon2id$v=19$m=65536,p=4,t=3$N32g5AoMpMIgEu1zQWCxVw$GX+JxlTXxjuvb2jUgNSm8XIhmaUm8fDl3A1h1Oy0gL4";
 import gravatarUrl from "gravatar-url";
 import { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
@@ -124,17 +132,16 @@ class AuthService {
       "+passwordHash",
     );
 
-    if (!user) {
-      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
-    }
+    // An argon2id verify of this throwaway value, using the same default cost
+    // parameters the real hashes are created with. Verifying against it on both
+    // miss paths makes "no such user", "google-only account" and "wrong
+    // password" cost the same, so response time cannot enumerate accounts.
+    const isPasswordCorrect = await argon2.verify(
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+      password,
+    );
 
-    if (!user.passwordHash) {
-      throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
-    }
-
-    const isPasswordCorrect = await argon2.verify(user.passwordHash, password);
-
-    if (!isPasswordCorrect) {
+    if (!user?.passwordHash || !isPasswordCorrect) {
       throw new AppError(401, "INVALID_CREDENTIALS", "Invalid Credentials");
     }
 

@@ -48,9 +48,12 @@ export function sanitizeText(input: string): string {
   });
 }
 
+// Decode only the entities that cannot form markup. `<` and `>` must NOT be
+// decoded: sanitize-html encodes a literal `<` as `&lt;`, and decoding it back
+// turned `&lt;script&gt;alert(1)&lt;/script&gt;` into a live tag in every field
+// calling sanitizePlainText (bio, company, location, status, ...). Output never
+// contains a raw angle bracket now, and still renders as typed.
 const ENTITY_DECODES: Array<[RegExp, string]> = [
-  [/&lt;/g, "<"],
-  [/&gt;/g, ">"],
   [/&quot;/g, '"'],
   [/&#0?39;/g, "'"],
   [/&amp;/g, "&"],

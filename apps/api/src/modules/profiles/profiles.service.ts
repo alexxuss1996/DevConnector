@@ -28,6 +28,24 @@ import {
   validateDateRange,
 } from "#helpers/profile";
 
+/**
+ * Whether this MongoDB deployment can run multi-document transactions, i.e. it
+ * is a replica set (`setName` in `hello`) or a sharded cluster (`isdbgrid`).
+ * Probed once per process: topology does not change under a running server.
+ */
+let topologyProbe: Promise<boolean> | undefined;
+
+function supportsTransactions(): Promise<boolean> {
+  topologyProbe ??= (
+    mongoose.connection.db?.admin().command({ hello: 1 }) ?? Promise.reject()
+  )
+    .then(
+      (hello) => Boolean(hello.setName) || hello.msg === "isdbgrid",
+      () => false,
+    );
+  return topologyProbe;
+}
+
 class ProfileService {
   /**
    * The single place a profile becomes a wire shape. Populates the owner and
@@ -98,7 +116,11 @@ class ProfileService {
         .skip((page - 1) * limit)
         .limit(limit)
         .populate("userId", ["name", "avatar"]),
-      Profile.countDocuments({}),
+      // No filter is ever applied here, so `countDocuments({})` is a full
+      // collection count on every list page. `estimatedDocumentCount` reads
+      // collection metadata instead and is the intended call for an unfiltered
+      // count.
+      Profile.estimatedDocumentCount(),
     ]);
 
     // A profile whose user was deleted populates `userId` to null, and there
@@ -194,13 +216,10 @@ class ProfileService {
         "At least one field is required",
       );
     }
-    // Reuse the same $set/$unset builder, but without upsert.
-    const existing = await Profile.findOne({ userId });
-    if (!existing) {
-      throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
-    }
-    const updated = await this.createOrUpdateProfileNoUpsert(userId, data);
-    return updated;
+    // Reuse the same $set/$unset builder, but without upsert. No pre-read: the
+    // `findOneAndUpdate` below returns null when the profile does not exist and
+    // raises the same 404, so reading it first would only add a round trip.
+    return this.createOrUpdateProfileNoUpsert(userId, data);
   }
 
   private async createOrUpdateProfileNoUpsert(
@@ -237,50 +256,54 @@ class ProfileService {
     return this.toPublicProfile(profile);
   }
   async deleteProfileAndUser(userId: string) {
-    // Try transactional cascade; fall back to non-transactional on standalone Mongo.
-    let session: mongoose.ClientSession | null = null;
-    let useTransaction = true;
+    // Multi-document transactions need a replica set or a sharded cluster.
+    // `startTransaction()` does not throw on a standalone server — it fails at
+    // the first operation, which is already inside the try below — so the
+    // topology has to be detected up front rather than caught after the fact.
+    const session = (await supportsTransactions())
+      ? await mongoose.startSession()
+      : null;
+    const opts = session ? { session } : {};
     try {
-      session = await mongoose.startSession();
-      session.startTransaction();
-    } catch {
-      session = null;
-      useTransaction = false;
-    }
-    const opts = session && useTransaction ? { session } : {};
-    try {
-      const profile = await Profile.findOneAndDelete({ userId }, opts);
+      if (session) session.startTransaction();
 
-      if (!profile) {
-        if (session && useTransaction) await session.abortTransaction();
+      // Match both ObjectId and legacy string forms of userId.
+      const uid = new Types.ObjectId(userId);
+
+      // Confirm both documents exist before deleting anything. On the
+      // non-transactional path a missing user discovered mid-cascade would
+      // leave the profile already gone and no way to resume the delete.
+      const [existingProfile, existingUser] = await Promise.all([
+        Profile.findOne({ userId }).select("_id").lean(),
+        User.findOne({ _id: userId }).select("_id").lean(),
+      ]);
+      if (!existingProfile) {
         throw new AppError(404, "PROFILE_NOT_FOUND", "Profile not found");
       }
-
-      const user = await User.findOneAndDelete({ _id: userId }, opts);
-      if (!user) {
-        if (session && useTransaction) await session.abortTransaction();
+      if (!existingUser) {
         throw new AppError(404, "USER_NOT_FOUND", "User not found");
       }
 
-      // Cascade: remove user's posts/comments/likes remnants and sessions.
-      // Match both ObjectId and legacy string forms of userId.
-      const uid = new Types.ObjectId(userId);
+      // Cascade: remove the user's posts, their like/comment remnants on other
+      // people's posts, and their sessions. The user row goes last.
       await Post.deleteMany({ userId: uid }, opts);
       await Post.updateMany(
-        {},
+        { $or: [{ "likes.userId": uid }, { "comments.userId": uid }] },
         {
           $pull: {
-            likes: { userId: { $in: [uid, userId] } },
-            comments: { userId: { $in: [uid, userId] } },
+            likes: { userId: uid },
+            comments: { userId: uid },
           },
         },
         opts,
       );
       await Session.deleteMany({ userId: uid }, opts);
+      await Profile.findOneAndDelete({ userId }, opts);
+      await User.findOneAndDelete({ _id: userId }, opts);
 
-      if (session && useTransaction) await session.commitTransaction();
+      if (session) await session.commitTransaction();
     } catch (err) {
-      if (session && useTransaction && session.inTransaction()) {
+      if (session?.inTransaction()) {
         await session.abortTransaction();
       }
       throw err;

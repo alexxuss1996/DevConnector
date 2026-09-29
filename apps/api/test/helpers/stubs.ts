@@ -111,6 +111,7 @@ type ChainableQuery<T> = Promise<T | null> & {
   exec: () => Promise<T | null>;
   populate: (...args: any[]) => ChainableQuery<T>;
   countDocuments: (...args: any[]) => ChainableQuery<number>;
+  estimatedDocumentCount: () => ChainableQuery<number>;
 };
 
 export function mkQuery<T>(value: T | null): ChainableQuery<T> {
@@ -124,6 +125,7 @@ export function mkQuery<T>(value: T | null): ChainableQuery<T> {
   q.populate = () => q;
   // Total is opt-in via mkCount.
   q.countDocuments = (() => q) as ChainableQuery<T>["countDocuments"];
+  q.estimatedDocumentCount = (() => q) as ChainableQuery<T>["estimatedDocumentCount"];
   return q;
 }
 
@@ -131,6 +133,7 @@ export function mkQuery<T>(value: T | null): ChainableQuery<T> {
 export function mkCount(total: number) {
   const q = Promise.resolve(total) as unknown as ChainableQuery<number>;
   q.countDocuments = () => q;
+  q.estimatedDocumentCount = () => q;
   q.exec = () => Promise.resolve(total);
   return q;
 }

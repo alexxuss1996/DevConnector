@@ -55,13 +55,55 @@ describe("sanitizePlainText", () => {
     assert.equal(sanitizePlainText("  hello  "), "hello");
   });
 
-  test("preserves ampersands and angle brackets (no entity re-encoding)", () => {
+  test("preserves ampersands (no entity re-encoding)", () => {
     assert.equal(sanitizePlainText("Jane & Doe"), "Jane & Doe");
     assert.equal(
       sanitizePlainText("100% & 200% <b>done</b>"),
       "100% & 200% done",
     );
-    assert.equal(sanitizePlainText("a < b"), "a < b");
+  });
+
+  test("encodes a literal angle bracket rather than emitting it raw", () => {
+    // A plain-text field must not hand the caller anything a browser can parse
+    // as a tag. `<` renders as `<` in every text renderer, so the entity form
+    // is both safe and lossless for display.
+    assert.equal(sanitizePlainText("a < b"), "a &lt; b");
+  });
+
+  test("does not resurrect markup smuggled through HTML entities", () => {
+    for (const smuggled of [
+      "&lt;script&gt;alert(1)&lt;/script&gt;",
+      "&#60;script&#62;alert(1)&#60;/script&#62;",
+      "&lt;img src=x onerror=alert(1)&gt;",
+      "&amp;lt;script&amp;gt;",
+    ]) {
+      assert.doesNotMatch(
+        sanitizePlainText(smuggled),
+        /[<>]/,
+        `entity-smuggled markup escaped as live tags: ${smuggled}`,
+      );
+    }
+  });
+
+  test("never emits a raw angle bracket for any input", () => {
+    for (const input of [
+      "<",
+      ">",
+      "a<b",
+      "<<",
+      "&lt;",
+      "&#60;",
+      "&#x3c;",
+      "&LT;",
+      "--><b>",
+      "\u0000<b>x",
+    ]) {
+      assert.doesNotMatch(
+        sanitizePlainText(input),
+        /[<>]/,
+        `raw angle bracket survived: ${JSON.stringify(input)}`,
+      );
+    }
   });
 
   test("returns empty string for falsy or blank input", () => {

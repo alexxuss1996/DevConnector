@@ -618,6 +618,38 @@ describe("POST /auth/refresh — additional cases", () => {
     });
   });
 
+  test("clears both auth cookies when the refresh fails", async () => {
+    const userId = newId();
+    const sessionId = newId();
+    const refreshToken = signRefreshToken(app, {
+      sub: userId.toString(),
+      sessionId: sessionId.toString(),
+    });
+    // A dead session: the cookie the browser still holds can never work again,
+    // so the failure response must take it away or the client retries forever.
+    stubMethod(Session, "findById", () => mkQuery(null));
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      cookies: { refresh_token: refreshToken },
+    });
+
+    assert.equal(reply.statusCode, 401);
+    const cleared = reply.cookies.map((c: any) => c.name);
+    assert.ok(
+      cleared.includes("access_token"),
+      `expected access_token cleared, got ${JSON.stringify(cleared)}`,
+    );
+    assert.ok(
+      cleared.includes("refresh_token"),
+      `expected refresh_token cleared, got ${JSON.stringify(cleared)}`,
+    );
+    for (const cookie of reply.cookies) {
+      assert.equal(cookie.value, "");
+    }
+  });
+
   test("returns 401 when token subject does not match session user", async () => {
     const tokenUserId = newId();
     const sessionUserId = newId();

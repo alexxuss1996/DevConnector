@@ -206,7 +206,7 @@ describe("request id and cache headers", () => {
     });
     try {
       stubMethod(Profile, "find", () => mkQuery([] as any));
-      stubMethod(Profile, "countDocuments", () => mkQuery(0) as any);
+      stubMethod(Profile, "estimatedDocumentCount", () => mkQuery(0) as any);
       stubMethod(Profile, "findOne", () => mkQuery(mkProfile() as any));
 
       const list = await app.inject({ method: "GET", url: "/profiles/" });

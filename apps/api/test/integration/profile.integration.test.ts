@@ -254,6 +254,65 @@ describe("integration — profile", () => {
     assert.equal(reply.statusCode, 201);
     assert.equal((reply.json().profile as any).githubusername, "octocat");
   });
+
+  // The cascade declares it "falls back to non-transactional on standalone
+  // Mongo", but `startTransaction()` does not throw on standalone — it fails at
+  // the first operation, which is already inside the outer try. Against the
+  // standalone server the integration harness uses, that made this route return
+  // 500 and delete nothing.
+  test("DELETE /profiles/ succeeds on a standalone (non-replica-set) server", async () => {
+    const email = testEmail("delete-account");
+    const { headers } = await setupBasicUser(email);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/profiles/",
+      headers,
+      payload: { status: "Dev", skills: ["JS"] },
+    });
+    assert.equal(created.statusCode, 201, "profile must exist before deleting");
+
+    const before = await app.inject({
+      method: "GET",
+      url: "/profiles/me",
+      headers,
+    });
+    assert.equal(before.statusCode, 200, "profile must be readable before delete");
+
+    const reply = await app.inject({
+      method: "DELETE",
+      url: "/profiles/",
+      headers,
+    });
+    assert.equal(
+      reply.statusCode,
+      204,
+      `account deletion failed: ${reply.statusCode} ${reply.body}`,
+    );
+
+    // The cascade must actually have run. With the user row gone the access
+    // token no longer resolves, so auth rejects before the profile lookup runs.
+    const after = await app.inject({
+      method: "GET",
+      url: "/profiles/me",
+      headers,
+    });
+    assert.ok(
+      after.statusCode === 401 || after.statusCode === 404,
+      `account should be unusable after delete, got ${after.statusCode}`,
+    );
+
+    // And the profile document itself is gone from the public directory.
+    const list = await app.inject({ method: "GET", url: "/profiles/?limit=50" });
+    assert.equal(list.statusCode, 200);
+    const remaining = list.json().profiles as Array<{ status: string }>;
+    assert.equal(
+      remaining.filter((p) => p.status === "Dev").length,
+      0,
+      "deleted profile should not appear in the public listing",
+    );
+  });
+
 });
 
 async function setupBasicUser(email: string) {

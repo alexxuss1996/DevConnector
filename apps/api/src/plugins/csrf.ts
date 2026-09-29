@@ -1,4 +1,5 @@
 import fp from "fastify-plugin";
+import AppError from "#helpers/app-error";
 import env from "#config/env";
 
 /**
@@ -14,11 +15,14 @@ import env from "#config/env";
  * `FRONTEND_URL` is resolved once at registration from the validated env
  * helper, so a malformed/missing value fails closed at boot instead of
  * silently allowing every cookie-authenticated mutation.
+ *
+ * The rejection is thrown, not sent, so it goes through `setErrorHandler` and
+ * picks up the requestId that correlates the client's 403 with the log line.
  */
 export default fp(async (fastify) => {
   const allowedOrigin = new URL(env.FRONTEND_URL).origin;
 
-  fastify.addHook("onRequest", async (request, reply) => {
+  fastify.addHook("onRequest", async (request) => {
     if (
       request.method === "GET" ||
       request.method === "HEAD" ||
@@ -40,14 +44,10 @@ export default fp(async (fastify) => {
     try {
       requestOrigin = new URL(origin).origin;
     } catch {
-      return reply
-        .status(403)
-        .send({ code: "FORBIDDEN", message: "Invalid origin" });
+      throw new AppError(403, "FORBIDDEN", "Invalid origin");
     }
     if (requestOrigin !== allowedOrigin) {
-      return reply
-        .status(403)
-        .send({ code: "FORBIDDEN", message: "Invalid origin" });
+      throw new AppError(403, "FORBIDDEN", "Invalid origin");
     }
   });
 });

@@ -1,4 +1,4 @@
-import { setAuthCookies } from "#helpers/auth.cookies";
+import { clearAuthCookies, setAuthCookies } from "#helpers/auth.cookies";
 import { authService } from "#modules/auth/auth.service";
 import { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 
@@ -16,7 +16,16 @@ const refresh: FastifyPluginAsyncTypebox = async (
           .status(401)
           .send({ code: "FAILED_AUTHENTICATION", message: "Unauthorized" });
       }
-      const result = await authService.refresh(fastify, token);
+      let result;
+      try {
+        result = await authService.refresh(fastify, token);
+      } catch (err) {
+        // A revoked/expired refresh token is dead: the client would keep
+        // retrying with a cookie the server will never accept, so take the
+        // cookies away and make it log in again.
+        clearAuthCookies(reply);
+        throw err;
+      }
       return setAuthCookies(
         reply,
         result.accessToken,

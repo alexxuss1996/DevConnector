@@ -191,6 +191,83 @@ describe("AuthService.login", () => {
     const query = findOne.mock.calls[0]?.arguments[0];
     assert.deepEqual(query, { email: "jane@example.com" });
   });
+
+  // A login miss must cost the same as a wrong password, or response time
+  // enumerates which emails have accounts. argon2id verification takes tens of
+  // milliseconds; a bare Mongo miss takes a fraction of one.
+  test("burns a password verify when the user does not exist", async () => {
+    stubMethod(User, "findOne", () => mkQuery(null));
+    const verify = stubMethod(argon2, "verify", async () => false);
+
+    await assert.rejects(
+      () =>
+        authService.login(app, {
+          email: "nobody@example.com",
+          password: "password123",
+        }),
+      (err: any) => err.statusCode === 401,
+    );
+
+    assert.equal(
+      verify.mock.callCount(),
+      1,
+      "miss path must still spend an argon2 verify, or latency enumerates accounts",
+    );
+  });
+
+  test("burns a password verify for a google-only account with no passwordHash", async () => {
+    stubMethod(
+      User,
+      "findOne",
+      () => mkQuery(mkUser({ email: "google@example.com" })),
+    );
+    const verify = stubMethod(argon2, "verify", async () => false);
+
+    await assert.rejects(
+      () =>
+        authService.login(app, {
+          email: "google@example.com",
+          password: "password123",
+        }),
+      (err: any) => err.statusCode === 401,
+    );
+
+    assert.equal(
+      verify.mock.callCount(),
+      1,
+      "no-passwordHash path must still spend an argon2 verify",
+    );
+  });
+
+  test("a wrong password and an unknown user produce the same 401", async () => {
+    const passwordHash = await argon2.hash("password123");
+    stubMethod(
+      User,
+      "findOne",
+      () => mkQuery(mkUser({ email: "jane@example.com", passwordHash })),
+    );
+    stubMethod(argon2, "verify", async () => false);
+
+    const wrongPassword = await authService
+      .login(app, { email: "jane@example.com", password: "wrongwrongwrong" })
+      .then(
+        () => null,
+        (err: any) => err,
+      );
+
+    stubMethod(User, "findOne", () => mkQuery(null));
+
+    const unknownUser = await authService
+      .login(app, { email: "nobody@example.com", password: "wrongwrongwrong" })
+      .then(
+        () => null,
+        (err: any) => err,
+      );
+
+    assert.equal(wrongPassword?.statusCode, unknownUser?.statusCode);
+    assert.equal(wrongPassword?.code, unknownUser?.code);
+    assert.equal(wrongPassword?.message, unknownUser?.message);
+  });
 });
 
 describe("AuthService.refresh", () => {

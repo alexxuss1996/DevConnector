@@ -173,7 +173,7 @@ describe("GET /profiles/ — uncovered", () => {
     // Our service does Profile.find().populate(...)
     // mkQuery for array needs to support populate chain; mkQuery already does
     stubMethod(Profile, "find", () => mkQuery([p1, p2] as any));
-    stubMethod(Profile, "countDocuments", () => mkQuery(2) as any);
+    stubMethod(Profile, "estimatedDocumentCount", () => mkQuery(2) as any);
 
     const reply = await app.inject({ method: "GET", url: "/profiles/" });
     assert.equal(reply.statusCode, 200);
@@ -195,7 +195,7 @@ describe("GET /profiles/ — uncovered", () => {
 
   test("returns 200 with empty array when no profiles", async () => {
     stubMethod(Profile, "find", () => mkQuery([] as any));
-    stubMethod(Profile, "countDocuments", () => mkQuery(0) as any);
+    stubMethod(Profile, "estimatedDocumentCount", () => mkQuery(0) as any);
     const reply = await app.inject({ method: "GET", url: "/profiles/" });
     assert.equal(reply.statusCode, 200);
     const body = reply.json() as any;
@@ -219,6 +219,15 @@ describe("GET /profiles/ — uncovered", () => {
 // ============================================================
 // DELETE /profiles/ — uncovered 32-35 (and service 96-106)
 // ============================================================
+/**
+ * `deleteProfileAndUser` confirms the profile and the user both exist before it
+ * deletes anything, so a missing user cannot leave a half-deleted account.
+ */
+function stubCascadePreflight(opts: { profile?: unknown; user?: unknown } = {}) {
+  stubMethod(Profile, "findOne", () => mkQuery(opts.profile ?? null) as any);
+  stubMethod(User, "findOne", () => mkQuery(opts.user ?? null) as any);
+}
+
 describe("DELETE /profiles/ — authentication and logic", () => {
   test("returns 401 without token", async () => {
     const reply = await app.inject({ method: "DELETE", url: "/profiles/" });
@@ -244,6 +253,7 @@ describe("DELETE /profiles/ — authentication and logic", () => {
     const token = signAccessToken(app, { sub: userId.toString() });
     const prof = mkProfile({ userId });
     const usr = { _id: userId } as any;
+    stubCascadePreflight({ profile: prof, user: usr });
     stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(prof as any));
     stubMethod(User, "findOneAndDelete", () => Promise.resolve(usr as any));
     stubMethod(Post, "deleteMany", () =>
@@ -266,7 +276,7 @@ describe("DELETE /profiles/ — authentication and logic", () => {
 
   test("returns 404 PROFILE_NOT_FOUND when profile missing", async () => {
     stubMongooseSession();
-    stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(null));
+    stubCascadePreflight({ profile: null });
     const reply = await app.inject({
       method: "DELETE",
       url: "/profiles/",
@@ -276,11 +286,15 @@ describe("DELETE /profiles/ — authentication and logic", () => {
     assert.equal((reply.json() as any).code, "PROFILE_NOT_FOUND");
   });
 
-  test("returns 404 when profile deleted but user missing (96-106 second branch)", async () => {
+  test("returns 404 USER_NOT_FOUND and deletes nothing when the user is missing", async () => {
     stubMongooseSession();
     const prof = mkProfile({});
-    stubMethod(Profile, "findOneAndDelete", () => Promise.resolve(prof as any));
-    stubMethod(User, "findOneAndDelete", () => Promise.resolve(null));
+    // Profile exists, user does not.
+    stubCascadePreflight({ profile: prof, user: null });
+    const delProfile = stubMethod(Profile, "findOneAndDelete", () =>
+      Promise.resolve(prof as any),
+    );
+    const delUser = stubMethod(User, "findOneAndDelete", () => Promise.resolve(null));
 
     const reply = await app.inject({
       method: "DELETE",
@@ -289,13 +303,18 @@ describe("DELETE /profiles/ — authentication and logic", () => {
     });
     assert.equal(reply.statusCode, 404);
     assert.equal((reply.json() as any).code, "USER_NOT_FOUND");
+    // The pre-flight is the point: nothing is removed, so the account can be
+    // retried once the user row is back rather than being left half-deleted.
+    assert.equal(delProfile.mock.callCount(), 0);
+    assert.equal(delUser.mock.callCount(), 0);
   });
 
   test("returns 204 on success and deletes both", async () => {
-    const session = stubMongooseSession();
+    stubMongooseSession();
     const userId = newId();
     const prof = mkProfile({ userId });
     const usr = { _id: userId } as any;
+    stubCascadePreflight({ profile: prof, user: usr });
     const delProfile = stubMethod(Profile, "findOneAndDelete", () =>
       Promise.resolve(prof as any),
     );
@@ -328,15 +347,21 @@ describe("DELETE /profiles/ — authentication and logic", () => {
     assert.equal(delUser.mock.callCount(), 1);
     const [uFilter] = delUser.mock.calls[0].arguments as any[];
     assert.deepEqual(uFilter, { _id: userId.toString() });
-    // Verify transaction was used: session passed to both operations and committed
-    assert.equal(delProfile.mock.calls[0].arguments[1]?.session, session);
-    assert.equal(delUser.mock.calls[0].arguments[1]?.session, session);
-    assert.equal(session.commitTransaction.mock.callCount(), 1);
-    assert.equal(session.endSession.mock.callCount(), 1);
+
+    // No session is threaded through: with no DB connection the topology probe
+    // reports that transactions are unsupported, so the cascade runs
+    // non-transactionally. That is the same path a standalone server takes, and
+    // it is why this route works there at all. Exercising the *transactional*
+    // path needs a real replica set, which the integration harness does not
+    // provide; the standalone behaviour is covered in
+    // test/integration/profile.integration.test.ts.
+    assert.equal(delProfile.mock.calls[0].arguments[1]?.session, undefined);
+    assert.equal(delUser.mock.calls[0].arguments[1]?.session, undefined);
   });
 
   test("returns 500 on unexpected error", async () => {
     stubMongooseSession();
+    stubCascadePreflight({ profile: {}, user: {} });
     stubMethod(Profile, "findOneAndDelete", () => {
       throw new Error("boom");
     });

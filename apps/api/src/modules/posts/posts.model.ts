@@ -88,8 +88,14 @@ const postSchema = new Schema<IPost>({
       },
     },
   ],
-});
+  // No route declares a response schema, so fast-json-stringify never runs and
+  // Mongoose's version key would ride along in every post body.
+}, { versionKey: false });
 
+// The feed sorts by newest with no filter, so a compound index cannot serve
+// the sort — its leading field has to be pinned by the query, and nothing here
+// filters on userId.
+postSchema.index({ createdAt: -1 });
 postSchema.index({ userId: 1, createdAt: -1 });
 postSchema.index({ "likes.userId": 1 });
 postSchema.index({ "comments.userId": 1 });
