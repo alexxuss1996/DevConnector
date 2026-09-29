@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import Fastify, { type FastifyInstance } from "fastify";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import { app, options, createApp } from "#app";
 import { oauthStub, noDb } from "./helpers/plugin-overrides.ts";
 
 const srcFile = (relative: string) =>
   fileURLToPath(new URL(`../src/${relative}`, import.meta.url));
+
+const testFile = (relative: string) =>
+  fileURLToPath(new URL(`./${relative}`, import.meta.url));
 
 describe("the real wiring", () => {
   let server: FastifyInstance;
@@ -15,7 +19,11 @@ describe("the real wiring", () => {
   before(async () => {
     server = await createApp({
       logger: false,
-      overrides: { oauth: oauthStub, db: noDb },
+      overrides: {
+        oauth: oauthStub,
+        db: noDb,
+        rateLimitKey: () => randomUUID(),
+      },
     });
   });
   after(async () => {
@@ -110,6 +118,7 @@ describe("the real wiring", () => {
   // key and therefore never reaches this path — the rate limiter's
   // errorResponseBuilder meeting the app's own error handler, which is what
   // production does, is only observable here.
+  // no-rate-limit-key: tripping the real budget is the point of this test.
   test("a tripped route budget returns the API's 429 shape", async () => {
     const strict = await createApp({
       logger: false,
@@ -148,6 +157,58 @@ describe("the real wiring", () => {
 // Fastify(options) root — see start.js. Mirroring that rather than passing
 // {overrides} means a future required option on the app would fail here too,
 // instead of the test passing and production breaking.
+/**
+ * Walks every `createApp(` call in the test tree and returns the call sites
+ * that do not pass a `rateLimitKey`.
+ */
+function createAppCallsWithoutRateLimitKey(): string[] {
+  const root = testFile("");
+  const offenders: string[] = [];
+
+  for (const entry of readdirSync(root, { recursive: true })) {
+    const name = String(entry);
+    if (!name.endsWith(".test.ts")) continue;
+    const source = readFileSync(testFile(name), "utf8");
+
+    for (let at = source.indexOf("createApp("); at !== -1; ) {
+      // Walk to the matching close paren so the argument text is the call,
+      // not the rest of the file.
+      let depth = 0;
+      let end = at;
+      for (; end < source.length; end++) {
+        if (source[end] === "(") depth++;
+        else if (source[end] === ")" && --depth === 0) break;
+      }
+      const call = source.slice(at, end + 1);
+      const before = source.slice(Math.max(0, at - 200), at);
+
+      const optedOut =
+        call.includes("rateLimitKey") || before.includes("no-rate-limit-key:");
+      if (!optedOut) {
+        const line = source.slice(0, at).split("\n").length;
+        offenders.push(`${name}:${line}`);
+      }
+      at = source.indexOf("createApp(", end + 1);
+    }
+  }
+  return offenders;
+}
+
+test("every createApp call in the test tree keys the rate limiter", () => {
+  // The real limiter is on and budgets are the production ones, so a suite
+  // that fires more than 100 requests at one address starts failing with a
+  // 429 that has nothing to do with what it is testing. Passing
+  // `rateLimitKey` moves the bucket per request and leaves the budget real.
+  //
+  // The default cannot live in createApp itself: defaulting it to a per-
+  // request key would silently switch rate limiting OFF in production for
+  // any caller who forgot the argument, and a DoS control should fail shut.
+  // A test that greps the call sites is what makes the convention a
+  // guarantee. A site that genuinely needs production keying opts out with
+  // a `no-rate-limit-key:` comment saying why.
+  assert.deepEqual(createAppCallsWithoutRateLimitKey(), []);
+});
+
 test("the default export is still a plugin the CLI can boot", async () => {
   const server = Fastify(options);
   await server.register(app, {
