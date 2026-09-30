@@ -47,13 +47,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # `test:unit` runs `node --env-file=.env`, and `.env` is gitignored so
-      # a fresh clone has none. The committed `.env.test` carries all seven
-      # vars the env validator requires, with localhost/dummy values the unit
-      # tests never reach — the suite stubs Mongo, OAuth and the session store.
-      # Proper fix: repoint `test:unit` at `.env.test` and drop this step.
-      - run: cp apps/api/.env.test apps/api/.env
-
       # `pnpm test` is `turbo run test`: api runs unit + integration (the
       # latter boots the mongo:7.0 container via test/bin/mongo-docker.sh),
       # web runs Vitest. GitHub runners have Docker, so both run here.
