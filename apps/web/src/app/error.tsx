@@ -26,7 +26,16 @@ export default function RouteError({
   // An API failure carries the correlation id the backend logged; anything
   // else that crossed the server boundary carries a Next digest. Either is the
   // one string that ties a user's report back to a log line.
-  const reference = error instanceof ApiError ? error.requestId : error.digest;
+  //
+  // Duck-typed on `requestId` rather than `instanceof ApiError`: an `ApiError`
+  // constructed in a Server Component does not arrive here as an ApiError at
+  // all. Next rebuilds it client-side via `resolveErrorProd()` as a bare
+  // `Error` carrying only `message` and `digest`, so class identity and any
+  // `name` we set are gone in a production build. `requestId` is read the same
+  // way whether it survives or not, and a plain Error has no such property, so
+  // the fallback is digest either way.
+  const apiError = error as Partial<ApiError>;
+  const reference = apiError.requestId ?? error.digest;
 
   return (
     <div role="alert">

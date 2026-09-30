@@ -33,18 +33,29 @@ describe("ApiClient", () => {
   });
 
   it("returns undefined for an empty 204 response", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    );
 
-    await expect(new ApiClient("http://api.test").request("/auth/logout")).resolves.toBeUndefined();
+    await expect(
+      new ApiClient("http://api.test").request("/auth/logout"),
+    ).resolves.toBeUndefined();
   });
 
   it("throws the backend error code and message", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ code: "INVALID_CREDENTIALS", message: "Invalid login" }), {
-          status: 401,
-        }),
+        new Response(
+          JSON.stringify({
+            code: "INVALID_CREDENTIALS",
+            message: "Invalid login",
+          }),
+          {
+            status: 401,
+          },
+        ),
       ),
     );
 
@@ -86,7 +97,9 @@ describe("ApiClient", () => {
     // `...init` used to spread after `headers`, so any caller passing
     // `init.headers` silently lost Content-Type and sent a JSON body with no
     // content type. Nothing passed `init` yet, which is why this stayed hidden.
-    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await new ApiClient("http://api.test").request("/posts", {
@@ -102,7 +115,9 @@ describe("ApiClient", () => {
   });
 
   it("lets a caller override Content-Type", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await new ApiClient("http://api.test").request("/posts", {
@@ -117,7 +132,9 @@ describe("ApiClient", () => {
   it("omits Content-Type on a bodyless request", async () => {
     // Cross-origin, a JSON Content-Type on a GET makes the request non-simple
     // and forces a CORS preflight for every read.
-    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await new ApiClient("http://api.test").request("/profiles/");
@@ -146,14 +163,16 @@ describe("ApiClient", () => {
 });
 
 describe("ApiClient 401 handling", () => {
-
   it("refreshes the session and replays the original request once", async () => {
     let firstCall = true;
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if (url.endsWith("/auth/refresh")) return new Response("{}", { status: 200 });
+      if (url.endsWith("/auth/refresh"))
+        return new Response("{}", { status: 200 });
       if (firstCall) {
         firstCall = false;
-        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), { status: 401 });
+        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), {
+          status: 401,
+        });
       }
       return new Response(JSON.stringify({ profile: { _id: "p1" } }), {
         status: 200,
@@ -167,8 +186,14 @@ describe("ApiClient 401 handling", () => {
     }>("/profiles/me");
 
     expect(result.profile._id).toBe("p1");
-    expect(fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/auth/refresh"))).toHaveLength(1);
-    expect(fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/profiles/me"))).toHaveLength(2);
+    expect(
+      fetchMock.mock.calls.filter((c) =>
+        String(c[0]).endsWith("/auth/refresh"),
+      ),
+    ).toHaveLength(1);
+    expect(
+      fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/profiles/me")),
+    ).toHaveLength(2);
   });
 
   it("refreshes once for concurrent 401s, not once per request", async () => {
@@ -180,7 +205,9 @@ describe("ApiClient 401 handling", () => {
       }
       if (!served) {
         served = true;
-        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), { status: 401 });
+        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), {
+          status: 401,
+        });
       }
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -192,22 +219,74 @@ describe("ApiClient 401 handling", () => {
     const client = new ApiClient("http://api.test");
     await Promise.all([client.request("/a"), client.request("/b")]);
 
-    expect(fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/auth/refresh"))).toHaveLength(1);
+    expect(
+      fetchMock.mock.calls.filter((c) =>
+        String(c[0]).endsWith("/auth/refresh"),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("keeps a concurrent refresh for one origin out of another origin's bucket", async () => {
+    // The single-flight map is keyed by base URL. Unkeyed, the first caller's
+    // refresh verdict is handed to every later caller, so a client pointed at
+    // staging would replay against a cookie staging never rotated.
+    const refreshes: string[] = [];
+    const served = new Set<string>();
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      const target = String(url);
+      if (target.endsWith("/auth/refresh")) {
+        refreshes.push(target);
+        await new Promise((r) => setTimeout(r, 5));
+        return new Response("{}", { status: 200 });
+      }
+      // 401 the first time each path is seen, then let the replay through, so
+      // both promises resolve and the assertion is on refresh count alone.
+      if (!served.has(target)) {
+        served.add(target);
+        return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), {
+          status: 401,
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await Promise.all([
+      new ApiClient("http://one.test").request("/a"),
+      new ApiClient("http://two.test").request("/b"),
+    ]);
+
+    // One refresh per origin, each against its own base URL — not one shared.
+    expect(refreshes.sort()).toEqual([
+      "http://one.test/auth/refresh",
+      "http://two.test/auth/refresh",
+    ]);
   });
 
   it("does not retry forever when the refresh itself is rejected", async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (url.endsWith("/auth/refresh")) {
-        return new Response(JSON.stringify({ code: "INVALID_REFRESH" }), { status: 401 });
+        return new Response(JSON.stringify({ code: "INVALID_REFRESH" }), {
+          status: 401,
+        });
       }
-      return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), { status: 401 });
+      return new Response(JSON.stringify({ code: "UNAUTHORIZED" }), {
+        status: 401,
+      });
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(new ApiClient("http://api.test").request("/profiles/me")).rejects.toBeInstanceOf(
-      ApiError,
-    );
-    expect(fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/auth/refresh"))).toHaveLength(1);
+    await expect(
+      new ApiClient("http://api.test").request("/profiles/me"),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(
+      fetchMock.mock.calls.filter((c) =>
+        String(c[0]).endsWith("/auth/refresh"),
+      ),
+    ).toHaveLength(1);
   });
 });
 

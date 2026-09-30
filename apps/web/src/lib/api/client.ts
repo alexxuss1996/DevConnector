@@ -61,8 +61,13 @@ function parseJson<T>(text: string): (T & ErrorBody) | undefined {
  * of concurrent 401s costs one refresh call rather than one each. The whole app
  * has separate `authApi` / `postsApi` / `profileApi` singletons, so this cannot
  * live on an instance.
+ *
+ * Keyed by base URL: `??=` would otherwise capture the first caller's origin
+ * and hand that verdict to every later caller, so a second `ApiClient` pointed
+ * at another environment would reuse a refresh that never touched it — and
+ * replay against a cookie that was never rotated.
  */
-let refreshInFlight: Promise<boolean> | null = null;
+const refreshInFlight = new Map<string, Promise<boolean>>();
 
 async function requestRefresh(baseUrl: string): Promise<boolean> {
   try {
@@ -77,12 +82,28 @@ async function requestRefresh(baseUrl: string): Promise<boolean> {
 }
 
 function refreshSession(baseUrl: string): Promise<boolean> {
-  // `??=` assigns before the finally callback can run, so the reset cannot race
-  // the assignment and leave a settled promise cached forever.
-  refreshInFlight ??= requestRefresh(baseUrl).finally(() => {
-    refreshInFlight = null;
-  });
-  return refreshInFlight;
+  const existing = refreshInFlight.get(baseUrl);
+  if (existing) return existing;
+  // Set the entry before awaiting, then clear it on settle. Assigning inside
+  // `finally` alone would let a second caller in the same tick start a second
+  // refresh.
+  const pending = requestRefresh(baseUrl);
+  refreshInFlight.set(baseUrl, pending);
+  // `.finally` returns a NEW promise, so the cleanup is chained onto that one
+  // and the original is handed back. The extra `.catch` is not redundant:
+  // `requestRefresh` swallows its own errors today, but if it ever rejects, the
+  // promise returned by `.finally` rejects with nobody listening and Node kills
+  // the process on the unhandled rejection.
+  void pending
+    .finally(() => {
+      // Only clear our own entry: a later refresh for this origin may already
+      // have replaced it.
+      if (refreshInFlight.get(baseUrl) === pending) {
+        refreshInFlight.delete(baseUrl);
+      }
+    })
+    .catch(() => {});
+  return pending;
 }
 
 /** Base HTTP client for the DevConnector API (cookie session auth). */
@@ -153,7 +174,11 @@ export class ApiClient {
     return this.request<T>(path, { ...init, method: "GET" });
   }
 
-  protected post<T>(path: string, body?: unknown, init: RequestInit = {}): Promise<T> {
+  protected post<T>(
+    path: string,
+    body?: unknown,
+    init: RequestInit = {},
+  ): Promise<T> {
     return this.request<T>(path, {
       ...init,
       method: "POST",
@@ -161,7 +186,11 @@ export class ApiClient {
     });
   }
 
-  protected put<T>(path: string, body?: unknown, init: RequestInit = {}): Promise<T> {
+  protected put<T>(
+    path: string,
+    body?: unknown,
+    init: RequestInit = {},
+  ): Promise<T> {
     return this.request<T>(path, {
       ...init,
       method: "PUT",
@@ -169,7 +198,11 @@ export class ApiClient {
     });
   }
 
-  protected patch<T>(path: string, body?: unknown, init: RequestInit = {}): Promise<T> {
+  protected patch<T>(
+    path: string,
+    body?: unknown,
+    init: RequestInit = {},
+  ): Promise<T> {
     return this.request<T>(path, {
       ...init,
       method: "PATCH",
@@ -183,7 +216,11 @@ export class ApiClient {
 
   /** POSTs the refresh endpoint directly, bypassing the 401 handling above. */
   protected requestRefreshEndpoint<T>(): Promise<T> {
-    return this.request<T>(REFRESH_PATH, { method: "POST" }, { isRefresh: true });
+    return this.request<T>(
+      REFRESH_PATH,
+      { method: "POST" },
+      { isRefresh: true },
+    );
   }
 }
 
@@ -199,7 +236,11 @@ function buildHeaders(init: RequestInit): Record<string, string> {
       ? Object.fromEntries(supplied.entries())
       : { ...(supplied as Record<string, string> | undefined) };
 
-  if (init.body !== undefined && init.body !== null && !("Content-Type" in headers)) {
+  if (
+    init.body !== undefined &&
+    init.body !== null &&
+    !("Content-Type" in headers)
+  ) {
     headers["Content-Type"] = "application/json";
   }
   return headers;
@@ -217,7 +258,10 @@ export const apiClient = new ApiClient();
  * Backwards-compatible fetch helper (delegates to the shared ApiClient).
  * Prefer `ApiClient`/`apiClient` for new code.
  */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   return apiClient.request<T>(path, init);
 }
 
