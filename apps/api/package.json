@@ -13,14 +13,14 @@
     "test:integration": "sh -c 'for port in 27018 27019; do if MONGODB_PORT=$port bash test/bin/mongo-docker.sh start; then export MONGODB_URI=mongodb://127.0.0.1:$port/devconnector_test; trap \"MONGODB_PORT=$port bash test/bin/mongo-docker.sh stop\" EXIT; npm run test:integration:run; exit $?; fi; done; exit 1'",
     "test:integration:run": "npm run build:ts && tsc -p test/tsconfig.json && node --env-file=.env.test --test \"test/integration/auth.integration.test.ts\" && node --env-file=.env.test --test \"test/integration/posts.integration.test.ts\" && node --env-file=.env.test --test \"test/integration/profile.integration.test.ts\"",
     "test": "npm run test:unit && npm run test:integration",
-    "start": "npm run clean && npm run build:ts && fastify start -l info -p 4000 dist/app.js --options",
+    "start": "npm run clean && npm run build:ts && fastify start -l info dist/app.js --options",
     "build": "tsc",
     "build:ts": "tsc",
     "check-types": "tsc --noEmit",
     "lint": "eslint src test",
     "watch:ts": "tsc -w",
     "dev": "npm run clean && npm run build:ts && concurrently -k -p \"[{name}]\" -n \"TypeScript,App\" -c \"yellow.bold,cyan.bold\" \"npm:watch:ts\" \"npm:dev:start\"",
-    "dev:start": "fastify start --ignore-watch=.ts$ -w -l info -P -p 4000 dist/app.js --options"
+    "dev:start": "fastify start --ignore-watch=.ts$ -w -l info -P dist/app.js --options"
   },
   "keywords": [],
   "author": "",
