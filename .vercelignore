@@ -1,0 +1,32 @@
+# Vercel uploads the working directory, not the git index, so .gitignore alone
+# does not keep these out of the deployment. Without this file the upload
+# carried ~53MB of build and coverage output: apps/api/coverage alone is 49MB.
+node_modules
+.turbo
+**/.turbo
+.vercel
+**/.vercel
+.superpowers
+
+# Build output — Vercel regenerates these on its builders.
+.next
+**/.next
+dist
+**/dist
+storybook-static
+**/storybook-static
+coverage
+**/coverage
+playwright-report
+test-results
+
+# Local env and logs. .env holds real credentials and must never be uploaded.
+.env
+.env.*
+**/.env
+**/.env.*
+*.log
+
+# The API is not deployed here. It is a separate service, and uploading its
+# sources would put the .env.example contract next to a build that ignores it.
+apps/api
