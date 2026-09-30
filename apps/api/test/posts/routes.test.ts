@@ -558,8 +558,10 @@ describe("GET /posts/ — logic", () => {
 
     assert.equal(reply.statusCode, 200);
     const posts = (reply.json() as any).posts;
-    // DB sort requested newest-first, stubbed rows pass through in order
-    assert.deepEqual(sortArgs?.[0], { createdAt: -1 });
+    // DB sort requested newest-first, with `_id` as the tiebreak so the order
+    // is total — two posts written in the same millisecond otherwise have no
+    // defined order and a page boundary can drop or repeat one.
+    assert.deepEqual(sortArgs?.[0], { createdAt: -1, _id: -1 });
     assert.equal(posts[0].text, "Newer");
     assert.equal(posts[1].text, "Middle");
     assert.equal(posts[2].text, "Older");
@@ -854,7 +856,7 @@ describe("postService — unit", () => {
     };
     stubMethod(Post, "find", () => q);
     const result = await postService.getPosts();
-    assert.deepEqual(sortArgs?.[0], { createdAt: -1 });
+    assert.deepEqual(sortArgs?.[0], { createdAt: -1, _id: -1 });
     assert.equal(result[0].text, "new");
     assert.equal(result[1].text, "old");
   });

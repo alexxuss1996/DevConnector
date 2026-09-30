@@ -317,12 +317,31 @@ describe("integration — posts", () => {
       _id: string;
       text: string;
     }>;
-    assert.ok(posts.length >= 3);
-
-    // Posts are returned in an array
+    // Assert order, not just membership: this is the "sorted newest-first"
+    // half of the test name, and an `includes` check passes even if the
+    // `sort({ createdAt: -1 })` in the service is deleted.
     const texts = posts.map((p) => p.text);
-    assert.ok(texts.includes("Post 0"));
-    assert.ok(texts.includes("Post 1"));
-    assert.ok(texts.includes("Post 2"));
+    assert.deepEqual(texts, ["Post 2", "Post 1", "Post 0"]);
+
+    // And the "paginated" half: a second page past the end is empty rather
+    // than a repeat of the first.
+    const secondPage = await app.inject({
+      method: "GET",
+      url: "/posts/?limit=2&page=2",
+      headers: author.headers,
+    });
+    assert.equal(secondPage.statusCode, 200);
+    assert.deepEqual(
+      (secondPage.json().posts as Array<{ text: string }>).map((p) => p.text),
+      ["Post 0"],
+    );
+
+    const beyondEnd = await app.inject({
+      method: "GET",
+      url: "/posts/?limit=2&page=9",
+      headers: author.headers,
+    });
+    assert.equal(beyondEnd.statusCode, 200);
+    assert.deepEqual(beyondEnd.json().posts, []);
   });
 });

@@ -8,7 +8,11 @@ class PostService {
   /** `page`/`limit` must come from `parsePagination`, the single clamp. */
   async getPosts(page = 1, limit = 20) {
     const posts = await Post.find()
-      .sort({ createdAt: -1 })
+      // `_id` breaks ties. `createdAt` is millisecond-resolution, so posts
+      // created in the same millisecond have no defined order — without a
+      // total order a page boundary can repeat or drop a post across pages,
+      // and the ordering assertion in the integration test is a coin flip.
+      .sort({ createdAt: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .populate("userId", ["name", "avatar"]);
@@ -197,7 +201,17 @@ class PostService {
         _id: id,
         comments: { $elemMatch: { _id: commentId, userId: user._id } },
       },
-      { $set: { "comments.$.text": sanitizedText, updatedAt: new Date() } },
+      {
+        $set: {
+          "comments.$.text": sanitizedText,
+          // The post schema sets `default: Date.now` manually rather than using
+          // `timestamps: true`, so nothing updates the edited subdocument on
+          // its own — without this the comment keeps its creation time forever
+          // while CommentSchema advertises `updatedAt` on the wire.
+          "comments.$.updatedAt": new Date(),
+          updatedAt: new Date(),
+        },
+      },
       { new: true },
     );
     if (post) {
