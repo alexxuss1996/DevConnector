@@ -1,4 +1,4 @@
-import "#config/env";
+import { isProduction, trustedProxyHops } from "#config/env";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad from "@fastify/autoload";
@@ -61,10 +61,30 @@ const options: AppOptions = {
     ignoreTrailingSlash: true,
   },
   ...baseOptions,
+  // `request.ip` is the connection peer unless this is set, and the rate-limit
+  // plugin keys every bucket on it. Two failure modes pull in opposite
+  // directions, so this is opt-in and defaults to trusting nothing:
+  //
+  //   - No proxy (direct exposure, local dev): trusting a hop makes
+  //     `request.ip` the client-supplied X-Forwarded-For, so a caller rotates
+  //     that header and gets an unlimited supply of rate-limit buckets. An
+  //     attacker then brute-forces /auth/login at any rate.
+  //   - Behind a proxy: NOT trusting it makes every request look like it came
+  //     from the proxy, collapsing the 5/min login cap into one site-wide
+  //     bucket that a single client can lock every user out of.
+  //
+  // Neither is knowable at boot, so the deployment states it. `true` is never
+  // accepted: it trusts the whole chain, which is the no-proxy case again.
+  // `TRUST_PROXY_HOPS=1` for a single reverse proxy or load balancer; validated
+  // in src/config/env.ts so a typo fails at boot instead of silently reverting
+  // to trusting nothing.
+  trustProxy: trustedProxyHops(),
   logger: {
-    level:
-      process.env.LOG_LEVEL ??
-      (process.env.NODE_ENV === "production" ? "info" : "debug"),
+    // Through the same helper the cookie flag uses: a direct
+    // `=== "production"` read here would accept a typo'd NODE_ENV that
+    // `isProduction` rejects, so debug logging could be enabled in a
+    // deployment the rest of the code treats as misconfigured.
+    level: process.env.LOG_LEVEL ?? (isProduction() ? "info" : "debug"),
     redact: ["req.headers.authorization", "req.headers.cookie", "req.cookies"],
   },
   ajv: {
