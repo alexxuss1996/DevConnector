@@ -24,6 +24,7 @@ import {
 import {
   buildProfileUpdate,
   mapDates,
+  requireSanitizedText,
   toOwner,
   validateDateRange,
 } from "#helpers/profile";
@@ -38,11 +39,10 @@ let topologyProbe: Promise<boolean> | undefined;
 function supportsTransactions(): Promise<boolean> {
   topologyProbe ??= (
     mongoose.connection.db?.admin().command({ hello: 1 }) ?? Promise.reject()
-  )
-    .then(
-      (hello) => Boolean(hello.setName) || hello.msg === "isdbgrid",
-      () => false,
-    );
+  ).then(
+    (hello) => Boolean(hello.setName) || hello.msg === "isdbgrid",
+    () => false,
+  );
   return topologyProbe;
 }
 
@@ -53,7 +53,13 @@ class ProfileService {
    * object and satisfies `PublicProfileSchema`.
    */
   private async toPublicProfile(doc: ProfileDocument): Promise<PublicProfile> {
-    await doc.populate("userId", ["name", "avatar"]);
+    // Mongoose only skips an already-populated path when `forceRepopulate` is
+    // false, and that is unset here, so re-populating an already-populated
+    // `userId` issues a second `users` query. A populated path is a document
+    // object; an unpopulated one is still an ObjectId. Only the latter needs it.
+    if (doc.userId instanceof Types.ObjectId) {
+      await doc.populate("userId", ["name", "avatar"]);
+    }
     const json = doc.toJSON() as Record<string, unknown>;
     return {
       ...(json as Omit<PublicProfile, "_id" | "userId">),
@@ -321,10 +327,13 @@ class ProfileService {
       "Experience",
     );
 
-    // Build experience object, only including optional fields when provided
+    // Build experience object, only including optional fields when provided.
+    // `title`/`company` are required by the schema, but the sanitiser can still
+    // reduce them to "" — and this `$push` runs without `runValidators`, so an
+    // empty title would persist silently instead of failing.
     const experience: Record<string, unknown> = {
-      title: sanitizePlainText(title),
-      company: sanitizePlainText(company),
+      title: requireSanitizedText(sanitizePlainText(title), "Job title"),
+      company: requireSanitizedText(sanitizePlainText(company), "Company name"),
       from: fromDate,
       current,
     };
@@ -364,11 +373,15 @@ class ProfileService {
       "Education",
     );
 
-    // Build education object, only including optional fields when provided
+    // Build education object, only including optional fields when provided.
+    // Required fields go through the same sanitiser-blank guard as experience.
     const education: Record<string, unknown> = {
-      school: sanitizePlainText(school),
-      degree: sanitizePlainText(degree),
-      fieldofstudy: sanitizePlainText(fieldofstudy),
+      school: requireSanitizedText(sanitizePlainText(school), "School"),
+      degree: requireSanitizedText(sanitizePlainText(degree), "Degree"),
+      fieldofstudy: requireSanitizedText(
+        sanitizePlainText(fieldofstudy),
+        "Field of study",
+      ),
       from: fromDate,
       current,
     };

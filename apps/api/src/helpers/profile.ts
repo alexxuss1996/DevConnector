@@ -115,6 +115,32 @@ export function mapDates<T extends { from?: unknown; to?: unknown }>(
 }
 
 /**
+ * A required text field can pass schema validation and still come out of the
+ * sanitiser empty: `status: "<b></b>"` satisfies `minLength: 1` and `.*\S.*`
+ * because the raw string has non-whitespace, but `sanitizePlainText` strips
+ * the tags to "". Mongoose then rejects the empty string on `required`, raising
+ * a ValidationError that `errorHandler` has no branch for — a 500 for what is
+ * plainly a bad request. Reject it here, as a 400, before the write.
+ *
+ * Also the last line of defence for the embedded subdocuments: `addExperience`
+ * `$push`es without `runValidators`, so a blank title would otherwise persist
+ * silently.
+ */
+export function requireSanitizedText(
+  value: string | undefined,
+  field: string,
+): string {
+  if (!value || value.trim() === "") {
+    throw new AppError(
+      400,
+      "VALIDATION_ERROR",
+      `${field} cannot be empty once formatting is stripped`,
+    );
+  }
+  return value;
+}
+
+/**
  * Turns a create/update payload into a sanitised Mongo update document, shared
  * by the create, upsert and partial-update paths so all three sanitise alike.
  */
@@ -148,11 +174,29 @@ export function buildProfileUpdate(
         if (sanitized) toSet[key] = sanitized;
         else toUnset[key] = 1;
       } else if (typeof value === "string") {
-        toSet[key] = sanitizePlainText(value);
+        const sanitized = sanitizePlainText(value);
+        // Only `status` is a required string, so only it can come back from the
+        // sanitiser empty and fail the model. An optional field clearing to ""
+        // is a legitimate write and must keep working.
+        toSet[key] =
+          key === "status"
+            ? requireSanitizedText(sanitized, "Status")
+            : sanitized;
       } else if (Array.isArray(value)) {
-        toSet[key] = value.map((v) =>
-          sanitizePlainText(v as string | undefined | null),
-        );
+        // `skills` is required with minItems 1, so a sanitiser-stripped blank
+        // would fail the model rather than the request.
+        if (key === "skills") {
+          toSet[key] = (value as string[]).map((v) =>
+            requireSanitizedText(
+              sanitizePlainText(v as string | undefined | null),
+              "Skill",
+            ),
+          );
+        } else {
+          toSet[key] = value.map((v) =>
+            sanitizePlainText(v as string | undefined | null),
+          );
+        }
       } else {
         toSet[key] = value;
       }

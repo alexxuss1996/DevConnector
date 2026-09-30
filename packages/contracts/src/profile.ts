@@ -18,6 +18,8 @@ export const PROFILE_LIMITS = {
   skill: 100,
   skills: 50,
   bio: 500,
+  /** Job title, school, degree, field of study — labels inside a subdocument. */
+  label: 200,
 } as const;
 
 export const CreateProfileSchema = Type.Object(
@@ -232,11 +234,55 @@ const NonBlankString = (description: string, examples: string[]) =>
     errorMessage: `${description} is required and cannot be blank`,
   });
 
+/**
+ * Longest free-text field a profile subdocument accepts.
+ *
+ * `AddExperienceSchema`/`AddEducationSchema` are the only body schemas without
+ * a length bound, and both feed a `$push` into an embedded array. An unbounded
+ * string is a way to push a document at the 16MB BSON ceiling: once a profile
+ * reaches it, every write to that profile fails, permanently. Keep the cap well
+ * below the limit so many entries still fit.
+ */
+export const SUBDOCUMENT_TEXT_MAX = 2000;
+const BoundedText = (description: string, examples: string[]) =>
+  Type.String({
+    maxLength: SUBDOCUMENT_TEXT_MAX,
+    description,
+    examples,
+    example: examples[0],
+  });
+
+/**
+ * A required, non-blank, length-bounded label — a job title, a school, a
+ * company name.
+ *
+ * These used to be `NonBlankString`, which is unbounded, so the only field the
+ * 16MB-BSON argument above applied to was the optional `description` and a
+ * client could still `$push` a 15MB `title`. The cap belongs on every string
+ * that lands in the subdocument, not just the one that happens to be free text.
+ */
+const BoundedNonBlankString = (description: string, examples: string[]) =>
+  Type.String({
+    minLength: 1,
+    maxLength: PROFILE_LIMITS.label,
+    pattern: ".*\\S.*",
+    description,
+    examples,
+    example: examples[0],
+    errorMessage: `${description} is required and cannot be blank`,
+  });
+
 export const AddExperienceSchema = Type.Object(
   {
-    title: NonBlankString("Job title", ["Senior Developer"]),
-    company: NonBlankString("Company name", ["Acme Corp"]),
-    location: Type.Optional(Type.String({ description: "Location", examples: ["Seattle, WA"], example: "Seattle, WA" })),
+    title: BoundedNonBlankString("Job title", ["Senior Developer"]),
+    company: BoundedNonBlankString("Company name", ["Acme Corp"]),
+    location: Type.Optional(
+      Type.String({
+        description: "Location",
+        examples: ["Seattle, WA"],
+        example: "Seattle, WA",
+      }),
+    ),
     from: Type.String({
       format: "date",
       description: "Start date (YYYY-MM-DD)",
@@ -244,15 +290,25 @@ export const AddExperienceSchema = Type.Object(
       example: "2022-01-15",
     }),
     to: Type.Optional(
-      Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2024-06-30"], example: "2024-06-30" }),
-    ),
-    current: Type.Optional(Type.Boolean({ description: "Current job", default: false, examples: [false], example: false })),
-    description: Type.Optional(
       Type.String({
-        description: "Role description",
-        examples: ["Built scalable APIs with Fastify and MongoDB"],
-        example: "Built scalable APIs with Fastify and MongoDB",
+        format: "date",
+        description: "End date (YYYY-MM-DD)",
+        examples: ["2024-06-30"],
+        example: "2024-06-30",
       }),
+    ),
+    current: Type.Optional(
+      Type.Boolean({
+        description: "Current job",
+        default: false,
+        examples: [false],
+        example: false,
+      }),
+    ),
+    description: Type.Optional(
+      BoundedText("Role description", [
+        "Built scalable APIs with Fastify and MongoDB",
+      ]),
     ),
   },
   { additionalProperties: false },
@@ -260,20 +316,35 @@ export const AddExperienceSchema = Type.Object(
 
 export const AddEducationSchema = Type.Object(
   {
-    school: NonBlankString("School or university", ["MIT"]),
-    degree: NonBlankString("Degree", ["Bachelor of Science"]),
-    fieldofstudy: NonBlankString("Field of study", ["Computer Science"]),
-    from: Type.String({ format: "date", description: "Start date (YYYY-MM-DD)", examples: ["2018-09-01"], example: "2018-09-01" }),
+    school: BoundedNonBlankString("School or university", ["MIT"]),
+    degree: BoundedNonBlankString("Degree", ["Bachelor of Science"]),
+    fieldofstudy: BoundedNonBlankString("Field of study", ["Computer Science"]),
+    from: Type.String({
+      format: "date",
+      description: "Start date (YYYY-MM-DD)",
+      examples: ["2018-09-01"],
+      example: "2018-09-01",
+    }),
     to: Type.Optional(
-      Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2022-06-15"], example: "2022-06-15" }),
-    ),
-    current: Type.Optional(Type.Boolean({ description: "Currently studying", default: false, examples: [false], example: false })),
-    description: Type.Optional(
       Type.String({
-        description: "Program description",
-        examples: ["Focused on distributed systems and databases"],
-        example: "Focused on distributed systems and databases",
+        format: "date",
+        description: "End date (YYYY-MM-DD)",
+        examples: ["2022-06-15"],
+        example: "2022-06-15",
       }),
+    ),
+    current: Type.Optional(
+      Type.Boolean({
+        description: "Currently studying",
+        default: false,
+        examples: [false],
+        example: false,
+      }),
+    ),
+    description: Type.Optional(
+      BoundedText("Program description", [
+        "Focused on distributed systems and databases",
+      ]),
     ),
   },
   { additionalProperties: false },
@@ -325,11 +396,42 @@ export const ExperienceSchema = Type.Object(
     _id: Type.Optional(Type.String({ description: "ObjectId hex string" })),
     title: NonBlankString("Job title", ["Senior Developer"]),
     company: NonBlankString("Company name", ["Acme Corp"]),
-    location: Type.Optional(Type.String({ description: "Location", examples: ["Seattle, WA"], example: "Seattle, WA" })),
-    from: Type.String({ format: "date", description: "Start date (YYYY-MM-DD)", examples: ["2022-01-15"], example: "2022-01-15" }),
-    to: Type.Optional(Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2024-06-30"], example: "2024-06-30" })),
-    current: Type.Optional(Type.Boolean({ description: "Current job", default: false, examples: [false], example: false })),
-    description: Type.Optional(Type.String({ description: "Role description", examples: ["Built scalable APIs with Fastify and MongoDB"], example: "Built scalable APIs with Fastify and MongoDB" })),
+    location: Type.Optional(
+      Type.String({
+        description: "Location",
+        examples: ["Seattle, WA"],
+        example: "Seattle, WA",
+      }),
+    ),
+    from: Type.String({
+      format: "date",
+      description: "Start date (YYYY-MM-DD)",
+      examples: ["2022-01-15"],
+      example: "2022-01-15",
+    }),
+    to: Type.Optional(
+      Type.String({
+        format: "date",
+        description: "End date (YYYY-MM-DD)",
+        examples: ["2024-06-30"],
+        example: "2024-06-30",
+      }),
+    ),
+    current: Type.Optional(
+      Type.Boolean({
+        description: "Current job",
+        default: false,
+        examples: [false],
+        example: false,
+      }),
+    ),
+    description: Type.Optional(
+      Type.String({
+        description: "Role description",
+        examples: ["Built scalable APIs with Fastify and MongoDB"],
+        example: "Built scalable APIs with Fastify and MongoDB",
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -341,10 +443,35 @@ export const EducationSchema = Type.Object(
     school: NonBlankString("School or university", ["MIT"]),
     degree: NonBlankString("Degree", ["Bachelor of Science"]),
     fieldofstudy: NonBlankString("Field of study", ["Computer Science"]),
-    from: Type.String({ format: "date", description: "Start date (YYYY-MM-DD)", examples: ["2018-09-01"], example: "2018-09-01" }),
-    to: Type.Optional(Type.String({ format: "date", description: "End date (YYYY-MM-DD)", examples: ["2022-06-15"], example: "2022-06-15" })),
-    current: Type.Optional(Type.Boolean({ description: "Currently studying", default: false, examples: [false], example: false })),
-    description: Type.Optional(Type.String({ description: "Program description", examples: ["Focused on distributed systems and databases"], example: "Focused on distributed systems and databases" })),
+    from: Type.String({
+      format: "date",
+      description: "Start date (YYYY-MM-DD)",
+      examples: ["2018-09-01"],
+      example: "2018-09-01",
+    }),
+    to: Type.Optional(
+      Type.String({
+        format: "date",
+        description: "End date (YYYY-MM-DD)",
+        examples: ["2022-06-15"],
+        example: "2022-06-15",
+      }),
+    ),
+    current: Type.Optional(
+      Type.Boolean({
+        description: "Currently studying",
+        default: false,
+        examples: [false],
+        example: false,
+      }),
+    ),
+    description: Type.Optional(
+      Type.String({
+        description: "Program description",
+        examples: ["Focused on distributed systems and databases"],
+        example: "Focused on distributed systems and databases",
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -386,9 +513,15 @@ export const PublicProfileSchema = Type.Object(
     _id: Type.String({ description: "ObjectId hex string" }),
     userId: ProfileOwnerSchema,
     company: OptionalText("Company name", ["Acme Corp"]),
-    website: OptionalText("Personal or company website", ["https://example.com"]),
+    website: OptionalText("Personal or company website", [
+      "https://example.com",
+    ]),
     location: OptionalText("Location, e.g. Seattle, WA", ["Seattle, WA"]),
-    status: Type.String({ minLength: 1, pattern: ".*\\S.*", description: "Professional status" }),
+    status: Type.String({
+      minLength: 1,
+      pattern: ".*\\S.*",
+      description: "Professional status",
+    }),
     skills: Type.Array(
       Type.String({ minLength: 1, pattern: ".*\\S.*", description: "A skill" }),
       { minItems: 1 },
@@ -407,8 +540,12 @@ export const PublicProfileSchema = Type.Object(
       },
       { additionalProperties: false },
     ),
-    createdAt: Type.Optional(Type.String({ format: "date-time", description: "ISO timestamp" })),
-    updatedAt: Type.Optional(Type.String({ format: "date-time", description: "ISO timestamp" })),
+    createdAt: Type.Optional(
+      Type.String({ format: "date-time", description: "ISO timestamp" }),
+    ),
+    updatedAt: Type.Optional(
+      Type.String({ format: "date-time", description: "ISO timestamp" }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -422,7 +559,11 @@ export const PublicProfileSummarySchema = Type.Object(
   {
     _id: Type.String({ description: "ObjectId hex string" }),
     userId: ProfileOwnerSchema,
-    status: Type.String({ minLength: 1, pattern: ".*\\S.*", description: "Professional status" }),
+    status: Type.String({
+      minLength: 1,
+      pattern: ".*\\S.*",
+      description: "Professional status",
+    }),
     company: OptionalText("Company name", ["Acme Corp"]),
     location: OptionalText("Location, e.g. Seattle, WA", ["Seattle, WA"]),
     skills: Type.Array(
@@ -441,7 +582,10 @@ export const ProfileResponseSchema = Type.Object(
 export const ProfileListResponseSchema = Type.Object(
   {
     profiles: Type.Array(PublicProfileSummarySchema),
-    total: Type.Integer({ minimum: 0, description: "Total profiles matching the query" }),
+    total: Type.Integer({
+      minimum: 0,
+      description: "Total profiles matching the query",
+    }),
     page: Type.Integer({ minimum: 1 }),
     limit: Type.Integer({ minimum: 1, maximum: 100 }),
   },
@@ -464,7 +608,9 @@ export const ErrorResponseSchema = Type.Object(
   {
     code: Type.String({ description: "Stable machine-readable error code" }),
     message: Type.String(),
-    requestId: Type.Optional(Type.String({ description: "Echoes X-Request-Id" })),
+    requestId: Type.Optional(
+      Type.String({ description: "Echoes X-Request-Id" }),
+    ),
   },
   { additionalProperties: true },
 );
@@ -479,16 +625,25 @@ export type ErrorResponse = Static<typeof ErrorResponseSchema>;
 export const PaginationQuerySchema = Type.Object(
   {
     page: Type.Optional(
-      Type.Union([Type.Integer({ minimum: 1 }), Type.String({ minLength: 1 })], {
-        default: 1,
-        description: "1-based page number",
-      }),
+      Type.Union(
+        [Type.Integer({ minimum: 1 }), Type.String({ minLength: 1 })],
+        {
+          default: 1,
+          description: "1-based page number",
+        },
+      ),
     ),
     limit: Type.Optional(
-      Type.Union([Type.Integer({ minimum: 1, maximum: 100 }), Type.String({ minLength: 1 })], {
-        default: 20,
-        description: "Page size, 1-100",
-      }),
+      Type.Union(
+        [
+          Type.Integer({ minimum: 1, maximum: 100 }),
+          Type.String({ minLength: 1 }),
+        ],
+        {
+          default: 20,
+          description: "Page size, 1-100",
+        },
+      ),
     ),
   },
   { additionalProperties: false },
@@ -503,7 +658,10 @@ export interface PaginationQuery {
  * Normalises a pagination query to safe integers, clamped to `limit` 1-100 and
  * `page` 1-10_000.
  */
-export function parsePagination(query: PaginationQuery = {}): { page: number; limit: number } {
+export function parsePagination(query: PaginationQuery = {}): {
+  page: number;
+  limit: number;
+} {
   const toInt = (value: unknown, fallback: number) => {
     const n = typeof value === "string" ? Number(value) : (value as number);
     if (!Number.isFinite(n) || !Number.isInteger(n)) return fallback;
@@ -519,4 +677,3 @@ export function parsePagination(query: PaginationQuery = {}): { page: number; li
   const limit = Math.min(100, Math.max(1, toInt(query.limit, 20)));
   return { page, limit };
 }
-

@@ -8,6 +8,7 @@ import {
   toLocalMongoUri,
 } from "../helpers/integration.ts";
 import { oauthStub } from "../helpers/plugin-overrides.ts";
+import { PROFILE_LIMITS, SUBDOCUMENT_TEXT_MAX } from "@dev-conn/contracts";
 import { createRateLimitedTestApp } from "../helpers/test-app.ts";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
@@ -277,7 +278,11 @@ describe("integration — profile", () => {
       url: "/profiles/me",
       headers,
     });
-    assert.equal(before.statusCode, 200, "profile must be readable before delete");
+    assert.equal(
+      before.statusCode,
+      200,
+      "profile must be readable before delete",
+    );
 
     const reply = await app.inject({
       method: "DELETE",
@@ -303,7 +308,10 @@ describe("integration — profile", () => {
     );
 
     // And the profile document itself is gone from the public directory.
-    const list = await app.inject({ method: "GET", url: "/profiles/?limit=50" });
+    const list = await app.inject({
+      method: "GET",
+      url: "/profiles/?limit=50",
+    });
     assert.equal(list.statusCode, 200);
     const remaining = list.json().profiles as Array<{ status: string }>;
     assert.equal(
@@ -313,6 +321,134 @@ describe("integration — profile", () => {
     );
   });
 
+  // The 16MB-BSON argument for capping subdocument strings only holds if the
+  // cap is on every string that lands in the document. `title` and `company`
+  // were unbounded once `description` was capped, so a client could still
+  // $push a 15MB title. Each of these pins one field so a future edit that
+  // drops a cap fails here rather than in production.
+  for (const field of ["title", "company"] as const) {
+    test(`rejects an over-long experience ${field} with 400`, async () => {
+      const { headers } = await setupBasicUser(testEmail(`exp-long-${field}`));
+      await app.inject({
+        method: "POST",
+        url: "/profiles/",
+        headers,
+        payload: { status: "Dev", skills: ["JS"] },
+      });
+
+      const reply = await app.inject({
+        method: "POST",
+        url: "/profiles/experience",
+        headers,
+        payload: {
+          [field]: "x".repeat(PROFILE_LIMITS.label + 1),
+          ...(field === "title" ? { company: "Acme" } : { title: "Dev" }),
+          from: "2020-01-01",
+        },
+      });
+      assert.equal(reply.statusCode, 400);
+      assert.equal((reply.json() as { code: string }).code, "VALIDATION_ERROR");
+    });
+  }
+
+  for (const field of ["school", "degree", "fieldofstudy"] as const) {
+    test(`rejects an over-long education ${field} with 400`, async () => {
+      const { headers } = await setupBasicUser(testEmail(`edu-long-${field}`));
+      await app.inject({
+        method: "POST",
+        url: "/profiles/",
+        headers,
+        payload: { status: "Dev", skills: ["JS"] },
+      });
+
+      const reply = await app.inject({
+        method: "POST",
+        url: "/profiles/education",
+        headers,
+        payload: {
+          school: "MIT",
+          degree: "BSc",
+          [field]: "x".repeat(PROFILE_LIMITS.label + 1),
+          from: "2010-01-01",
+        },
+      });
+      assert.equal(reply.statusCode, 400);
+      assert.equal((reply.json() as { code: string }).code, "VALIDATION_ERROR");
+    });
+  }
+
+  test("rejects an over-long experience description with 400", async () => {
+    const { headers } = await setupBasicUser(testEmail("exp-desc-long"));
+    await app.inject({
+      method: "POST",
+      url: "/profiles/",
+      headers,
+      payload: { status: "Dev", skills: ["JS"] },
+    });
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/profiles/experience",
+      headers,
+      payload: {
+        title: "Dev",
+        company: "Acme",
+        from: "2020-01-01",
+        description: "x".repeat(SUBDOCUMENT_TEXT_MAX + 1),
+      },
+    });
+    assert.equal(reply.statusCode, 400);
+  });
+
+  // A whitespace-only required field is a client error, not a server error:
+  // the sanitiser strips the tags and leaves "", which fails the non-blank
+  // pattern. It used to reach the service as an empty string and surface as a
+  // 500.
+  test("returns 400, not 500, for a required field that sanitizes to blank", async () => {
+    const { headers } = await setupBasicUser(testEmail("blank-required"));
+    await app.inject({
+      method: "POST",
+      url: "/profiles/",
+      headers,
+      payload: { status: "Dev", skills: ["JS"] },
+    });
+
+    const reply = await app.inject({
+      method: "POST",
+      url: "/profiles/experience",
+      headers,
+      payload: {
+        title: "<b></b>",
+        company: "Acme",
+        from: "2020-01-01",
+      },
+    });
+    assert.equal(reply.statusCode, 400);
+    assert.equal((reply.json() as { code: string }).code, "VALIDATION_ERROR");
+  });
+
+  // The optional field must stay clearable: rejecting a blank `bio` would make
+  // it impossible to remove one, which is the regression the sanitiser guard
+  // risks when it is applied to optional fields.
+  test("still allows clearing an optional profile field to a blank string", async () => {
+    const { headers } = await setupBasicUser(testEmail("clear-optional"));
+    const created = await app.inject({
+      method: "POST",
+      url: "/profiles/",
+      headers,
+      payload: { status: "Dev", skills: ["JS"], bio: "Something" },
+    });
+    assert.equal(created.statusCode, 201);
+
+    const reply = await app.inject({
+      method: "PATCH",
+      url: "/profiles/",
+      headers,
+      payload: { bio: "" },
+    });
+    assert.equal(reply.statusCode, 200);
+    assert.equal((reply.json().profile as { bio?: string }).bio ?? "", "");
+  });
 });
 
 async function setupBasicUser(email: string) {
