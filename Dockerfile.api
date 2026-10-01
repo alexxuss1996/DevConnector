@@ -1,0 +1,83 @@
+# Deploy target for the API only. Northflank's buildpack mode re-runs a
+# dependency check on every container start, which re-resolves the registry
+# when NODE_ENV=production (the buildpack prunes devDependencies that were
+# installed at build time) and eventually times out — the container dies before
+# `fastify start` ever runs. Baking node_modules into the image removes the
+# launch-time check entirely.
+#
+# apps/web is deliberately not built here; Vercel owns the frontend. The
+# Dockerfile and the Procfile both ignore the web workspace.
+
+FROM node:24-slim AS build
+
+# argon2 is a native module. It ships prebuilt binaries for common platforms,
+# but node-gyp-build falls back to compiling, which needs a toolchain.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Corepack provides the pnpm version pinned in package.json, so the image and
+# CI resolve the same dependency graph.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+
+# Copy only the manifests first so the install layer is cached until a
+# dependency actually changes. pnpm needs the full workspace layout to
+# resolve workspace:* links, so every package.json has to be present.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/contracts/package.json ./packages/contracts/
+# Shared tsconfig presets are workspace packages that tsc resolves by name, so
+# their contents have to exist before any build step runs.
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+
+# allowBuilds in pnpm-workspace.yaml permits argon2's install script here; it
+# is copied above.
+RUN pnpm install --frozen-lockfile
+
+COPY apps/api/tsconfig.json ./apps/api/
+COPY packages/contracts/tsconfig.json ./packages/contracts/
+COPY packages/contracts/src ./packages/contracts/src
+COPY packages/typescript-config/*.json ./packages/typescript-config/
+COPY apps/api/src ./apps/api/src
+
+RUN pnpm --filter @dev-conn/contracts build \
+ && pnpm --filter api build
+
+# The API reads its env at import time and throws on anything missing
+# (src/config/env.ts), so prod dependencies are all that the runtime needs.
+FROM node:24-slim AS runtime
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+
+# node_modules comes from the build stage, so the runtime image inherits the
+# exact tree that compiled — no install, no registry access, no launch-time
+# dependency check. The workspace layout has to be reproduced here too, because
+# pnpm's node_modules is symlink-based and the links are relative.
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/packages/contracts/node_modules ./packages/contracts/node_modules
+COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+# The start script is `clean && build:ts && fastify start`, which recompiles on
+# every boot, and `pnpm exec` re-verifies the dependency tree before running.
+# Both are launch-time work the build stage already did, so call the binary
+# directly: nothing here touches the network.
+WORKDIR /app/apps/api
+CMD ["./node_modules/.bin/fastify", "start", "-l", "info", "dist/app.js", "--options"]
