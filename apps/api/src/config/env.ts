@@ -1,4 +1,59 @@
 /** Required env vars and how to validate them, checked once at import. */
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+/**
+ * `KEY=value` pairs from env-file content. Handles `export` prefixes,
+ * `#` comments, and single/double quotes. Single-line values only — enough
+ * for every var this service reads (see REQUIRED below).
+ */
+function parseEnvFile(path: string): Map<string, string> {
+  const vars = new Map<string, string>();
+  if (!existsSync(path)) return vars;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(trimmed);
+    if (!match) continue;
+    let value = match[2].trim();
+    const quote = value[0];
+    if (value.length >= 2 && (quote === '"' || quote === "'") && value.endsWith(quote)) {
+      value = value.slice(1, -1);
+      if (quote === '"') value = value.replace(/\\n/g, "\n").replace(/\\"/g, '"');
+    } else {
+      const comment = value.search(/\s#/);
+      if (comment !== -1) value = value.slice(0, comment).trim();
+    }
+    vars.set(match[1], value);
+  }
+  return vars;
+}
+
+/**
+ * `.env.local` overrides for development, mirroring the Next.js convention:
+ * `.env` holds shared/deployed values, `.env.local` the machine-local ones.
+ * Loaded only when NODE_ENV is unset or `development` — never in
+ * test/staging/production, so a stray local file cannot shadow a real
+ * deployment or test run.
+ *
+ * `process.loadEnvFile` cannot do this: it never overrides keys already set,
+ * and fastify-cli has already loaded `.env` by the time this module runs.
+ * So `.env.local` replaces file-sourced values, never a variable exported in
+ * the real environment.
+ */
+{
+  const nodeEnv = process.env.NODE_ENV;
+  if (nodeEnv === undefined || nodeEnv === "" || nodeEnv === "development") {
+    const cwd = process.cwd();
+    const fileVars = parseEnvFile(join(cwd, ".env"));
+    for (const [key, value] of parseEnvFile(join(cwd, ".env.local"))) {
+      // A defined value that differs from `.env` can only come from the real
+      // environment (env files never override it), so it is left alone.
+      const current = process.env[key];
+      if (current === undefined || current === fileVars.get(key)) process.env[key] = value;
+    }
+  }
+}
 const REQUIRED = {
   JWT_SECRET: (v: string) =>
     v.length >= 32 ? undefined : "must be >= 32 characters",
