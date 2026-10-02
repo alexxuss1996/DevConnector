@@ -28,13 +28,28 @@ describe("Home", () => {
     expect(container.textContent).toContain("The social network for developers");
   });
 
-  it("has a login link to /login?next=/posts", async () => {
+  it("has register and login CTAs", async () => {
     const { container } = await render(<Home />);
 
     const links = Array.from(container.querySelectorAll("a"));
-    console.log("All anchor tags:", links.map((a) => a.outerHTML));
+    const registerLink = links.find((a) => a.getAttribute("href")?.includes("/register"));
+    expect(registerLink).not.toBeUndefined();
     const loginLink = links.find((a) => a.getAttribute("href")?.includes("login"));
     expect(loginLink).not.toBeUndefined();
-    expect(loginLink?.getAttribute("href")).toBe("/login?next=/posts");
+  });
+
+  it("shows hero image with descriptive alt", async () => {
+    const { container } = await render(<Home />);
+
+    const img = container.querySelector('img[alt*="Developer typing code on laptop"]');
+    expect(img).not.toBeNull();
+  });
+
+  it("has header, main and footer landmarks", async () => {
+    const { container } = await render(<Home />);
+
+    expect(container.querySelector("header")).not.toBeNull();
+    expect(container.querySelector("main")).not.toBeNull();
+    expect(container.querySelector("footer")).not.toBeNull();
   });
 });

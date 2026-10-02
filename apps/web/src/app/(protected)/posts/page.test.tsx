@@ -60,6 +60,19 @@ beforeEach(() => {
 });
 
 describe("PostsPage", () => {
+  it("keeps the feed in one constrained column", async () => {
+    mocks.posts = { data: undefined, isLoading: true, error: null };
+
+    const { container, root } = await render(<PostsPage />);
+
+    const column = container.querySelector('[data-testid="feed-column"]');
+    expect(column).not.toBeNull();
+    expect(column?.querySelector("h1")?.textContent).toBe("Posts");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows an error state when the list fails to load", async () => {
     mocks.posts = {
       data: undefined,

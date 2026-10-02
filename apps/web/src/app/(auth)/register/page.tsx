@@ -12,35 +12,36 @@ import { Field } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { toaster } from "@/components/ui/toaster";
 import { ApiError } from "@/lib/api/client";
-import { useLoginMutation } from "@/lib/queries";
+import { useRegisterMutation } from "@/lib/queries";
 
-interface LoginValues {
+interface RegisterValues {
+  name: string;
   email: string;
   password: string;
 }
 
-function LoginForm() {
+function RegisterForm() {
   const router = useRouter();
   const [next] = useQueryState("next", { defaultValue: "/posts" });
-  const login = useLoginMutation();
+  const registerMutation = useRegisterMutation();
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginValues>({ defaultValues: { email: "", password: "" } });
+  } = useForm<RegisterValues>({ defaultValues: { name: "", email: "", password: "" } });
 
-  const onSubmit = async (values: LoginValues) => {
+  const onSubmit = async (values: RegisterValues) => {
     try {
-      await login.mutateAsync(values);
-      router.replace(next || "/posts");
+      await registerMutation.mutateAsync(values);
+      router.replace(`/create-profile?next=${encodeURIComponent(next || "/posts")}`);
     } catch (err) {
       const description =
         err instanceof ApiError && err.requestId
           ? `${err.message} (request ${err.requestId})`
           : err instanceof Error
             ? err.message
-            : "Login failed";
-      toaster.create({ title: "Login failed", description, type: "error" });
+            : "Registration failed";
+      toaster.create({ title: "Registration failed", description, type: "error" });
     }
   };
 
@@ -54,13 +55,24 @@ function LoginForm() {
         p={{ base: 5, md: 8 }}
       >
         <Heading as="h1" size="lg" letterSpacing="-0.02em">
-          Log in
+          Create account
         </Heading>
         <Text color="muted" fontSize="sm" mt={1} mb={6}>
-          Sign in to post updates and browse developers.
+          Pick a name and a password. You will add a profile in the next step.
         </Text>
 
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: "grid", gap: 16 }}>
+          <Field label="Name" invalid={!!errors.name} errorText={errors.name?.message}>
+            <Input
+              {...register("name", {
+                required: "Name is required",
+                minLength: { value: 3, message: "Name must be at least 3 characters" },
+                maxLength: { value: 30, message: "Name must be at most 30 characters" },
+                validate: (v) => /\S/.test(v) || "Name cannot be blank",
+              })}
+              placeholder="Alex Novak"
+            />
+          </Field>
           <Field label="Email" invalid={!!errors.email} errorText={errors.email?.message}>
             <Input
               type="email"
@@ -81,15 +93,15 @@ function LoginForm() {
             />
           </Field>
           <Button type="submit" loading={isSubmitting} colorPalette="brand">
-            Log in
+            Create account
           </Button>
         </form>
 
         <Text mt={5} fontSize="sm" color="muted">
-          No account yet?{" "}
-          <Link href={`/register?next=${encodeURIComponent(next || "/posts")}`}>
+          Already have an account?{" "}
+          <Link href={`/login?next=${encodeURIComponent(next || "/posts")}`}>
             <Box as="span" color="brand.fg">
-              Create one
+              Log in
             </Box>
           </Link>
         </Text>
@@ -98,10 +110,10 @@ function LoginForm() {
   );
 }
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <Suspense>
-      <LoginForm />
+      <RegisterForm />
     </Suspense>
   );
 }

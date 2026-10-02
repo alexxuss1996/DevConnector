@@ -11,7 +11,14 @@ export type ColorModeProviderProps = ThemeProviderProps
 
 export function ColorModeProvider(props: ColorModeProviderProps) {
   return (
-    <ThemeProvider attribute="class" disableTransitionOnChange {...props} />
+    <ThemeProvider
+      attribute="class"
+      // Without an explicit default, next-themes assumes "light". The product is
+      // dark-first, so the OS preference decides until the visitor toggles it.
+      defaultTheme="system"
+      disableTransitionOnChange
+      {...props}
+    />
   )
 }
 
@@ -24,14 +31,18 @@ export interface UseColorModeReturn {
 }
 
 export function useColorMode(): UseColorModeReturn {
-  const { resolvedTheme, setTheme, forcedTheme } = useTheme()
-  const colorMode = forcedTheme || resolvedTheme
+  // next-themes' context is undefined without a ThemeProvider above it. Several
+  // page components render in test harnesses that mount no provider, so this
+  // reads defensively rather than destructuring a possibly-undefined value.
+  const theme = useTheme()
+  const resolvedTheme = theme?.resolvedTheme
+  const colorMode = theme?.forcedTheme || resolvedTheme
   const toggleColorMode = () => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark")
+    theme?.setTheme(resolvedTheme === "dark" ? "light" : "dark")
   }
   return {
     colorMode: colorMode as ColorMode,
-    setColorMode: setTheme,
+    setColorMode: theme?.setTheme,
     toggleColorMode,
   }
 }

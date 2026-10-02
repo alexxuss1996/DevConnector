@@ -1,6 +1,8 @@
 "use client";
 
 import type { Post } from "@dev-conn/contracts";
+import { Box, Flex, Text } from "@chakra-ui/react";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toaster } from "@/components/ui/toaster";
 import { ApiError } from "@/lib/api/client";
@@ -50,26 +52,68 @@ export function PostCard({ post, onOpen }: { post: Post; onOpen: (id: string) =>
   };
 
   return (
-    <article data-testid="post-card" style={{ display: "grid", gap: 8 }}>
-      <button
-        type="button"
-        data-testid="post-open"
-        onClick={() => onOpen(post._id)}
-        style={{ textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: 0 }}
-      >
-        {post.text}
-      </button>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <Button data-testid="like-button" size="sm" variant="ghost" onClick={toggleLike}>
-          {liked ? "Unlike" : "Like"} ({post.likes.length})
-        </Button>
-        <span>{post.comments.length} comments</span>
-        {mine && (
-          <Button data-testid="delete-button" size="sm" variant="ghost" onClick={remove}>
-            Delete
+    <Box
+      as="article"
+      data-testid="post-card"
+      py={5}
+      borderBottomWidth="1px"
+      borderColor="line"
+    >
+      <Flex gap={3} align="start">
+        <Avatar name={post.userId.name} size="sm" flexShrink={0} />
+
+        <Box flex="1" minW={0}>
+          <Text className="dc-mono" fontSize="xs" color="muted">
+            {post.userId.name ?? "Developer"}
+          </Text>
+
+          <Button
+            data-testid="post-open"
+            variant="plain"
+            onClick={() => onOpen(post._id)}
+            h="auto"
+            p={0}
+            display="block"
+            w="full"
+            textAlign="left"
+            fontFamily="body"
+            fontSize="md"
+            lineHeight="1.6"
+            color="fg"
+            whiteSpace="pre-wrap"
+            overflowWrap="anywhere"
+            mt={1}
+          >
+            {post.text}
           </Button>
-        )}
-      </div>
-    </article>
+
+          <Flex align="center" gap={2} mt={3}>
+            <Button
+              data-testid="like-button"
+              size="xs"
+              variant="ghost"
+              colorPalette="brand"
+              onClick={toggleLike}
+            >
+              {liked ? "Unlike" : "Like"}
+            </Button>
+            <Text className="dc-mono" fontSize="xs" color="muted">
+              {post.likes.length} likes / {post.comments.length} comments
+            </Text>
+            {mine && (
+              <Button
+                data-testid="delete-button"
+                size="xs"
+                variant="ghost"
+                ml="auto"
+                onClick={remove}
+              >
+                Delete
+              </Button>
+            )}
+          </Flex>
+        </Box>
+      </Flex>
+    </Box>
   );
 }

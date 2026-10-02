@@ -2,6 +2,8 @@
 
 import { Suspense } from "react";
 import { useQueryState } from "nuqs";
+import { Box, Flex, Heading, SimpleGrid, Text } from "@chakra-ui/react";
+
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   PaginationItems,
@@ -22,20 +24,33 @@ function DevelopersContent() {
   const { data, isLoading, error } = useProfiles({ page, limit: LIMIT });
 
   return (
-    <div style={{ display: "grid", gap: 24, maxWidth: 640 }}>
-      <h1>Developers</h1>
+    <Box maxW="900px" mx="auto" w="full">
+      <Heading as="h1" size="xl" letterSpacing="-0.02em">
+        Developers
+      </Heading>
+      <Text color="muted" mt={1} mb={8}>
+        {data ? `${data.total} on the network` : "Everyone on the network."}
+      </Text>
+
       {isLoading && <Skeleton height="20px" />}
       {error && (
-        <EmptyState title="Something went wrong" description="Could not load developers. Try again." />
+        <EmptyState
+          title="Something went wrong"
+          description="Could not load developers. Try again."
+        />
       )}
       {data && data.total === 0 && (
         <EmptyState title="No developers yet" description="Check back later." />
       )}
-      {data?.profiles.map((profile) => (
-        <ProfileCard key={profile._id} profile={profile} onOpen={(id) => void setUserId(id)} />
-      ))}
+
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+        {data?.profiles.map((profile) => (
+          <ProfileCard key={profile._id} profile={profile} onOpen={(id) => void setUserId(id)} />
+        ))}
+      </SimpleGrid>
+
       {data && data.total > 0 && (
-        <div data-testid="pagination">
+        <Flex data-testid="pagination" justify="center" mt={8}>
           <PaginationRoot
             count={data.total}
             pageSize={LIMIT}
@@ -46,10 +61,11 @@ function DevelopersContent() {
             <PaginationItems />
             <PaginationNextTrigger />
           </PaginationRoot>
-        </div>
+        </Flex>
       )}
+
       {userId && <ProfileDetailDialog userId={userId} onClose={() => void setUserId("")} />}
-    </div>
+    </Box>
   );
 }
 

@@ -84,6 +84,27 @@ describe("ProtectedLayout", () => {
     container.remove();
   });
 
+  it("redirects to create-profile when the user has no profile", async () => {
+    mocks.myProfile = {
+      isLoading: false,
+      error: new ApiError(404, "PROFILE_NOT_FOUND", "Profile not found"),
+    };
+
+    const { container, root } = await render(
+      <ProtectedLayout>
+        <div data-testid="protected-children">secret</div>
+      </ProtectedLayout>,
+    );
+
+    expect(mocks.replace).toHaveBeenCalledOnce();
+    const firstCall = mocks.replace.mock.calls[0];
+    expect(firstCall?.[0]).toMatch(/^\/create-profile\?next=/);
+    expect(container.querySelector('[data-testid="protected-children"]')).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("shows an error state instead of a blank page on non-401 errors", async () => {
     mocks.myProfile = {
       isLoading: false,
