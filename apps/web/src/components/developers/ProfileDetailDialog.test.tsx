@@ -62,4 +62,20 @@ describe("ProfileDetailDialog", () => {
 
     await act(async () => root.unmount());
   });
+
+  it("shows an error state on 500 instead of an empty dialog", async () => {
+    mocks.profileById.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new ApiError(500, "INTERNAL_ERROR", "Boom"),
+    });
+
+    const { root } = await render(
+      <ProfileDetailDialog userId="6712abcd1234abcd1234abcd" onClose={() => {}} />,
+    );
+
+    expect(document.body.textContent).toMatch(/something went wrong/i);
+
+    await act(async () => root.unmount());
+  });
 });

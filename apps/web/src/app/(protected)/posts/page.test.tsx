@@ -4,32 +4,42 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api/client";
+
 const mocks = vi.hoisted(() => ({
-  profiles: undefined as unknown,
-  page: 1,
-  setPage: vi.fn(),
-  userId: "",
-  setUserId: vi.fn(),
+  posts: undefined as unknown,
+  postId: "",
+  setPostId: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => "/posts",
+  useSearchParams: () => new URLSearchParams(""),
 }));
 
 vi.mock("@/lib/queries", () => ({
-  useProfiles: () => mocks.profiles,
+  usePosts: () => mocks.posts,
+  useCreatePostMutation: () => ({ mutateAsync: vi.fn() }),
+  useLikePostMutation: () => ({ mutateAsync: vi.fn() }),
+  useUnlikePostMutation: () => ({ mutateAsync: vi.fn() }),
+  useDeletePostMutation: () => ({ mutateAsync: vi.fn() }),
+  useMyProfile: () => ({ data: undefined }),
 }));
 
 vi.mock("nuqs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("nuqs")>();
   return {
     ...actual,
-    useQueryState: (key: string) =>
-      key === "page" ? [mocks.page, mocks.setPage] : [mocks.userId, mocks.setUserId],
+    useQueryState: () => [mocks.postId, mocks.setPostId],
   };
 });
 
-vi.mock("@/components/developers/ProfileDetailDialog", () => ({
-  ProfileDetailDialog: () => null,
+vi.mock("@/components/posts/PostDetailDialog", () => ({
+  PostDetailDialog: () => null,
 }));
 
-import DevelopersPage from "@/app/(protected)/developers/page";
+import PostsPage from "@/app/(protected)/posts/page";
 
 async function render(node: React.ReactNode) {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -46,34 +56,18 @@ async function render(node: React.ReactNode) {
 }
 
 beforeEach(() => {
-  mocks.profiles = { data: undefined, isLoading: true };
+  mocks.posts = { data: undefined, isLoading: true, error: null };
 });
 
-describe("DevelopersPage empty", () => {
-  it("hides pagination and shows EmptyState when total is 0", async () => {
-    mocks.profiles = {
-      data: { profiles: [], total: 0, page: 1, limit: 12 },
-      isLoading: false,
-    };
-
-    const { container, root } = await render(<DevelopersPage />);
-
-    expect(container.textContent).toMatch(/no developers/i);
-    expect(container.querySelector('[data-testid="pagination"]')).toBeNull();
-
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
+describe("PostsPage", () => {
   it("shows an error state when the list fails to load", async () => {
-    const { ApiError } = await import("@/lib/api/client");
-    mocks.profiles = {
+    mocks.posts = {
       data: undefined,
       isLoading: false,
       error: new ApiError(500, "INTERNAL_ERROR", "Boom"),
     };
 
-    const { container, root } = await render(<DevelopersPage />);
+    const { container, root } = await render(<PostsPage />);
 
     expect(container.textContent).toMatch(/something went wrong/i);
 

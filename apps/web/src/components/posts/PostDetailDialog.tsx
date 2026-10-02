@@ -16,6 +16,7 @@ import { Field } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toaster } from "@/components/ui/toaster";
 import { ApiError } from "@/lib/api/client";
+import { useUnauthorizedRedirect } from "@/lib/auth-redirect";
 import {
   useAddCommentMutation,
   useDeleteCommentMutation,
@@ -42,6 +43,7 @@ export function PostDetailDialog({ postId, onClose }: { postId: string; onClose:
   const addComment = useAddCommentMutation();
   const updateComment = useUpdateCommentMutation();
   const deleteComment = useDeleteCommentMutation();
+  const redirectIfExpired = useUnauthorizedRedirect();
   const { data: me } = useMyProfile();
   const myId = me?.profile.userId._id;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export function PostDetailDialog({ postId, onClose }: { postId: string; onClose:
       await addComment.mutateAsync({ params: { id: postId }, data: { text: values.text } });
       reset();
     } catch (err) {
+      if (redirectIfExpired(err)) return;
       toaster.create({ title: "Could not add comment", description: errorDescription(err, "Try again"), type: "error" });
     }
   };
@@ -68,6 +71,7 @@ export function PostDetailDialog({ postId, onClose }: { postId: string; onClose:
       await updateComment.mutateAsync({ params: { id: postId, commentId }, data: { text } });
       setEditingId(null);
     } catch (err) {
+      if (redirectIfExpired(err)) return;
       toaster.create({ title: "Could not update comment", description: errorDescription(err, "Try again"), type: "error" });
     }
   };
@@ -76,6 +80,7 @@ export function PostDetailDialog({ postId, onClose }: { postId: string; onClose:
     try {
       await deleteComment.mutateAsync({ id: postId, commentId });
     } catch (err) {
+      if (redirectIfExpired(err)) return;
       toaster.create({ title: "Could not delete comment", description: errorDescription(err, "Try again"), type: "error" });
     }
   };
@@ -94,10 +99,16 @@ export function PostDetailDialog({ postId, onClose }: { postId: string; onClose:
           {isValidId && postQuery.error instanceof ApiError && postQuery.error.status === 404 && (
             <EmptyState title="Post not found" description="It may have been deleted." />
           )}
+          {isValidId && postQuery.error && !(postQuery.error instanceof ApiError && postQuery.error.status === 404) && (
+            <EmptyState title="Something went wrong" description="Could not load this post. Try again." />
+          )}
           {isValidId && postQuery.data && (
             <div style={{ display: "grid", gap: 16 }}>
               <p>{postQuery.data.post.text}</p>
               {commentsQuery.isLoading && <Skeleton height="20px" />}
+              {commentsQuery.error && (
+                <EmptyState title="Could not load comments" description="Try reopening this post." />
+              )}
               {(commentsQuery.data?.comments ?? []).map((comment) => (
                 <div key={comment._id} style={{ display: "grid", gap: 4 }}>
                   <strong>{comment.name}</strong>

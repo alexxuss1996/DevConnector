@@ -4,6 +4,7 @@ import type { Post } from "@dev-conn/contracts";
 import { Button } from "@/components/ui/button";
 import { toaster } from "@/components/ui/toaster";
 import { ApiError } from "@/lib/api/client";
+import { useUnauthorizedRedirect } from "@/lib/auth-redirect";
 import {
   useDeletePostMutation,
   useLikePostMutation,
@@ -23,6 +24,7 @@ export function PostCard({ post, onOpen }: { post: Post; onOpen: (id: string) =>
   const likePost = useLikePostMutation();
   const unlikePost = useUnlikePostMutation();
   const deletePost = useDeletePostMutation();
+  const redirectIfExpired = useUnauthorizedRedirect();
   const { data } = useMyProfile();
   const myId = data?.profile.userId._id;
   const liked = myId ? post.likes.some((l) => l.userId === myId) : false;
@@ -33,6 +35,7 @@ export function PostCard({ post, onOpen }: { post: Post; onOpen: (id: string) =>
       if (liked) await unlikePost.mutateAsync({ id: post._id });
       else await likePost.mutateAsync({ id: post._id });
     } catch (err) {
+      if (redirectIfExpired(err)) return;
       toaster.create({ title: "Could not update like", description: errorDescription(err, "Try again"), type: "error" });
     }
   };
@@ -41,6 +44,7 @@ export function PostCard({ post, onOpen }: { post: Post; onOpen: (id: string) =>
     try {
       await deletePost.mutateAsync({ id: post._id });
     } catch (err) {
+      if (redirectIfExpired(err)) return;
       toaster.create({ title: "Could not delete post", description: errorDescription(err, "Try again"), type: "error" });
     }
   };

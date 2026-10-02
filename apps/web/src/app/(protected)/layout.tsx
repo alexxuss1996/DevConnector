@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ApiError } from "@/lib/api/client";
 import { useMyProfile } from "@/lib/queries";
 
@@ -22,7 +23,8 @@ function GuardInner({ children }: { children: React.ReactNode }) {
   }, [isLoading, error, router, pathname, searchParams]);
 
   if (isLoading) return <Skeleton height="20px" />;
-  if (error) return null;
+  if (error instanceof ApiError && error.status === 401) return null;
+  if (error) return <EmptyState title="Something went wrong" description="Could not check your session. Try again." />;
   if (!data) return null;
   return <>{children}</>;
 }

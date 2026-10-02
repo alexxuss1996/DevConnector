@@ -6,6 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+  usePathname: () => "/posts",
+  useSearchParams: () => new URLSearchParams(""),
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -13,6 +20,7 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 import { PostComposer } from "@/components/posts/PostComposer";
+import { ApiError } from "@/lib/api/client";
 
 async function render(node: React.ReactNode) {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -59,6 +67,26 @@ describe("PostComposer", () => {
     expect(mocks.mutateAsync).toHaveBeenCalledWith({ text: "Hello world" });
     expect(onCreated).toHaveBeenCalledOnce();
     expect((container.querySelector("textarea") as HTMLTextAreaElement)?.value).toBe("");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("redirects to login when the session expired", async () => {
+    mocks.mutateAsync.mockRejectedValueOnce(
+      new ApiError(401, "UNAUTHORIZED", "Unauthorized"),
+    );
+    const { container, root } = await render(<PostComposer />);
+
+    const textarea = container.querySelector("textarea");
+    await act(async () => {
+      fillTextarea(textarea, "Hello world");
+    });
+    await act(async () => {
+      (container.querySelector('button[type="submit"]') as HTMLButtonElement)?.click();
+    });
+
+    expect(mocks.replace).toHaveBeenCalledWith("/login?next=%2Fposts");
 
     await act(async () => root.unmount());
     container.remove();

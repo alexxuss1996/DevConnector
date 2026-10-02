@@ -14,7 +14,14 @@ const mocks = vi.hoisted(() => ({
   addComment: vi.fn(),
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
+  replace: vi.fn(),
   myId: "6712abcd1234abcd1234abce",
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+  usePathname: () => "/posts",
+  useSearchParams: () => new URLSearchParams(""),
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -168,6 +175,62 @@ describe("PostDetailDialog", () => {
     );
 
     expect(document.body.textContent).toMatch(/not found/i);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("shows an error state on 500 instead of an empty dialog", async () => {
+    mocks.usePost.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new ApiError(500, "INTERNAL_ERROR", "Boom"),
+    });
+
+    const { container, root } = await render(
+      <PostDetailDialog postId={POST_ID} onClose={() => {}} />,
+    );
+
+    expect(document.body.textContent).toMatch(/something went wrong/i);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("redirects to login when adding a comment fails with 401", async () => {
+    mocks.usePost.mockReturnValue({
+      data: {
+        post: {
+          _id: POST_ID,
+          userId: { _id: "other", name: "Alex" },
+          text: "Hi",
+          likes: [],
+          comments: [],
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+    mocks.usePostComments.mockReturnValue({
+      data: { comments: [] },
+      isLoading: false,
+      error: null,
+    });
+    mocks.addComment.mockRejectedValueOnce(new ApiError(401, "UNAUTHORIZED", "Unauthorized"));
+
+    const { container, root } = await render(
+      <PostDetailDialog postId={POST_ID} onClose={() => {}} />,
+    );
+
+    const textarea = document.body.querySelector("textarea");
+    await act(async () => {
+      fillTextarea(textarea, "Great post");
+    });
+    await act(async () => {
+      (document.body.querySelector('button[type="submit"]') as HTMLButtonElement)?.click();
+    });
+
+    expect(mocks.replace).toHaveBeenCalledWith("/login?next=%2Fposts");
 
     await act(async () => root.unmount());
     container.remove();

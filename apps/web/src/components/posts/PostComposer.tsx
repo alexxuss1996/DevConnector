@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { toaster } from "@/components/ui/toaster";
 import { ApiError } from "@/lib/api/client";
+import { useUnauthorizedRedirect } from "@/lib/auth-redirect";
 import { useCreatePostMutation } from "@/lib/queries";
 
 interface ComposerValues {
@@ -14,6 +15,7 @@ interface ComposerValues {
 
 export function PostComposer({ onCreated }: { onCreated?: () => void }) {
   const createPost = useCreatePostMutation();
+  const redirectIfExpired = useUnauthorizedRedirect();
   const {
     register,
     handleSubmit,
@@ -27,6 +29,7 @@ export function PostComposer({ onCreated }: { onCreated?: () => void }) {
       reset();
       onCreated?.();
     } catch (err) {
+      if (redirectIfExpired(err)) return;
       const description =
         err instanceof ApiError && err.requestId
           ? `${err.message} (request ${err.requestId})`

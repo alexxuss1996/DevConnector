@@ -11,13 +11,16 @@ import { usePosts } from "@/lib/queries";
 
 function PostsContent() {
   const [postId, setPostId] = useQueryState("postId", { defaultValue: "" });
-  const { data, isLoading } = usePosts();
+  const { data, isLoading, error } = usePosts();
 
   return (
     <div style={{ display: "grid", gap: 24, maxWidth: 640 }}>
       <h1>Posts</h1>
       <PostComposer />
       {isLoading && <Skeleton height="20px" />}
+      {error && (
+        <EmptyState title="Something went wrong" description="Could not load posts. Try again." />
+      )}
       {data && data.posts.length === 0 && (
         <EmptyState title="No posts yet" description="Be the first to share an update." />
       )}

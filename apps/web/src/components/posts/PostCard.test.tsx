@@ -9,7 +9,14 @@ const mocks = vi.hoisted(() => ({
   like: vi.fn(),
   unlike: vi.fn(),
   remove: vi.fn(),
+  replace: vi.fn(),
   myId: "6712abcd1234abcd1234abce",
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+  usePathname: () => "/posts",
+  useSearchParams: () => new URLSearchParams(""),
 }));
 
 vi.mock("@/lib/queries", () => ({
@@ -20,6 +27,7 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 import { PostCard } from "@/components/posts/PostCard";
+import { ApiError } from "@/lib/api/client";
 
 const basePost: Post = {
   _id: "6712abcd1234abcd1234abcd",
@@ -98,6 +106,20 @@ describe("PostCard", () => {
     });
 
     expect(onOpen).toHaveBeenCalledWith(basePost._id);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("redirects to login when like fails with 401", async () => {
+    mocks.like.mockRejectedValueOnce(new ApiError(401, "UNAUTHORIZED", "Unauthorized"));
+    const { container, root } = await render(<PostCard post={basePost} onOpen={vi.fn()} />);
+
+    await act(async () => {
+      (container.querySelector('[data-testid="like-button"]') as HTMLButtonElement)?.click();
+    });
+
+    expect(mocks.replace).toHaveBeenCalledWith("/login?next=%2Fposts");
 
     await act(async () => root.unmount());
     container.remove();

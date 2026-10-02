@@ -83,4 +83,24 @@ describe("ProtectedLayout", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it("shows an error state instead of a blank page on non-401 errors", async () => {
+    mocks.myProfile = {
+      isLoading: false,
+      error: new ApiError(500, "INTERNAL_ERROR", "Boom"),
+    };
+
+    const { container, root } = await render(
+      <ProtectedLayout>
+        <div data-testid="protected-children">secret</div>
+      </ProtectedLayout>,
+    );
+
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="protected-children"]')).toBeNull();
+    expect(container.textContent).toMatch(/something went wrong/i);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });

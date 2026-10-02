@@ -19,12 +19,15 @@ const LIMIT = 12;
 function DevelopersContent() {
   const [page, setPage] = useQueryState("page", { defaultValue: 1, parse: Number });
   const [userId, setUserId] = useQueryState("userId", { defaultValue: "" });
-  const { data, isLoading } = useProfiles({ page, limit: LIMIT });
+  const { data, isLoading, error } = useProfiles({ page, limit: LIMIT });
 
   return (
     <div style={{ display: "grid", gap: 24, maxWidth: 640 }}>
       <h1>Developers</h1>
       {isLoading && <Skeleton height="20px" />}
+      {error && (
+        <EmptyState title="Something went wrong" description="Could not load developers. Try again." />
+      )}
       {data && data.total === 0 && (
         <EmptyState title="No developers yet" description="Check back later." />
       )}

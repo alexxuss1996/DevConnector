@@ -34,6 +34,9 @@ export function ProfileDetailDialog({ userId, onClose }: { userId: string; onClo
           {isValidId && query.error instanceof ApiError && query.error.status === 404 && (
             <EmptyState title="Developer not found" description="That profile does not exist." />
           )}
+          {isValidId && query.error && !(query.error instanceof ApiError && query.error.status === 404) && (
+            <EmptyState title="Something went wrong" description="Could not load this profile. Try again." />
+          )}
           {isValidId && query.data && (
             <div style={{ display: "grid", gap: 16 }}>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
