@@ -1,0 +1,20 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to main supersedes the run in flight, but never cancel after the
+# hook fires — a half-sent deploy hook leaves no deployment to inspect.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  vercel:
+    name: Trigger Vercel deploy hook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire deploy hook
+        run: curl --fail-with-body --silent --show-error -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_MAIN }}"
