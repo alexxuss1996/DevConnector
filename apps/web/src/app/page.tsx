@@ -50,8 +50,8 @@ export default function Home() {
           </Heading>
 
           <Text fontSize={{ base: "md", md: "lg" }} color="muted" maxW="46ch">
-            The social network for developers. Share what you build, keep your profile
-            current, and find people working on the same stack.
+            The social network for developers. Share what you build, keep your
+            profile current, and find people working on the same stack.
           </Text>
 
           <Flex gap={3} wrap="wrap">
@@ -96,8 +96,19 @@ export default function Home() {
 
       {/* A definition list, not a card row: three identical bordered boxes is
           the single most recognisable generated-page tell there is. */}
-      <Stack as="section" aria-labelledby="capabilities" gap={0} mt={{ base: 16, md: 24 }}>
-        <Heading as="h2" id="capabilities" size="lg" letterSpacing="-0.02em" mb={6}>
+      <Stack
+        as="section"
+        aria-labelledby="capabilities"
+        gap={0}
+        mt={{ base: 16, md: 24 }}
+      >
+        <Heading
+          as="h2"
+          id="capabilities"
+          size="lg"
+          letterSpacing="-0.02em"
+          mb={6}
+        >
           What you get
         </Heading>
 
@@ -112,7 +123,11 @@ export default function Home() {
               borderBottomWidth="1px"
               borderColor="line"
             >
-              <Flex align="center" gap={3} md={{ width: "180px", flexShrink: 0 }}>
+              <Flex
+                align="center"
+                gap={3}
+                md={{ width: "180px", flexShrink: 0 }}
+              >
                 <Box as="span" color="brand.fg" aria-hidden display="flex">
                   <item.icon />
                 </Box>
@@ -127,30 +142,6 @@ export default function Home() {
           ))}
         </Box>
       </Stack>
-
-      {/* Full-width band rather than a third copy of the split above. */}
-      <Box
-        as="section"
-        mt={{ base: 16, md: 24 }}
-        bg="panel"
-        borderWidth="1px"
-        borderColor="line"
-        borderRadius="6px"
-        px={{ base: 6, md: 10 }}
-        py={{ base: 8, md: 12 }}
-        textAlign="center"
-      >
-        <Heading as="h2" size="xl" letterSpacing="-0.02em">
-          Open an account and post your first update
-        </Heading>
-        <Text mt={3} color="muted" mx="auto" maxW="48ch">
-          Setting up takes two minutes. Your profile needs three fields and you can
-          fill in the rest whenever you want.
-        </Text>
-        <Button mt={6} colorPalette="brand" size="lg" asChild>
-          <NextLink href="/register">Create account</NextLink>
-        </Button>
-      </Box>
     </PageShell>
   );
 }

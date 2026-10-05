@@ -45,7 +45,16 @@ const config = defineConfig({
         raised: { value: { base: "#FFFFFF", _dark: "#171C23" } },
         /** Every hairline on the site is this one token. */
         line: { value: { base: "#E2E6EC", _dark: "#232A33" } },
-        fg: { value: { base: "#0C0F14", _dark: "#E6EDF3" } },
+        /* `muted` nested under `fg`, not just a sibling: Chakra's global CSS
+           styles every `::placeholder` with `fg.muted/80` and prose recipes ask
+           for `fg.muted` directly. With only the flat `fg` token those paths
+           resolve to nothing, so the browser fell back to inherited
+           `color` and placeholders rendered at full strength — reading as
+           typed values. `DEFAULT` keeps the bare `fg` path working. */
+        fg: {
+          DEFAULT: { value: { base: "#0C0F14", _dark: "#E6EDF3" } },
+          muted: { value: { base: "#59626F", _dark: "#8B98A5" } },
+        },
         muted: { value: { base: "#59626F", _dark: "#8B98A5" } },
 
         /* Chakra's stock focus ring points at a palette token that resolves to

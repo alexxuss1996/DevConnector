@@ -24,11 +24,18 @@ export function PageShell({
   children,
   headerActions,
   belowHeader,
-  maxW = "1080px",
+  maxW = "1200px",
 }: PageShellProps) {
   return (
     <Flex direction="column" minH="100dvh" bg="canvas">
-      <Box position="sticky" top={0} zIndex={10} bg="panel" borderBottomWidth="1px" borderColor="line">
+      <Box
+        position="sticky"
+        top={0}
+        zIndex={10}
+        bg="panel"
+        borderBottomWidth="1px"
+        borderColor="line"
+      >
         <SiteHeader actions={headerActions} />
         {belowHeader}
       </Box>
