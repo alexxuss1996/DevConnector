@@ -55,7 +55,7 @@ export default function Home() {
           </Text>
 
           <Flex gap={3} wrap="wrap">
-            <Button colorPalette="brand" size="lg" asChild>
+            <Button colorPalette="blue" size="lg" asChild>
               <NextLink href="/register">
                 Create account <FiArrowRight />
               </NextLink>
@@ -71,7 +71,7 @@ export default function Home() {
           overflow="hidden"
           borderRadius="6px"
           borderWidth="1px"
-          borderColor="line"
+          borderColor="border"
           aspectRatio={{ base: "4 / 3", md: "5 / 6" }}
         >
           <Image
@@ -112,7 +112,7 @@ export default function Home() {
           What you get
         </Heading>
 
-        <Box borderTopWidth="1px" borderColor="line">
+        <Box borderTopWidth="1px" borderColor="border">
           {capabilities.map((item) => (
             <Flex
               key={item.title}
@@ -121,14 +121,14 @@ export default function Home() {
               gap={{ base: 2, md: 8 }}
               py={5}
               borderBottomWidth="1px"
-              borderColor="line"
+              borderColor="border"
             >
               <Flex
                 align="center"
                 gap={3}
                 md={{ width: "180px", flexShrink: 0 }}
               >
-                <Box as="span" color="brand.fg" aria-hidden display="flex">
+                <Box as="span" color="blue.solid" aria-hidden display="flex">
                   <item.icon />
                 </Box>
                 <Heading as="h3" size="md">

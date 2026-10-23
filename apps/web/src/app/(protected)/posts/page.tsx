@@ -25,9 +25,9 @@ function PostsContent() {
       </Text>
 
       <Box
-        bg="raised"
+        bg="bg.subtle"
         borderWidth="1px"
-        borderColor="line"
+        borderColor="border"
         borderRadius="6px"
         p={4}
         mb={8}
@@ -48,7 +48,7 @@ function PostsContent() {
 
       {/* One hairline-separated column rather than a stack of boxes, so the feed
           reads as a single chronicle instead of a pile of cards. */}
-      <Stack gap={0} borderTopWidth="1px" borderColor="line">
+      <Stack gap={0} borderTopWidth="1px" borderColor="border">
         {data?.posts.map((post) => (
           <PostCard key={post._id} post={post} onOpen={(id) => void setPostId(id)} />
         ))}

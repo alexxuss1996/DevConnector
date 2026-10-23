@@ -27,14 +27,14 @@ export function PageShell({
   maxW = "1200px",
 }: PageShellProps) {
   return (
-    <Flex direction="column" minH="100dvh" bg="canvas">
+    <Flex direction="column" minH="100dvh" bg="bg">
       <Box
         position="sticky"
         top={0}
         zIndex={10}
-        bg="panel"
+        bg="bg.panel"
         borderBottomWidth="1px"
-        borderColor="line"
+        borderColor="border"
       >
         <SiteHeader actions={headerActions} />
         {belowHeader}

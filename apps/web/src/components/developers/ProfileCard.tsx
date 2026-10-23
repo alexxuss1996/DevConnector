@@ -19,13 +19,13 @@ export function ProfileCard({
     <Box
       as="article"
       data-testid="profile-card"
-      bg="panel"
+      bg="bg.panel"
       borderWidth="1px"
-      borderColor="line"
+      borderColor="border"
       borderRadius="6px"
       p={5}
       transition="border-color 120ms ease"
-      _hover={{ borderColor: "brand.fg" }}
+      _hover={{ borderColor: "blue.solid" }}
     >
       <Flex gap={4} align="start">
         <Avatar name={profile.userId.name} flexShrink={0} />
@@ -43,12 +43,12 @@ export function ProfileCard({
             fontWeight="semibold"
             fontSize="md"
             color="fg"
-            _hover={{ color: "brand.fg" }}
+            _hover={{ color: "blue.solid" }}
           >
             {profile.userId.name ?? "Developer"}
           </Button>
 
-          <Text className="dc-mono" fontSize="xs" color="brand.fg" mt={1}>
+          <Text className="dc-mono" fontSize="xs" color="blue.solid" mt={1}>
             {profile.status}
           </Text>
 
@@ -60,7 +60,7 @@ export function ProfileCard({
 
           <Flex gap={1.5} wrap="wrap" mt={3}>
             {profile.skills.map((skill) => (
-              <Tag key={skill} size="sm" variant="subtle" colorPalette="brand" className="dc-mono">
+              <Tag key={skill} size="sm" variant="subtle" colorPalette="blue" className="dc-mono">
                 {skill}
               </Tag>
             ))}

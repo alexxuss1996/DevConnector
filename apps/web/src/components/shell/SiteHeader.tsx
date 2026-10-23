@@ -25,7 +25,7 @@ export function SiteHeader({ actions }: SiteHeaderProps) {
           <ChakraLink asChild color="fg" textDecoration="none" _hover={{ textDecoration: "none" }}>
             <NextLink href="/" aria-label="DevConnector home">
               <Flex align="center" gap={2}>
-                <Box aria-hidden boxSize="8px" bg="brand.fg" flexShrink={0} />
+                <Box aria-hidden boxSize="8px" bg="blue.solid" flexShrink={0} />
                 <Text fontWeight="semibold" fontSize="sm" letterSpacing="-0.01em">
                   DevConnector
                 </Text>
@@ -58,7 +58,7 @@ function SignedOutActions() {
       >
         <NextLink href={loginHref("/posts")}>Log in</NextLink>
       </ChakraLink>
-      <Button colorPalette="brand" size="sm" asChild>
+      <Button colorPalette="blue" size="sm" asChild>
         <NextLink href="/register">Create account</NextLink>
       </Button>
     </Flex>

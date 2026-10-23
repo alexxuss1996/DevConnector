@@ -7,7 +7,7 @@ import { loginHref } from "@/lib/auth-redirect";
 
 export function SiteFooter() {
   return (
-    <Box as="footer" borderTopWidth="1px" borderColor="line" bg="panel">
+    <Box as="footer" borderTopWidth="1px" borderColor="border" bg="bg.panel">
       <Box maxW="1080px" mx="auto" px={{ base: 4, md: 6 }} py={5}>
         <Flex justify="space-between" align="center" wrap="wrap" gap={3}>
           <Text fontSize="sm" color="muted">
@@ -25,7 +25,7 @@ export function SiteFooter() {
 
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <ChakraLink asChild color="fg" textDecoration="none" _hover={{ color: "brand.fg" }}>
+    <ChakraLink asChild color="fg" textDecoration="none" _hover={{ color: "blue.solid" }}>
       <NextLink href={href}>{children}</NextLink>
     </ChakraLink>
   );

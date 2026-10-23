@@ -48,9 +48,9 @@ function RegisterForm() {
   return (
     <PageShell maxW="460px">
       <Box
-        bg="panel"
+        bg="bg.panel"
         borderWidth="1px"
-        borderColor="line"
+        borderColor="border"
         borderRadius="6px"
         p={{ base: 5, md: 8 }}
       >
@@ -92,7 +92,7 @@ function RegisterForm() {
               })}
             />
           </Field>
-          <Button type="submit" loading={isSubmitting} colorPalette="brand">
+          <Button type="submit" loading={isSubmitting} colorPalette="blue">
             Create account
           </Button>
         </form>
@@ -100,7 +100,7 @@ function RegisterForm() {
         <Text mt={5} fontSize="sm" color="muted">
           Already have an account?{" "}
           <Link href={`/login?next=${encodeURIComponent(next || "/posts")}`}>
-            <Box as="span" color="brand.fg">
+            <Box as="span" color="blue.solid">
               Log in
             </Box>
           </Link>

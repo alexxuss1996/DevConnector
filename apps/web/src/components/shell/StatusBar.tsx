@@ -20,7 +20,7 @@ export function StatusBar({ detail }: { detail?: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <Box borderTopWidth="1px" borderColor="line">
+    <Box borderTopWidth="1px" borderColor="border">
       <Box maxW="1080px" mx="auto" px={{ base: 4, md: 6 }}>
         <Flex minH={8} align="center" gap={{ base: 4, md: 6 }} className="dc-mono" fontSize="xs">
           <Flex as="nav" gap={{ base: 4, md: 5 }}>
@@ -34,7 +34,7 @@ export function StatusBar({ detail }: { detail?: React.ReactNode }) {
                   textDecoration="none"
                   aria-current={active ? "page" : undefined}
                   borderBottomWidth="2px"
-                  borderColor={active ? "brand.solid" : "transparent"}
+                  borderColor={active ? "blue.solid" : "transparent"}
                   lineHeight="20px"
                   _hover={{ color: "fg", textDecoration: "none" }}
                 >

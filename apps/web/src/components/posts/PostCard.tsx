@@ -57,7 +57,7 @@ export function PostCard({ post, onOpen }: { post: Post; onOpen: (id: string) =>
       data-testid="post-card"
       py={5}
       borderBottomWidth="1px"
-      borderColor="line"
+      borderColor="border"
     >
       <Flex gap={3} align="start">
         <Avatar name={post.userId.name} size="sm" flexShrink={0} />
@@ -92,7 +92,7 @@ export function PostCard({ post, onOpen }: { post: Post; onOpen: (id: string) =>
               data-testid="like-button"
               size="xs"
               variant="ghost"
-              colorPalette="brand"
+              colorPalette="blue"
               onClick={toggleLike}
             >
               {liked ? "Unlike" : "Like"}

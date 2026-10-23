@@ -95,9 +95,9 @@ function CreateProfileForm() {
   return (
     <PageShell maxW="560px">
       <Box
-        bg="panel"
+        bg="bg.panel"
         borderWidth="1px"
-        borderColor="line"
+        borderColor="border"
         borderRadius="6px"
         p={{ base: 5, md: 8 }}
       >
@@ -140,7 +140,7 @@ function CreateProfileForm() {
           <Field label="Bio" invalid={!!errors.bio} errorText={errors.bio?.message}>
             <Input {...register("bio")} placeholder="I build APIs and the tools around them." />
           </Field>
-          <Button type="submit" loading={isSubmitting} colorPalette="brand">
+          <Button type="submit" loading={isSubmitting} colorPalette="blue">
             Save profile
           </Button>
         </form>
