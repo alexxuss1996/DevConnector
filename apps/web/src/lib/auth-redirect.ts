@@ -6,6 +6,11 @@ export function loginHref(next: string) {
   return `/login?next=${encodeURIComponent(next)}`;
 }
 
+/** Only same-site paths are safe redirect targets after login. */
+export function safeNextPath(next: string | null): string {
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
+
 /** True when the session is dead rather than the request being wrong. */
 export function isUnauthorizedError(err: unknown) {
   return err instanceof ApiError && err.status === 401;

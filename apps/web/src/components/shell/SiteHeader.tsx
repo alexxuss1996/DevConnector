@@ -1,14 +1,16 @@
 "use client";
 
 import NextLink from "next/link";
-import { Box, Flex, Link as ChakraLink, Text } from "@chakra-ui/react";
+import { Box, Flex, Link as ChakraLink, Skeleton, Text } from "@chakra-ui/react";
 
 import { Button } from "@/components/ui/button";
 import { ColorModeButton } from "@/components/ui/color-mode";
+import { ApiError } from "@/lib/api/client";
 import { loginHref } from "@/lib/auth-redirect";
+import { useLogoutMutation, useMyProfile } from "@/lib/queries";
 
 export interface SiteHeaderProps {
-  /** Replaces the default signed-out actions once a session exists. */
+  /** Replaces the session-aware actions (e.g. a route with its own chrome). */
   actions?: React.ReactNode;
 }
 
@@ -34,7 +36,7 @@ export function SiteHeader({ actions }: SiteHeaderProps) {
           </ChakraLink>
 
           <Flex align="center" gap={{ base: 2, md: 3 }}>
-            {actions ?? <SignedOutActions />}
+            {actions ?? <SessionActions />}
             {/* Own chrome rather than part of `actions`, so the switch appears
                 identically whether or not there is a session. */}
             <ColorModeButton size="sm" />
@@ -45,22 +47,42 @@ export function SiteHeader({ actions }: SiteHeaderProps) {
   );
 }
 
-function SignedOutActions() {
-  return (
-    <Flex align="center" gap={{ base: 3, md: 2 }}>
-      <ChakraLink
-        asChild
-        fontSize="sm"
-        color="muted"
-        textDecoration="none"
-        display={{ base: "none", sm: "inline" }}
-        _hover={{ color: "fg", textDecoration: "none" }}
-      >
-        <NextLink href={loginHref("/posts")}>Log in</NextLink>
-      </ChakraLink>
+function SessionActions() {
+  const { data, error, isLoading } = useMyProfile({ retry: false });
+  const logout = useLogoutMutation();
+
+  // Same probe the pages use: 401 means signed out, 404 means signed in but
+  // no profile yet.
+  const signedIn =
+    !!data || (error instanceof ApiError && error.status === 404);
+
+  if (isLoading) return <Skeleton height="32px" width="80px" />;
+
+  if (!signedIn) {
+    return (
       <Button colorPalette="blue" size="sm" asChild>
-        <NextLink href="/register">Create account</NextLink>
+        <NextLink href={loginHref("/")}>Sign in</NextLink>
       </Button>
-    </Flex>
+    );
+  }
+
+  return (
+    <>
+      <Text fontSize="sm" color="muted" truncate>
+        {data?.profile.userId.name ?? "Signed in"}
+      </Text>
+      <Button
+        size="sm"
+        variant="outline"
+        loading={logout.isPending}
+        onClick={() =>
+          logout.mutate(undefined, {
+            onSettled: () => window.location.assign("/"),
+          })
+        }
+      >
+        Sign out
+      </Button>
+    </>
   );
 }

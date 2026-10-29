@@ -15,7 +15,7 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
       attribute="class"
       // Without an explicit default, next-themes assumes "light". The product is
       // dark-first, so the OS preference decides until the visitor toggles it.
-      defaultTheme="light"
+      defaultTheme="system"
       disableTransitionOnChange
       {...props}
     />

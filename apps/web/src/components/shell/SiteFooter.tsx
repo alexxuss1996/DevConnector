@@ -14,8 +14,7 @@ export function SiteFooter() {
             DevConnector, an internal developer community
           </Text>
           <Flex gap={5} fontSize="sm">
-            <FooterLink href={loginHref("/posts")}>Log in</FooterLink>
-            <FooterLink href="/register">Create account</FooterLink>
+            <FooterLink href={loginHref("/")}>Sign in</FooterLink>
           </Flex>
         </Flex>
       </Box>

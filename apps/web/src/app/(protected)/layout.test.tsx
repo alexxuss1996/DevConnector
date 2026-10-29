@@ -19,6 +19,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/queries", () => ({
   useMyProfile: () => mocks.myProfile,
+  useLogoutMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import ProtectedLayout from "@/app/(protected)/layout";

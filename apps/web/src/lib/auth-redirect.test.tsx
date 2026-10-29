@@ -14,7 +14,12 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(""),
 }));
 
-import { isUnauthorizedError, loginHref, useUnauthorizedRedirect } from "@/lib/auth-redirect";
+import {
+  isUnauthorizedError,
+  loginHref,
+  safeNextPath,
+  useUnauthorizedRedirect,
+} from "@/lib/auth-redirect";
 
 describe("loginHref", () => {
   it("builds a login URL preserving next", () => {
@@ -22,6 +27,15 @@ describe("loginHref", () => {
     expect(loginHref("/posts?postId=6712abcd1234abcd1234abcd")).toBe(
       "/login?next=%2Fposts%3FpostId%3D6712abcd1234abcd1234abcd",
     );
+  });
+});
+
+describe("safeNextPath", () => {
+  it("keeps local paths and rejects external or protocol-relative ones", () => {
+    expect(safeNextPath("/posts?page=2")).toBe("/posts?page=2");
+    expect(safeNextPath("https://evil.example")).toBe("/");
+    expect(safeNextPath("//evil.example")).toBe("/");
+    expect(safeNextPath(null)).toBe("/");
   });
 });
 

@@ -1,146 +1,72 @@
 "use client";
 
-import Image from "next/image";
 import NextLink from "next/link";
-import { Box, Flex, Grid, Heading, Stack, Text } from "@chakra-ui/react";
-import { FiArrowRight, FiCode, FiUser, FiUsers } from "react-icons/fi";
+import { Button, Heading, Skeleton, Stack, Text } from "@chakra-ui/react";
 
 import { PageShell } from "@/components/shell/PageShell";
-import { Button } from "@/components/ui/button";
-import { loginHref } from "@/lib/auth-redirect";
+import { ApiError } from "@/lib/api/client";
+import { useLogoutMutation, useMyProfile } from "@/lib/queries";
 
-const capabilities = [
-  {
-    icon: FiCode,
-    title: "Share your work",
-    text: "Post an update, ask a question, and reply in the comments.",
-  },
-  {
-    icon: FiUser,
-    title: "Build your profile",
-    text: "Record your status, skills, experience, and education once, then reuse it anywhere.",
-  },
-  {
-    icon: FiUsers,
-    title: "Find your people",
-    text: "Browse the directory and open any profile to see what someone works with.",
-  },
-];
+export default function HomePage() {
+  const { data, error, isLoading } = useMyProfile({ retry: false });
+  const logout = useLogoutMutation();
 
-export default function Home() {
+  // `/profiles/me` 401s when signed out and 404s when signed in without a
+  // profile yet. Any other failure is treated as signed out so the page still
+  // offers a way in.
+  const signedIn =
+    !!data || (error instanceof ApiError && error.status === 404);
+  const signedOut = !isLoading && !signedIn;
+
+  const headerActions = isLoading ? (
+    <Skeleton height="32px" width="80px" />
+  ) : signedOut ? (
+    <Button size="sm" colorPalette="blue" asChild>
+      <NextLink href="/login">Sign in</NextLink>
+    </Button>
+  ) : (
+    <>
+      <Text fontSize="sm" color="muted" truncate>
+        {data?.profile.userId.name ?? "Signed in"}
+      </Text>
+      <Button
+        size="sm"
+        variant="outline"
+        loading={logout.isPending}
+        onClick={() =>
+          logout.mutate(undefined, {
+            onSettled: () => window.location.assign("/"),
+          })
+        }
+      >
+        Sign out
+      </Button>
+    </>
+  );
+
   return (
-    <PageShell>
-      {/* Asymmetric split: copy left, portrait crop of the photo right. The old
-          full-bleed scrim washed the photo out and read as a stock banner. */}
-      <Grid
-        as="section"
-        templateColumns={{ base: "1fr", md: "1.05fr 0.95fr" }}
-        gap={{ base: 10, md: 12 }}
-        alignItems="center"
-      >
-        <Stack gap={5} maxW="34rem">
-          <Heading
-            as="h1"
-            size={{ base: "2xl", md: "3xl" }}
-            lineHeight="1.05"
-            letterSpacing="-0.02em"
-          >
-            Welcome to DevConnector
-            <Box as="span" className="dc-caret" aria-hidden />
-          </Heading>
-
-          <Text fontSize={{ base: "md", md: "lg" }} color="muted" maxW="46ch">
-            The social network for developers. Share what you build, keep your
-            profile current, and find people working on the same stack.
-          </Text>
-
-          <Flex gap={3} wrap="wrap">
-            <Button colorPalette="blue" size="lg" asChild>
-              <NextLink href="/register">
-                Create account <FiArrowRight />
-              </NextLink>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <NextLink href={loginHref("/posts")}>Log in</NextLink>
-            </Button>
-          </Flex>
-        </Stack>
-
-        <Box
-          position="relative"
-          overflow="hidden"
-          borderRadius="6px"
-          borderWidth="1px"
-          borderColor="border"
-          aspectRatio={{ base: "4 / 3", md: "5 / 6" }}
-        >
-          <Image
-            src="/showcase.jpg"
-            alt="Developer typing code on laptop with an editor open"
-            fill
-            priority
-            sizes="(max-width: 768px) 100vw, 45vw"
-            style={{
-              objectFit: "cover",
-              filter: "grayscale(1) contrast(1.08) brightness(0.78)",
-            }}
-          />
-          <Box
-            aria-hidden
-            position="absolute"
-            inset={0}
-            bg="linear-gradient(200deg, rgba(255,166,87,0.10), rgba(11,14,17,0.72) 62%)"
-          />
-        </Box>
-      </Grid>
-
-      {/* A definition list, not a card row: three identical bordered boxes is
-          the single most recognisable generated-page tell there is. */}
-      <Stack
-        as="section"
-        aria-labelledby="capabilities"
-        gap={0}
-        mt={{ base: 16, md: 24 }}
-      >
-        <Heading
-          as="h2"
-          id="capabilities"
-          size="lg"
-          letterSpacing="-0.02em"
-          mb={6}
-        >
-          What you get
+    <PageShell headerActions={headerActions}>
+      <Stack gap={4} maxW="34rem">
+        <Heading as="h1" size={{ base: "2xl", md: "3xl" }}>
+          DevConnector
         </Heading>
-
-        <Box borderTopWidth="1px" borderColor="border">
-          {capabilities.map((item) => (
-            <Flex
-              key={item.title}
-              as="article"
-              direction={{ base: "column", md: "row" }}
-              gap={{ base: 2, md: 8 }}
-              py={5}
-              borderBottomWidth="1px"
-              borderColor="border"
-            >
-              <Flex
-                align="center"
-                gap={3}
-                md={{ width: "180px", flexShrink: 0 }}
-              >
-                <Box as="span" color="blue.solid" aria-hidden display="flex">
-                  <item.icon />
-                </Box>
-                <Heading as="h3" size="md">
-                  {item.title}
-                </Heading>
-              </Flex>
-              <Text color="muted" maxW="58ch">
-                {item.text}
-              </Text>
-            </Flex>
-          ))}
-        </Box>
+        <Text color="muted">
+          {isLoading
+            ? "Checking session…"
+            : signedOut
+              ? "You are signed out."
+              : "You are signed in."}
+        </Text>
+        {signedOut && (
+          <Button colorPalette="blue" alignSelf="flex-start" asChild>
+            <NextLink href="/login">Sign in</NextLink>
+          </Button>
+        )}
+        {!isLoading && !signedOut && (
+          <Button variant="outline" alignSelf="flex-start" asChild>
+            <NextLink href="/dashboard">Open dashboard</NextLink>
+          </Button>
+        )}
       </Stack>
     </PageShell>
   );
