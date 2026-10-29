@@ -1,25 +1,16 @@
 /* Colours, fonts and radii live in src/theme.ts as Chakra tokens. This file
-   holds the things that are not tokens, plus the font stacks.
+   holds the things that are not tokens.
 
-   next/font/local loads the Geist files and exposes --font-geist-sans and
-   --font-geist-mono, but Chakra emits its own --chakra-fonts-* variables
-   afterwards and wins any `:root` rule we write. So the stacks are declared
-   here instead, on selectors specific enough to beat it. The `dc-mono` class
-   is what the StatusBar and card metadata use for their small labels. */
+   next/font/google exposes --font-inter and --font-jetbrains-mono on <html>,
+   which the Chakra font tokens reference. The `dc-mono` class is what the
+   StatusBar and card metadata use for their small labels. */
 
 html body {
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
-}
-
-/* Chakra's Heading recipe reads --chakra-fonts-heading, and it emits that
-   variable on `:root` (specificity 0,1,0). A bare `:root` rule ties with it
-   and loses on order, so this one is written as `html:root` (0,1,1) to win. */
-html:root {
-  --chakra-fonts-heading: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
 }
 
 .dc-mono {
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
 @keyframes dc-caret-blink {
